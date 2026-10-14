@@ -1,0 +1,564 @@
+{
+  "$schema": "https://melvoridle.com/assets/schema/gameData.json",
+  "namespace": "worker_folks",
+  "data": {
+    "modifiers": [
+      {
+        "id": "folkFreeOvertime",
+        "allowedScopes": [
+          {
+            "scopes": {},
+            "descriptions": [
+              {
+                "text": "Overtime costs normal wages for every Folk",
+                "includeSign": false,
+                "lang": "MOD_WF_MODIFIER_folkFreeOvertime"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "pets": [
+      {
+        "id": "Bruno",
+        "name": "Bruno",
+        "media": "img/pet.png",
+        "hint": "Hint: Hiring",
+        "ignoreCompletion": false,
+        "activeInRaid": false,
+        "scaleChanceWithMasteryPool": false,
+        "skillID": "worker_folks:Hiring",
+        "modifiers": {
+          "worker_folks:folkStrikeGrace": 10,
+          "worker_folks:folkWageDiscount": 2
+        }
+      }
+    ],
+    "items": [
+      {
+        "itemType": "Equipment",
+        "id": "Overseers_Hat",
+        "name": "Overseers Hat",
+        "category": "Hiring",
+        "type": "Equipment",
+        "media": "img/town_helmet.png",
+        "ignoreCompletion": false,
+        "obtainFromItemLog": false,
+        "golbinRaidExclusive": false,
+        "sellsFor": 2000,
+        "customDescription": "+2% Hiring Skill XP<br><span class=\"text-warning\">With all four Overseers Outfit equipped: +8% Hiring Mastery XP</span>",
+        "tier": "none",
+        "validSlots": [
+          "Helmet"
+        ],
+        "occupiesSlots": [],
+        "equipRequirements": [],
+        "equipmentStats": [],
+        "modifiers": {
+          "skillXP": [
+            {
+              "skillID": "worker_folks:Hiring",
+              "value": 2
+            }
+          ]
+        }
+      },
+      {
+        "itemType": "Equipment",
+        "id": "Overseers_Body",
+        "name": "Overseers Body",
+        "category": "Hiring",
+        "type": "Equipment",
+        "media": "img/town_body.png",
+        "ignoreCompletion": false,
+        "obtainFromItemLog": false,
+        "golbinRaidExclusive": false,
+        "sellsFor": 2000,
+        "customDescription": "+2% Hiring Skill XP<br><span class=\"text-warning\">With all four Overseers Outfit equipped: +8% Hiring Mastery XP</span>",
+        "tier": "none",
+        "validSlots": [
+          "Platebody"
+        ],
+        "occupiesSlots": [],
+        "equipRequirements": [],
+        "equipmentStats": [],
+        "modifiers": {
+          "skillXP": [
+            {
+              "skillID": "worker_folks:Hiring",
+              "value": 2
+            }
+          ]
+        }
+      },
+      {
+        "itemType": "Equipment",
+        "id": "Overseers_Leggings",
+        "name": "Overseers Leggings",
+        "category": "Hiring",
+        "type": "Equipment",
+        "media": "img/town_legs.png",
+        "ignoreCompletion": false,
+        "obtainFromItemLog": false,
+        "golbinRaidExclusive": false,
+        "sellsFor": 2000,
+        "customDescription": "+2% Hiring Skill XP<br><span class=\"text-warning\">With all four Overseers Outfit equipped: +8% Hiring Mastery XP</span>",
+        "tier": "none",
+        "validSlots": [
+          "Platelegs"
+        ],
+        "occupiesSlots": [],
+        "equipRequirements": [],
+        "equipmentStats": [],
+        "modifiers": {
+          "skillXP": [
+            {
+              "skillID": "worker_folks:Hiring",
+              "value": 2
+            }
+          ]
+        }
+      },
+      {
+        "itemType": "Equipment",
+        "id": "Overseers_Boots",
+        "name": "Overseers Boots",
+        "category": "Hiring",
+        "type": "Equipment",
+        "media": "img/town_boots.png",
+        "ignoreCompletion": false,
+        "obtainFromItemLog": false,
+        "golbinRaidExclusive": false,
+        "sellsFor": 2000,
+        "customDescription": "+2% Hiring Skill XP<br><span class=\"text-warning\">With all four Overseers Outfit equipped: +8% Hiring Mastery XP</span>",
+        "tier": "none",
+        "validSlots": [
+          "Boots"
+        ],
+        "occupiesSlots": [],
+        "equipRequirements": [],
+        "equipmentStats": [],
+        "modifiers": {
+          "skillXP": [
+            {
+              "skillID": "worker_folks:Hiring",
+              "value": 2
+            }
+          ]
+        }
+      },
+      {
+        "itemType": "Equipment",
+        "id": "Hiring_Skillcape",
+        "name": "Hiring Skillcape",
+        "category": "Combat",
+        "type": "Armour",
+        "media": "img/skillcape.png",
+        "ignoreCompletion": false,
+        "obtainFromItemLog": false,
+        "golbinRaidExclusive": false,
+        "sellsFor": 250000,
+        "tier": "Skillcape",
+        "validSlots": [
+          "Cape"
+        ],
+        "occupiesSlots": [],
+        "equipRequirements": [
+          {
+            "type": "SkillLevel",
+            "skillID": "worker_folks:Hiring",
+            "level": 99
+          }
+        ],
+        "equipmentStats": [
+          {
+            "key": "meleeDefenceBonus",
+            "value": 9
+          },
+          {
+            "key": "rangedDefenceBonus",
+            "value": 9
+          },
+          {
+            "key": "magicDefenceBonus",
+            "value": 9
+          }
+        ],
+        "modifiers": {
+          "worker_folks:folkWageDiscount": 5,
+          "worker_folks:folkCooldown": -10
+        }
+      }
+    ],
+    "itemSynergies": [
+      {
+        "itemIDs": [
+          "worker_folks:Overseers_Hat",
+          "worker_folks:Overseers_Body",
+          "worker_folks:Overseers_Leggings",
+          "worker_folks:Overseers_Boots"
+        ],
+        "playerModifiers": {
+          "masteryXP": [
+            {
+              "skillID": "worker_folks:Hiring",
+              "value": 8
+            }
+          ]
+        }
+      }
+    ],
+    "ancientRelics": [
+      {
+        "id": "HiringRelic1",
+        "name": "Hiring Relic 1",
+        "skillID": "worker_folks:Hiring",
+        "number": 1,
+        "modifiers": {
+          "masteryXP": [
+            {
+              "skillID": "worker_folks:Hiring",
+              "realmID": "melvorD:Melvor",
+              "value": 50
+            }
+          ]
+        }
+      },
+      {
+        "id": "HiringRelic2",
+        "name": "Hiring Relic 2",
+        "skillID": "worker_folks:Hiring",
+        "number": 2,
+        "modifiers": {
+          "worker_folks:folkWageDiscount": 10
+        }
+      },
+      {
+        "id": "HiringRelic3",
+        "name": "Hiring Relic 3",
+        "skillID": "worker_folks:Hiring",
+        "number": 3,
+        "modifiers": {
+          "currencyGain": [
+            {
+              "currencyID": "melvorD:GP",
+              "value": 10
+            }
+          ]
+        }
+      },
+      {
+        "id": "HiringRelic4",
+        "name": "Hiring Relic 4",
+        "skillID": "worker_folks:Hiring",
+        "number": 4,
+        "modifiers": {
+          "skillInterval": -3
+        }
+      },
+      {
+        "id": "HiringRelic5",
+        "name": "Hiring Relic 5",
+        "skillID": "worker_folks:Hiring",
+        "number": 5,
+        "modifiers": {
+          "skillXP": [
+            {
+              "skillID": "worker_folks:Hiring",
+              "value": 25
+            }
+          ],
+          "worker_folks:folkCooldown": -25
+        }
+      },
+      {
+        "id": "HiringMasterRelic",
+        "name": "Hiring Master Relic",
+        "skillID": "worker_folks:Hiring",
+        "number": 6,
+        "modifiers": {
+          "worker_folks:folkFreeOvertime": 1,
+          "minHitBasedOnMaxHit": 5,
+          "nonCombatSkillXP": 5
+        }
+      }
+    ],
+    "ancientRelicsDisplayOrder": [
+      {
+        "insertAt": "End",
+        "ids": [
+          "worker_folks:Hiring"
+        ]
+      }
+    ],
+    "shopPurchases": [
+      {
+        "id": "Overseers_Hat",
+        "media": "img/town_helmet.png",
+        "category": "melvorF:Township",
+        "contains": {
+          "items": [
+            {
+              "id": "worker_folks:Overseers_Hat",
+              "quantity": 1
+            }
+          ]
+        },
+        "cost": {
+          "items": [],
+          "currencies": [
+            {
+              "currency": "melvorD:GP",
+              "type": "Fixed",
+              "cost": 100000
+            }
+          ]
+        },
+        "allowQuantityPurchase": false,
+        "unlockRequirements": [],
+        "purchaseRequirements": [
+          {
+            "type": "SkillLevel",
+            "skillID": "melvorD:Township",
+            "level": 10
+          },
+          {
+            "type": "TownshipTask",
+            "count": 20
+          }
+        ],
+        "defaultBuyLimit": 0,
+        "buyLimitOverrides": [],
+        "showBuyLimit": false
+      },
+      {
+        "id": "Overseers_Body",
+        "media": "img/town_body.png",
+        "category": "melvorF:Township",
+        "contains": {
+          "items": [
+            {
+              "id": "worker_folks:Overseers_Body",
+              "quantity": 1
+            }
+          ]
+        },
+        "cost": {
+          "items": [],
+          "currencies": [
+            {
+              "currency": "melvorD:GP",
+              "type": "Fixed",
+              "cost": 100000
+            }
+          ]
+        },
+        "allowQuantityPurchase": false,
+        "unlockRequirements": [],
+        "purchaseRequirements": [
+          {
+            "type": "SkillLevel",
+            "skillID": "melvorD:Township",
+            "level": 20
+          },
+          {
+            "type": "TownshipTask",
+            "count": 40
+          }
+        ],
+        "defaultBuyLimit": 0,
+        "buyLimitOverrides": [],
+        "showBuyLimit": false
+      },
+      {
+        "id": "Overseers_Leggings",
+        "media": "img/town_legs.png",
+        "category": "melvorF:Township",
+        "contains": {
+          "items": [
+            {
+              "id": "worker_folks:Overseers_Leggings",
+              "quantity": 1
+            }
+          ]
+        },
+        "cost": {
+          "items": [],
+          "currencies": [
+            {
+              "currency": "melvorD:GP",
+              "type": "Fixed",
+              "cost": 100000
+            }
+          ]
+        },
+        "allowQuantityPurchase": false,
+        "unlockRequirements": [],
+        "purchaseRequirements": [
+          {
+            "type": "SkillLevel",
+            "skillID": "melvorD:Township",
+            "level": 40
+          },
+          {
+            "type": "TownshipTask",
+            "count": 60
+          }
+        ],
+        "defaultBuyLimit": 0,
+        "buyLimitOverrides": [],
+        "showBuyLimit": false
+      },
+      {
+        "id": "Overseers_Boots",
+        "media": "img/town_boots.png",
+        "category": "melvorF:Township",
+        "contains": {
+          "items": [
+            {
+              "id": "worker_folks:Overseers_Boots",
+              "quantity": 1
+            }
+          ]
+        },
+        "cost": {
+          "items": [],
+          "currencies": [
+            {
+              "currency": "melvorD:GP",
+              "type": "Fixed",
+              "cost": 100000
+            }
+          ]
+        },
+        "allowQuantityPurchase": false,
+        "unlockRequirements": [],
+        "purchaseRequirements": [
+          {
+            "type": "SkillLevel",
+            "skillID": "melvorD:Township",
+            "level": 60
+          },
+          {
+            "type": "TownshipTask",
+            "count": 80
+          }
+        ],
+        "defaultBuyLimit": 0,
+        "buyLimitOverrides": [],
+        "showBuyLimit": false
+      },
+      {
+        "id": "Hiring_Skillcape",
+        "media": "img/skillcape.png",
+        "category": "melvorD:Skillcapes",
+        "contains": {
+          "items": [
+            {
+              "id": "worker_folks:Hiring_Skillcape",
+              "quantity": 1
+            }
+          ]
+        },
+        "cost": {
+          "items": [],
+          "currencies": [
+            {
+              "currency": "melvorD:GP",
+              "type": "Fixed",
+              "cost": 1000000
+            }
+          ]
+        },
+        "allowQuantityPurchase": false,
+        "unlockRequirements": [],
+        "purchaseRequirements": [
+          {
+            "type": "SkillLevel",
+            "skillID": "worker_folks:Hiring",
+            "level": 99
+          }
+        ],
+        "defaultBuyLimit": 1,
+        "buyLimitOverrides": [],
+        "showBuyLimit": false
+      }
+    ],
+    "skillData": [
+      {
+        "skillID": "worker_folks:Hiring",
+        "data": {
+          "pets": [
+            "worker_folks:Bruno"
+          ],
+          "ancientRelicSets": [
+            {
+              "realmID": "melvorD:Melvor",
+              "relicDrops": [
+                {
+                  "relicID": "worker_folks:HiringRelic1",
+                  "requirements": [],
+                  "chance": {
+                    "type": "Fixed",
+                    "chance": 0.0005
+                  }
+                },
+                {
+                  "relicID": "worker_folks:HiringRelic2",
+                  "requirements": [],
+                  "chance": {
+                    "type": "Fixed",
+                    "chance": 0.0005
+                  }
+                },
+                {
+                  "relicID": "worker_folks:HiringRelic3",
+                  "requirements": [],
+                  "chance": {
+                    "type": "Fixed",
+                    "chance": 0.0005
+                  }
+                },
+                {
+                  "relicID": "worker_folks:HiringRelic4",
+                  "requirements": [],
+                  "chance": {
+                    "type": "Fixed",
+                    "chance": 0.0005
+                  }
+                },
+                {
+                  "relicID": "worker_folks:HiringRelic5",
+                  "requirements": [],
+                  "chance": {
+                    "type": "Fixed",
+                    "chance": 0.0005
+                  }
+                }
+              ],
+              "completedRelicID": "worker_folks:HiringMasterRelic",
+              "levelUpUnlocks": [
+                20,
+                99
+              ]
+            }
+          ],
+          "minibar": {
+            "defaultItems": [
+              "worker_folks:Hiring_Skillcape",
+              "worker_folks:Overseers_Hat",
+              "worker_folks:Overseers_Body",
+              "worker_folks:Overseers_Leggings",
+              "worker_folks:Overseers_Boots"
+            ],
+            "pets": [
+              "worker_folks:Bruno"
+            ],
+            "upgrades": []
+          }
+        }
+      }
+    ]
+  }
+}

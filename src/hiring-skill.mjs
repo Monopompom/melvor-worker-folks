@@ -1,0 +1,836 @@
+// The Hiring skill: a SkillWithMastery whose mastery actions are Folk slots.
+// A fixed pool of slots is registered from data (registration happens before the
+// save is read, and other mods may add skills later), and only the first
+// `delegableCount` slots are exposed to the mastery UI, pool cap and token odds.
+
+export const SKILL_ID = 'worker_folks:Hiring';
+export const MAX_FOLK_SLOTS = 24;
+/** Shop purchase ids (local part) per tier. */
+export const LICENCE_PURCHASE = { Newbie: 'Licence_Newbie', Junior: 'Licence_Junior', Middle: 'Licence_Middle', Senior: 'Licence_Senior', Expert: 'Licence_Expert' };
+export const HIRE_PURCHASE = { Newbie: 'Hire_Newbie', Junior: 'Hire_Junior', Middle: 'Hire_Middle', Senior: 'Hire_Senior', Expert: 'Hire_Expert' };
+export const SHIFT_SLOT_PURCHASE = 'Shift_Slot';
+/** Marks the start of mod data inside the skill's save region ("WOLK"). */
+export const SAVE_MAGIC = 0x574f4c4b;
+
+export function createHiringClass({ selectDelegable, log, createCrew, createEventBus, folkModel, pickName, renderFolkCards, renderReservePanel, produceRate, rules, perks, promotion, pricing }) {
+  class FolkSlotAction extends MasteryAction {
+    constructor(namespace, data, game, skill) {
+      super(namespace, data, game);
+      this.index = data.index;
+      this.hiring = skill;
+    }
+    get name() {
+      return this.hiring.getSlotName(this);
+    }
+    get media() {
+      return this.hiring.getSlotMedia(this);
+    }
+  }
+
+  class Hiring extends SkillWithMastery {
+    constructor(namespace, game) {
+      super(namespace, 'Hiring', game, 'FolkSlot');
+      this._media = 'img/icon_no_bg.png';
+      this.renderQueue = new MasterySkillRenderQueue();
+      /** Active actions a Folk may hold, computed on character load. */
+      this.delegableSkills = [];
+      /** Skill ids excluded by the player (settings, later ticket). */
+      this.excludedSkillIds = [];
+      /** Mod-wide event bus; other slices subscribe here instead of patching each other. */
+      this.events = createEventBus();
+      /** Every hired Folk. Persisted inside this skill's save region (see encode). */
+      this.crew = createCrew({
+        bus: this.events,
+        model: folkModel,
+        pickName,
+        maxSlots: MAX_FOLK_SLOTS,
+      });
+      this.renderQueue.folks = false;
+      /** Skills currently running beside the main action (delegation.mjs). */
+      this.delegated = new Set();
+      /** The delegated skill whose stop() is in progress (delegation.mjs). */
+      this.stopping = undefined;
+      /**
+       * skill → folk id | null: a working Folk picked on another page moves when that page
+       * starts; null means the player takes the skill over at its next start.
+       */
+      this.pending = new Map();
+      /** Testing aid: extra Shift Slots granted by the dev console (not saved). */
+      this.devExtraShiftSlots = 0;
+      /** { folk, skill, table, outcome } while a delegated skill resolves (acting.mjs). */
+      this.acting = undefined;
+      /** Outcome of the most recent delegated action: 'fail' | 'ok' | 'bonus'. */
+      this.lastOutcome = undefined;
+      this.events.on('crewChanged', () => {
+        this.renderQueue.folks = true;
+        this.sortedMasteryActions.forEach((a) => this.renderQueue.actionMastery.add(a));
+      });
+      this.events.on('folkReleased', ({ skill: released, folk }) => {
+        if (folk === undefined) return;
+        this.pending.forEach((id, skill) => {
+          if (id === folk.id || (id === null && skill === released)) this.applyPending(skill);
+        });
+      });
+      this.events.on('folkFired', ({ folk }) => {
+        this.pending.forEach((id, skill) => { if (id === folk.id) this.clearPending(skill); });
+        this.resetSlotMastery(folk.slot);
+      });
+      /** Cards unfolded by the player (not saved). */
+      this.expanded = new Set();
+    }
+
+    // ---- persistence -------------------------------------------------------
+    // Folks live in the game save (cloud-synced, no 8 KB characterStorage cap).
+    // The game wraps each skill's region with a byte length, so a save made with
+    // this mod still loads when the mod is removed. A magic word guards against
+    // saves written by builds that wrote nothing after the base skill data.
+
+    encode(writer) {
+      super.encode(writer);
+      writer.writeUint32(SAVE_MAGIC);
+      writer.writeString(this.crew.serialize());
+      return writer;
+    }
+
+    decode(reader, version) {
+      super.decode(reader, version);
+      if (peekUint32(reader) !== SAVE_MAGIC) return;
+      reader.getUint32();
+      const json = reader.getString();
+      const report = this.crew.load(json);
+      if (report.corrupt) console.warn('[Worker Folks] crew data was unreadable; starting with an empty crew');
+      if (report.applied.length > 0) log(`migrated crew save from v${report.applied[0]} to v${folkModel.SAVE_VERSION}`);
+      if (report.dropped > 0) console.warn(`[Worker Folks] dropped ${report.dropped} invalid Folk record(s)`);
+    }
+
+    // ---- presentation --------------------------------------------------------
+
+    roleName(tier) {
+      return getLangString(`MOD_WF_ROLE_${tier}`);
+    }
+
+    portrait(tier) {
+      return this.getMediaURL(`img/worker_folk_${tier.toLowerCase()}.png`);
+    }
+
+    statusOf(folk) {
+      if (folk.onStrike) return 'strike';
+      if (folk.cooldownTicks > 0) return 'cooldown';
+      if (folk.debt > 0) return 'debt';
+      const skill = this.skillOf(folk);
+      if (skill === undefined || !this.delegated.has(skill)) return 'idle';
+      return this.perksOf(folk).overtimeActive ? 'overtime' : 'working';
+    }
+
+    /** May the Folk start work? Debt alone is fine (grace time); strikes and cooldowns are not. */
+    folkAvailable(folk) {
+      const status = this.statusOf(folk);
+      return status !== 'cooldown' && status !== 'strike';
+    }
+
+    stopFolk(folk) {
+      const skill = this.skillOf(folk);
+      if (skill === undefined || !this.delegated.has(skill)) return false;
+      const stopped = skill.stop();
+      this.renderQueue.folks = true;
+      return stopped;
+    }
+
+    /**
+     * Ends a delegated run no matter what: a death, a strike or a firing must not
+     * leave the skill active. Thieving refuses stop() while stunned, so the stun is
+     * cleared first (the engine does the same in its own stopOnDeath). When the
+     * engine still refuses (Golbin Raid) the skill is dropped from the roster.
+     */
+    forceStop(skill) {
+      if (skill === undefined || !this.delegated.has(skill)) return; // never touches the player's own run
+      if (skill.stunTimer !== undefined && 'stunState' in skill) {
+        skill.stunState = 0;
+        skill.stunTimer.stop();
+      }
+      if (!skill.stop()) this.release(skill);
+      // stop() inside an action: GatheringSkill.action restarts the timer afterwards
+      // (acting.mjs clears it); outside one, nothing should keep ticking.
+      if (!skill.isActive && skill.actionTimer?.isActive && this.acting?.skill !== skill) skill.actionTimer.stop();
+      skill.renderQueue.progressBar = true;
+    }
+
+    /** What a delegated skill is doing right now (tree, recipe, NPC...) as `{ name, media }`, or null. */
+    currentAction(skill) {
+      if (skill === undefined || !this.delegated.has(skill)) return null;
+      try {
+        const action = skill.masteryAction;
+        if (typeof action?.name !== 'string') return null;
+        let media;
+        try { media = action.media; } catch { media = undefined; }
+        return { name: action.name, media: typeof media === 'string' ? media : undefined };
+      } catch {
+        return null;
+      }
+    }
+
+    currentActionName(skill) {
+      return this.currentAction(skill)?.name ?? null;
+    }
+
+    /** Hourly wage for working `skill` as `{ text, icon }` (its currency), or null when wages are off. */
+    wageLine(folk, skill) {
+      const payroll = this.payroll;
+      if (payroll === undefined || !payroll.enabled) return null;
+      const currencyId = payroll.currencyIdFor(skill);
+      const currency = this.game.currencies.getObjectByID(currencyId);
+      return {
+        text: templateLangString('MOD_WF_CTRL_WAGE', { wage: numberWithCommas(Math.round(payroll.hourlyWageOf(folk))), currency: currency?.name ?? currencyId }),
+        icon: currency?.media,
+      };
+    }
+
+    /**
+     * Worker-modal tile lines under "name (role)", styled like the Hiring card:
+     * Produce Rate (blue badge) and wage (yellow badge) on their own lines, the tier effects in italics,
+     * then the status in colour with its icon, skill and action ("Idle · Fishing · Raw Shrimp").
+     */
+    folkLines(folk, pageSkill) {
+      const lines = [{ badges: [{ cls: 'badge badge-info', text: templateLangString('MOD_WF_CARD_RATE', { rate: `${produceRate.produceRate(folk.tier)}` }) }] }];
+      const wage = this.wageLine(folk, pageSkill);
+      if (wage !== null) lines.push({ badges: [{ cls: 'badge badge-warning', text: wage.text }] });
+      const effects = this.tierEffectTexts(folk.tier);
+      if (effects.length > 0) lines.push({ text: effects.join(' · '), cls: 'font-italic text-muted' });
+      const status = this.statusOf(folk);
+      const skill = this.skillOf(folk);
+      const cls = `wf-text-${status} font-w700`;
+      lines.push({ icon: this.getMediaURL(`img/status_${status}.png`), text: getLangString(`MOD_WF_STATUS_${status}`), cls });
+      if (folk.skillId !== null) {
+        // "⛏ Woodcutting (🌳 Oak Tree)": skill icon + name, then the current action in brackets.
+        const segments = [{ icon: this.game.skills.getObjectByID(folk.skillId)?.media, text: this.skillName(folk.skillId) }];
+        const action = this.currentAction(skill);
+        if (action !== null) segments.push({ text: ' (' }, { icon: action.media, text: action.name }, { text: ')' });
+        lines.push({ segments, cls });
+      }
+      return lines;
+    }
+
+    skillName(skillId) {
+      const skill = this.game.skills.getObjectByID(skillId);
+      return skill !== undefined ? skill.name : skillId;
+    }
+
+    /** Entries for a skill page's Worker dropdown. */
+    workerOptions(skill) {
+      return rules.workerOptions({
+        folks: this.crew.all.map((f) => ({ id: f.id, name: f.name, tier: f.tier, skillId: f.skillId, available: this.folkAvailable(f), lines: this.folkLines(f, skill) })),
+        skillId: skill.id,
+        skillNameOf: (id) => this.skillName(id),
+      });
+    }
+
+    /**
+     * Who takes this skill at its next start: a Folk waiting to move here, null when
+     * the player takes it back from a working Folk, undefined when nothing is pending.
+     */
+    pendingFor(skill) {
+      const id = this.pending.get(skill);
+      if (id === undefined) return undefined;
+      if (id === null) return null;
+      const folk = this.crew.byId(id);
+      if (folk === undefined) this.pending.delete(skill);
+      return folk;
+    }
+
+    clearPending(skill) {
+      if (this.pending.delete(skill)) this.events.emit('folkPending', { skill, folk: undefined });
+    }
+
+    /**
+     * Puts a Folk on a skill (folkId null: the player works it; the holder is unassigned).
+     * A Folk busy on another skill keeps working there until this skill is started, and a
+     * Folk working this skill keeps going until the player starts an action here.
+     */
+    setWorker(skill, folkId) {
+      this.clearPending(skill);
+      if (folkId === null) {
+        const holder = this.crew.bySkill(skill.id);
+        if (holder === undefined) return true;
+        if (rules.releaseMode({ working: this.delegated.has(skill) }) === 'now') return this.crew.assign(holder.id, null);
+        this.pending.set(skill, null);
+        this.events.emit('folkPending', { skill, folk: null });
+        return true;
+      }
+      const folk = this.crew.byId(folkId);
+      if (folk === undefined) return false;
+      const current = this.skillOf(folk);
+      const mode = rules.moveMode({
+        currentSkillId: folk.skillId,
+        targetSkillId: skill.id,
+        working: current !== undefined && this.delegated.has(current),
+      });
+      if (mode === 'none') return true;
+      if (mode === 'now') return this.crew.assign(folkId, skill.id);
+      this.pending.forEach((id, other) => { if (id === folkId) this.pending.delete(other); });
+      this.pending.set(skill, folkId);
+      this.events.emit('folkPending', { skill, folk });
+      return true;
+    }
+
+    /**
+     * Called when a skill starts: a pending Folk moves onto it now (its old skill stops),
+     * or the player takes it back (the working Folk is unassigned and stops).
+     */
+    applyPending(skill) {
+      const folk = this.pendingFor(skill);
+      if (folk === undefined) return;
+      this.pending.delete(skill);
+      if (folk === null) {
+        const holder = this.crew.bySkill(skill.id);
+        if (holder !== undefined) this.crew.assign(holder.id, null);
+        else this.events.emit('folkPending', { skill, folk: undefined });
+        return;
+      }
+      this.crew.assign(folk.id, skill.id);
+    }
+
+    assignmentText(folk) {
+      if (folk.skillId === null) return getLangString('MOD_WF_UNASSIGNED');
+      const skill = this.game.skills.getObjectByID(folk.skillId);
+      return skill !== undefined ? skill.name : folk.skillId;
+    }
+
+    renderReserve() {
+      const payroll = this.payroll;
+      if (payroll === undefined) return;
+      const capacityHours = payroll.capacityHours();
+      renderReservePanel({
+        enabled: payroll.enabled,
+        lockedText: this.levels !== undefined && capacityHours === 0 ? templateLangString('MOD_WF_RESERVE_LOCKED', { level: `${this.levels.reserveLevel}` }) : undefined,
+        capacityText: capacityHours > 0 ? templateLangString('MOD_WF_RESERVE_CAPACITY', { hours: `${capacityHours}` }) : '',
+        media: this.getMediaURL('img/payroll_reserve.png'),
+        currencies: ['melvorD:GP', 'melvorItA:AbyssalPieces']
+          .map((id) => ({ id, currency: this.game.currencies.getObjectByID(id) }))
+          .filter(({ id, currency }) => currency !== undefined && (id === 'melvorD:GP' || this.crew.reserveOf(id) > 0 || (payroll.crewPerHour()[id] ?? 0) > 0))
+          .map(({ id, currency }) => ({
+            id,
+            name: currency.name,
+            media: currency.media,
+            amount: this.crew.reserveOf(id),
+            perHour: Math.round(payroll.crewPerHour()[id] ?? 0),
+            hours: payroll.hoursCovered(id),
+            capacity: payroll.capacityOf(id),
+            room: payroll.roomFor(id),
+            bank: currency.amount,
+          })),
+        onDeposit: (id, amount) => payroll.deposit(id, amount),
+      });
+    }
+
+    renderFolks() {
+      if (!this.renderQueue.folks) return;
+      this.renderReserve();
+      const done = renderFolkCards(this.crew.all, {
+        roleName: (tier) => this.roleName(tier),
+        portrait: (tier) => this.portrait(tier),
+        status: (folk) => this.statusOf(folk),
+        statusIcon: (status) => this.getMediaURL(`img/status_${status}.png`),
+        statusText: (status) => getLangString(`MOD_WF_STATUS_${status}`),
+        assignmentText: (folk) => this.assignmentText(folk),
+        skillMedia: (folk) => this.skillOf(folk)?.media,
+        rateText: (folk) => templateLangString('MOD_WF_CARD_RATE', { rate: `${produceRate.produceRate(folk.tier)}` }),
+        effectTexts: (folk) => this.tierEffectTexts(folk.tier),
+        isWorking: (folk) => {
+          const skill = this.skillOf(folk);
+          return skill !== undefined && this.delegated.has(skill);
+        },
+        detailText: (folk) => {
+          const skill = this.skillOf(folk);
+          if (skill === undefined) return getLangString('MOD_WF_CARD_SKILL_NONE');
+          if (!this.delegated.has(skill)) return templateLangString('MOD_WF_CARD_READY', { skill: skill.name });
+          const action = this.currentActionName(skill);
+          return action === null ? getLangString('MOD_WF_CARD_WORKING') : templateLangString('MOD_WF_CARD_WORKING_ON', { action });
+        },
+        onStop: (folk) => this.stopFolk(folk),
+        stopText: () => getLangString('MOD_WF_BUTTON_STOP'),
+        wageText: (folk) => {
+          const payroll = this.payroll;
+          if (payroll === undefined || !payroll.enabled) return '';
+          return templateLangString('MOD_WF_CARD_WAGE', { wage: numberWithCommas(Math.round(payroll.hourlyWageOf(folk))) });
+        },
+        strikeInfo: (folk) => {
+          const payroll = this.payroll;
+          if (payroll === undefined) return null;
+          if (!folk.onStrike) {
+            const d = this.debtText(folk);
+            return d === null ? null : { debtOnly: true, owedText: templateLangString('MOD_WF_DEBT_OWED', { amount: d.amount, minutes: d.minutes }) };
+          }
+          const fmt = (parts) => Object.entries(parts).map(([id, amount]) => `${numberWithCommas(amount)} ${this.game.currencies.getObjectByID(id)?.name ?? id}`).join(' + ');
+          const plain = payroll.settlementOf(folk);
+          const apology = payroll.settlementOf(folk, { apology: true });
+          return {
+            owedText: templateLangString('MOD_WF_STRIKE_OWED', { amount: fmt({ [plain.debtCurrency]: plain.debt }), severance: numberWithCommas(plain.severance) }),
+            settleText: templateLangString('MOD_WF_BUTTON_SETTLE', { amount: fmt(plain.parts) }),
+            apologyText: this.levels !== undefined && !this.levels.apologyUnlocked()
+              ? `${templateLangString('MOD_WF_BUTTON_APOLOGY', { amount: fmt(apology.parts) })} (${this.levels.lockText(this.levels.apologyLevel)})`
+              : templateLangString('MOD_WF_BUTTON_APOLOGY', { amount: fmt(apology.parts) }),
+            canSettle: payroll.canSettle(folk),
+            canApologise: payroll.canSettle(folk, { apology: true }),
+            onSettle: () => payroll.settle(folk),
+            onApologise: () => payroll.settle(folk, { apology: true }),
+          };
+        },
+        masterySlot: (folk) => this.slotOf(folk),
+        masteryProgress: (folk) => this.masteryProgressOf(folk),
+        skill: this,
+        isExpanded: (folk) => this.expanded.has(folk.id),
+        onToggleExpand: (folk) => {
+          if (!this.expanded.delete(folk.id)) this.expanded.add(folk.id);
+          this.renderQueue.folks = true;
+        },
+        detailsText: () => getLangString('MOD_WF_BUTTON_DETAILS'),
+        promoteText: () => (this.levels !== undefined && !this.levels.promotionsUnlocked()
+          ? `${getLangString('MOD_WF_BUTTON_PROMOTE')} (${this.levels.lockText(this.levels.promotionLevel)})`
+          : getLangString('MOD_WF_BUTTON_PROMOTE')),
+        fireText: () => getLangString('MOD_WF_BUTTON_FIRE'),
+        canPromote: (folk) => promotion.NEXT_TIER[folk.tier] !== null,
+        promoteReady: (folk) => this.promotionPlanFor(folk).ok,
+        onPromote: (folk) => this.promote(folk),
+        onFire: (folk) => this.fire(folk),
+        perkLines: (folk) => this.perkLines(folk),
+        overtime: (folk) => {
+          const p = this.perksOf(folk);
+          // The button exists only once mastery 30 unlocks it; the perk list already explains the effect.
+          return { unlocked: p.overtimeUnlocked, on: p.overtimeActive, text: getLangString(p.overtimeActive ? 'MOD_WF_OVERTIME_ON' : 'MOD_WF_OVERTIME_OFF') };
+        },
+        onToggleOvertime: (folk) => this.setOvertime(folk, !folk.overtime),
+        perksTitle: () => getLangString('MOD_WF_PERKS_TITLE'),
+        gearText: () => getLangString('MOD_WF_BUTTON_GEAR'),
+        onGear: (folk) => this.loadout?.openLoadout(folk),
+        hp: (folk) => this.health?.hpView(folk),
+        frozenSlots: () => this.health?.frozenSlotsView() ?? [],
+        frozenTitle: () => getLangString('MOD_WF_SLOT_FROZEN_TITLE'),
+        frozenReason: () => this.health?.freezeReason() ?? '',
+        cooldownText: (folk) => (folk.cooldownTicks > 0 ? templateLangString('MOD_WF_CARD_COOLDOWN', { time: formatAsShorthandTimePeriod(folk.cooldownTicks * TICK_INTERVAL, true) }) : ''),
+      });
+      if (done) this.renderQueue.folks = false;
+    }
+
+    render() {
+      super.render();
+      this.renderFolks();
+    }
+
+    /** Cards show live skill state: refresh whenever this page opens. */
+    onPageChange() {
+      this.renderQueue.folks = true;
+      super.onPageChange(); // renders right away
+    }
+
+    // Hiring is never an active action itself: no activeTick/passiveTick here,
+    // so Game.registerSkill does not put it into game.activeActions. The skill minibar
+    // (settings, pet, mastery, milestones, relics, quick-equip of Hiring gear) is the engine's.
+
+    get delegableCount() {
+      return this.delegableSkills.length;
+    }
+
+    /** Shared cap: total Folks can never exceed the delegable-skill count. */
+    get folkCap() {
+      return this.delegableCount;
+    }
+
+    purchase(localId) {
+      return this.game.shop.purchases.getObjectByID(`${this.namespace}:${localId}`);
+    }
+
+    purchaseCount(localId) {
+      const purchase = this.purchase(localId);
+      return purchase === undefined ? 0 : this.game.shop.getPurchaseCount(purchase);
+    }
+
+    hasLicence(tier) {
+      return this.purchaseCount(LICENCE_PURCHASE[tier]) > 0;
+    }
+
+    /** Highest tier licence owned, or null. */
+    get highestLicence() {
+      const tiers = Object.keys(LICENCE_PURCHASE);
+      for (let i = tiers.length - 1; i >= 0; i -= 1) if (this.hasLicence(tiers[i])) return tiers[i];
+      return null;
+    }
+
+    /** Shift Slots outside the licence cap: the dev console only (`workerFolksDev`). */
+    get extraShiftSlots() {
+      return this.devExtraShiftSlots;
+    }
+
+    /** Folks allowed to work at once: 1 from the Trainee licence + bought Shift Slots + free level slots, within the licence cap, plus extras. */
+    get shiftSlots() {
+      const owned = (this.hasLicence('Newbie') ? 1 : 0) + this.purchaseCount(SHIFT_SLOT_PURCHASE);
+      const free = this.levels?.freeShiftSlots() ?? 0;
+      const cap = pricing.shiftSlotCap(this.highestLicence, this.folkCap);
+      return Math.min(owned + free, Math.max(cap, owned)) + this.extraShiftSlots;
+    }
+
+    /**
+     * A `worker_folks:*` modifier from the player's own table. Read there, not through
+     * `game.modifiers`, because while a Folk acts that getter returns the Folk's table, which
+     * leaves out what the player wears (Overseer's Outfit, Hiring Skillcape).
+     */
+    playerModifier(localId) {
+      const table = this.game.combat?.player?.modifiers;
+      if (table === undefined || typeof table.getValue !== 'function') return 0;
+      return table.getValue(`worker_folks:${localId}`, ModifierQuery.EMPTY);
+    }
+
+    /** Pool bonuses, pet, worn gear and relics, as one perk object (see mastery-perks.bonusPerks); the Master Relic's free overtime included. */
+    bonusPerks() {
+      return perks.bonusPerks({
+        wageDiscountPercent: this.playerModifier('folkWageDiscount'),
+        graceMinutes: this.playerModifier('folkStrikeGrace'),
+        cooldownPercent: this.playerModifier('folkCooldown'),
+        autoSettle: this.playerModifier('folkAutoSettle') > 0,
+        freeOvertime: this.playerModifier('folkFreeOvertime') > 0,
+      });
+    }
+
+    /** Hiring is the player's skill: its XP modifiers come from the player's own table even while a Folk is acting. */
+    getXPModifier(action) {
+      const table = this.game.combat.player.modifiers;
+      return table.getValue('melvorD:skillXP', this.getActionModifierQuery(action)) + table.getValue('melvorD:nonCombatSkillXP', ModifierQuery.EMPTY);
+    }
+
+    getMasteryXPModifier(action) {
+      const table = this.game.combat.player.modifiers;
+      let modifier = table.getValue('melvorD:masteryXP', this.getActionModifierQuery(action));
+      this.game.astrology.masteryXPConstellations.forEach((constellation) => {
+        const value = table.getValue(constellation.masteryXPModifier.id, this.modQuery);
+        if (value > 0) modifier += value * constellation.maxValueModifiers;
+      });
+      return modifier;
+    }
+
+    isDelegated(skill) {
+      return this.delegated.has(skill);
+    }
+
+    /** Removes a skill from the delegated set and tells the other slices. */
+    release(skill) {
+      if (!this.delegated.delete(skill)) return;
+      this.renderQueue.folks = true;
+      log(`released: ${skill.id}`);
+      this.events.emit('folkReleased', { skill, folk: this.crew.bySkill(skill.id), offline: !this.game._isInOnlineLoop });
+    }
+
+    /** A delegated skill's action timer just fired: mastery, tokens, then the wage/offline listeners. */
+    delegatedActionDone(skill, intervalMs = 0) {
+      const folk = this.crew.bySkill(skill.id);
+      const outcome = this.lastOutcome ?? 'ok';
+      this.lastOutcome = undefined;
+      if (folk !== undefined && intervalMs > 0) this.addFolkMastery(folk, intervalMs);
+      this.events.emit('folkActionDone', { skill, folk, outcome, intervalMs, offline: !this.game._isInOnlineLoop });
+    }
+
+    // ---- Folk mastery ---------------------------------------------------------
+
+    slotOf(folk) {
+      return this.sortedMasteryActions[folk.slot];
+    }
+
+    masteryLevelOf(folk) {
+      const slot = this.slotOf(folk);
+      return slot === undefined ? 1 : this.getMasteryLevel(slot);
+    }
+
+    masteryProgressOf(folk) {
+      const slot = this.slotOf(folk);
+      return slot === undefined ? { xp: 0, level: 1, percent: 0, nextLevelXP: 0 } : this.getMasteryProgress(slot);
+    }
+
+    poolPercent() {
+      return this.getMasteryPoolProgress(this.game.defaultRealm);
+    }
+
+    perksOf(folk) {
+      return perks.combinedPerks(this.masteryLevelOf(folk), this.bonusPerks(), { overtimeOn: folk.overtime, overtimeWageFactor: this.levels?.overtimeWageFactor() ?? 2 });
+    }
+
+    // Hooks read by payroll.mjs and acting.mjs
+    wageDiscount(folk) {
+      const p = this.perksOf(folk);
+      return perks.totalWageDiscount(p.wageRaise, p.wageDiscount, this.levels?.wageDiscount() ?? 0);
+    }
+
+    /** Multiplier on the tier wage: the seniority raise (40% → 100% by mastery) times the overtime factor. */
+    wageFactor(folk) {
+      const p = this.perksOf(folk);
+      return p.wageFactor * p.wageRaise;
+    }
+
+    wageRaise(folk) {
+      return this.perksOf(folk).wageRaise;
+    }
+
+    graceMs(folk) {
+      return this.perksOf(folk).graceMs;
+    }
+
+    /** "In debt" details for the card, the Worker box and the offline summary, or null. */
+    debtText(folk) {
+      const payroll = this.payroll;
+      if (payroll === undefined || folk.onStrike || !(folk.debt > 0)) return null;
+      const currency = this.game.currencies.getObjectByID(folk.debtCurrency ?? 'melvorD:GP');
+      const minutes = Math.ceil(payroll.graceLeftMs(folk) / 60000);
+      return { amount: `${numberWithCommas(folk.debt)} ${currency?.name ?? ''}`.trim(), minutes: `${minutes}` };
+    }
+
+    cooldownFactor(folk) {
+      return this.perksOf(folk).cooldownMult;
+    }
+
+    severanceFree(folk) {
+      return this.perksOf(folk).trusted;
+    }
+
+    autoSettle() {
+      return this.bonusPerks().autoSettle;
+    }
+
+    setOvertime(folk, on) {
+      if (!this.perksOf(folk).overtimeUnlocked) on = false;
+      if (folk.overtime === on) return;
+      folk.overtime = on;
+      this.crew.touch(); // acting tables rebuild on crewChanged
+    }
+
+    addFolkMastery(folk, intervalMs) {
+      const slot = this.slotOf(folk);
+      if (slot === undefined) return;
+      let xp = perks.masteryXPForAction({ level: this.getMasteryLevel(slot), intervalMs, tier: folk.tier, modifierPercent: this.getMasteryXPModifier(slot) });
+      if (this.game.modifiers.halveMasteryXP > 0) xp /= 2;
+      this.addMasteryXP(slot, xp);
+      this.addMasteryPoolXP(slot.realm, this.getMasteryXPToAddToPool(xp));
+      this.rollFolkMasteryToken(slot.realm);
+    }
+
+    rollFolkMasteryToken(realm) {
+      const tokens = this.masteryTokens.get(realm);
+      if (tokens === undefined) return;
+      tokens.forEach((token) => {
+        if (!token.rollInSkill || !rollPercentage(this.masteryTokenChance)) return;
+        this.game.bank.addItem(token, 1 + this.game.modifiers.flatMasteryTokens, true, true, false, true, `Skill.${this.id}`);
+      });
+    }
+
+    /** Firing clears the slot's mastery; the next hire in that slot starts at 1. */
+    resetSlotMastery(slotIndex) {
+      const slot = this.sortedMasteryActions[slotIndex];
+      if (slot === undefined || !this.actionMastery.has(slot)) return;
+      this.actionMastery.delete(slot);
+      this.updateTotalCurrentMasteryLevel();
+      this.renderQueue.actionMastery.add(slot);
+      this.updateMasteryDisplays(slot);
+    }
+
+    // ---- promotion and firing ---------------------------------------------------
+
+    diplomaItem(targetTier) {
+      const id = promotion.diplomaFor(targetTier, { hasTotH: this.game.registeredNamespaces.hasNamespace('melvorTotH') });
+      return id === null ? undefined : this.game.items.getObjectByID(id);
+    }
+
+    promotionPlanFor(folk) {
+      const nextTier = promotion.NEXT_TIER[folk.tier] ?? null;
+      const diploma = nextTier === null ? undefined : this.diplomaItem(nextTier);
+      const plan = promotion.promotionPlan({
+        tier: folk.tier,
+        masteryLevel: this.masteryLevelOf(folk),
+        hasLicence: nextTier !== null && this.hasLicence(nextTier),
+        nextHirePrice: nextTier === null ? 0 : pricing.hirePrice(nextTier, this.crew.countByTier(nextTier)),
+        hasDiploma: diploma !== undefined && this.game.bank.getQty(diploma) > 0,
+        gp: this.game.gp.amount,
+        hiringLevel: this.level,
+        promotionLevel: this.levels?.promotionLevel ?? 0,
+        costRate: this.levels?.promotionCostRate() ?? promotion.PROMOTION_COST_RATE,
+      });
+      return { ...plan, diploma };
+    }
+
+    /** Opens the promotion modal; applies the promotion when confirmed and still valid. */
+    promote(folk) {
+      const plan = this.promotionPlanFor(folk);
+      if (plan.nextTier === null) return;
+      const row = (met, text) => `<div class="${met ? 'text-success' : 'text-danger'} font-size-sm">${met ? '✓' : '✗'} ${text}</div>`;
+      const diplomaText = plan.diploma === undefined ? '?' : `<img class="skill-icon-xs mr-1" src="${plan.diploma.media}">${plan.diploma.name}`;
+      const html = `
+        <div class="text-left">
+          ${this.levels === undefined ? '' : row(!plan.blockers.includes('level'), templateLangString('MOD_WF_PROMO_LEVEL', { level: `${this.levels.promotionLevel}`, now: `${this.level}` }))}
+          ${row(!plan.blockers.includes('licence'), templateLangString('MOD_WF_PROMO_LICENCE', { role: this.roleName(plan.nextTier) }))}
+          ${row(!plan.blockers.includes('mastery'), templateLangString('MOD_WF_PROMO_MASTERY', { gate: `${plan.gate}`, level: `${this.masteryLevelOf(folk)}` }))}
+          ${row(!plan.blockers.includes('diploma'), templateLangString('MOD_WF_PROMO_DIPLOMA', { item: diplomaText }))}
+          ${row(!plan.blockers.includes('gp'), templateLangString('MOD_WF_PROMO_COST', { cost: numberWithCommas(plan.cost), percent: `${Math.round((this.levels?.promotionCostRate() ?? promotion.PROMOTION_COST_RATE) * 100)}` }))}
+          <div class="text-muted font-size-sm mt-2">${getLangString('MOD_WF_PROMO_KEEPS')}</div>
+        </div>`;
+      SwalLocale.fire({
+        title: templateLangString('MOD_WF_PROMO_TITLE', { name: folk.name, role: this.roleName(plan.nextTier) }),
+        html,
+        imageUrl: this.portrait(plan.nextTier),
+        imageWidth: 64,
+        imageHeight: 64,
+        customClass: (typeof createSwalCustomClass === 'function' ? createSwalCustomClass({ popup: 'wf-ui' }) : { popup: 'wf-ui' }),
+        showCancelButton: true,
+        confirmButtonText: getLangString('MOD_WF_BUTTON_PROMOTE'),
+      }).then((result) => {
+        if (!result.isConfirmed) return;
+        const fresh = this.promotionPlanFor(folk);
+        if (!fresh.ok) {
+          this.game.notifications.createErrorNotification('worker_folks:promo', getLangString('MOD_WF_PROMO_BLOCKED'));
+          return;
+        }
+        this.game.gp.remove(fresh.cost);
+        this.game.bank.removeItemQuantity(fresh.diploma, 1, true);
+        this.crew.promote(folk.id, fresh.nextTier);
+        this.game.notifications.createSuccessNotification(
+          'worker_folks:promoted',
+          templateLangString('MOD_WF_PROMOTED', { name: folk.name, role: this.roleName(fresh.nextTier) }),
+          this.portrait(fresh.nextTier),
+        );
+      });
+    }
+
+    returnLoadout(folk) {
+      this.loadout?.returnAll(folk);
+    }
+
+    /** Confirms, returns the loadout, then fires. */
+    fire(folk) {
+      SwalLocale.fire({
+        title: templateLangString('MOD_WF_FIRE_TITLE', { name: folk.name }),
+        html: `<div class="font-size-sm">${getLangString('MOD_WF_FIRE_TEXT')}</div>`,
+        imageUrl: this.portrait(folk.tier),
+        imageWidth: 64,
+        imageHeight: 64,
+        customClass: (typeof createSwalCustomClass === 'function' ? createSwalCustomClass({ popup: 'wf-ui' }) : { popup: 'wf-ui' }),
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: getLangString('MOD_WF_BUTTON_FIRE'),
+      }).then((result) => {
+        if (!result.isConfirmed) return;
+        this.returnLoadout?.(folk);
+        this.crew.fire(folk.id, { reason: 'fired' });
+      });
+    }
+
+    /** Text lines for the card's details panel: unlocked and next perks. */
+    perkLines(folk) {
+      const level = this.masteryLevelOf(folk);
+      const lines = [];
+      lines.push({ met: true, text: templateLangString('MOD_WF_PERK_WAGE', { value: (this.wageRaise(folk) * 100).toFixed(0) }) });
+      lines.push({ met: true, text: templateLangString('MOD_WF_PERK_RELIEF', { value: (this.wageDiscount(folk) * 100).toFixed(1) }) });
+      perks.LEVEL_MILESTONES.forEach(([at, key]) => {
+        lines.push({ met: level >= at, text: `${at}: ${getLangString(`MOD_WF_PERK_${key}`)}` });
+      });
+      return lines;
+    }
+
+    /** Card text for a tier's effects (Produce Rate is shown separately). */
+    tierEffectTexts(tier) {
+      const mods = produceRate.tierModifiers(tier, { preservationDisabled: !!this.game.currentGamemode.disablePreservation });
+      const lines = [];
+      if (mods.skillInterval !== 0) lines.push(templateLangString('MOD_WF_EFFECT_INTERVAL', { value: `${mods.skillInterval > 0 ? '+' : ''}${mods.skillInterval}` }));
+      if (mods.skillPreservationChance !== 0) lines.push(templateLangString('MOD_WF_EFFECT_PRESERVATION', { value: `${mods.skillPreservationChance}` }));
+      if (mods.skillXP !== 0) lines.push(templateLangString('MOD_WF_EFFECT_XP', { value: `${mods.skillXP}` }));
+      if (!produceRate.rollsPets(tier)) lines.push(getLangString('MOD_WF_EFFECT_NO_PETS'));
+      if (tier === 'Expert') lines.push(getLangString('MOD_WF_EFFECT_CREW_BONUS'));
+      return lines;
+    }
+
+    skillOf(folk) {
+      return folk.skillId === null ? undefined : this.delegableSkills.find((s) => s.id === folk.skillId);
+    }
+
+    registerData(namespace, data) {
+      super.registerData(namespace, data);
+      if (data.folkSlots !== undefined) {
+        data.folkSlots.forEach((slotData) => {
+          this.actions.registerObject(new FolkSlotAction(namespace, slotData, this.game, this));
+        });
+      }
+    }
+
+    postDataRegistration() {
+      super.postDataRegistration();
+      this.sortedMasteryActions = this.actions.allObjects.sort((a, b) => a.index - b.index);
+    }
+
+    /** Only the first N slots exist from the player's point of view. */
+    isMasteryActionUnlocked(action) {
+      return action.index < this.delegableCount;
+    }
+
+    /** Mastery screens list hired Folks only. */
+    getSortedMasteryActionsInRealm(realm) {
+      return this.sortedMasteryActions.filter((a) => a.realm === realm && this.isMasteryActionUnlocked(a) && this.crew.bySlot(a.index) !== undefined);
+    }
+
+    getBaseMasteryPoolCap(realm) {
+      const count = realm === this.game.defaultRealm ? this.delegableCount : 0;
+      return count * 500000;
+    }
+
+    getSlotName(action) {
+      const folk = this.crew.bySlot(action.index);
+      if (folk !== undefined) return `${folk.name} (${this.roleName(folk.tier)})`;
+      return templateLangString('MOD_WF_FOLK_SLOT', { index: `${action.index + 1}` });
+    }
+
+    getSlotMedia(action) {
+      const folk = this.crew.bySlot(action.index);
+      return this.portrait(folk !== undefined ? folk.tier : 'Newbie');
+    }
+
+    computeDelegableSkills() {
+      const combatLikeIds = [this.game.combat.id, this.game.golbinRaid.id];
+      this.delegableSkills = selectDelegable(this.game.activeActions.allObjects, {
+        combatLikeIds,
+        excludeIds: this.excludedSkillIds,
+      });
+    }
+
+    /**
+     * True when the current gamemode could lock Hiring with no way to unlock it:
+     * it ships a fixed starting-skill list (so a new character locks every other
+     * skill) and sells no skill unlocks. Ancient Relics is the shipped example.
+     */
+    get mustStayUnlocked() {
+      const mode = this.game.currentGamemode;
+      return mode.startingSkills !== undefined && !mode.allowSkillUnlock;
+    }
+
+    setUnlock(isUnlocked) {
+      // Game.setupCurrentGamemode() runs AFTER skill.onLoad() on a new character
+      // and calls setUnlock(startingSkills.has(skill)) — false for a mod skill.
+      super.setUnlock(isUnlocked || this.mustStayUnlocked);
+    }
+
+    onLoad() {
+      this.computeDelegableSkills();
+      // A skill added to an existing save starts locked. In gamemodes without
+      // skill-unlock purchases that would just show a padlock forever.
+      if (!this._unlocked && !this.game.currentGamemode.allowSkillUnlock) {
+        this._unlocked = true;
+      }
+      super.onLoad();
+      this.renderQueue.folks = true;
+      log(`delegable skills: ${this.delegableCount}; crew: ${this.crew.size}`);
+    }
+
+    getErrorLog() {
+      return `Delegable skills: ${this.delegableCount}\nUnlocked: ${this._unlocked}\n`;
+    }
+  }
+
+  return { Hiring, FolkSlotAction };
+}
+
+/** Reads the next Uint32 without consuming it (undefined when fewer than 4 bytes remain). */
+function peekUint32(reader) {
+  if (reader.dataView.byteLength - reader.byteOffset < 4) return undefined;
+  return reader.dataView.getUint32(reader.byteOffset);
+}

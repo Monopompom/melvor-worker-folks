@@ -1,0 +1,7 @@
+{
+  "name": "Worker Folks: Hiring",
+  "version": "1.1.0",
+  "namespace": "worker_folks",
+  "setup": "setup.mjs",
+  "icon": "img/icon.png"
+}

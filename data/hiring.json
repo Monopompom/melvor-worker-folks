@@ -1,0 +1,303 @@
+{
+  "$schema": "https://melvoridle.com/assets/schema/gameData.json",
+  "namespace": "worker_folks",
+  "data": {
+    "pages": [
+      {
+        "id": "Hiring",
+        "media": "img/icon.png",
+        "containerID": "worker-folks-container",
+        "headerBgClass": "bg-worker-folks",
+        "hasGameGuide": false,
+        "canBeDefault": true,
+        "skills": [
+          "worker_folks:Hiring"
+        ],
+        "skillSidebarCategoryID": "Passive"
+      }
+    ],
+    "skillData": [
+      {
+        "skillID": "worker_folks:Hiring",
+        "data": {
+          "folkSlots": [
+            {
+              "id": "Slot1",
+              "index": 0
+            },
+            {
+              "id": "Slot2",
+              "index": 1
+            },
+            {
+              "id": "Slot3",
+              "index": 2
+            },
+            {
+              "id": "Slot4",
+              "index": 3
+            },
+            {
+              "id": "Slot5",
+              "index": 4
+            },
+            {
+              "id": "Slot6",
+              "index": 5
+            },
+            {
+              "id": "Slot7",
+              "index": 6
+            },
+            {
+              "id": "Slot8",
+              "index": 7
+            },
+            {
+              "id": "Slot9",
+              "index": 8
+            },
+            {
+              "id": "Slot10",
+              "index": 9
+            },
+            {
+              "id": "Slot11",
+              "index": 10
+            },
+            {
+              "id": "Slot12",
+              "index": 11
+            },
+            {
+              "id": "Slot13",
+              "index": 12
+            },
+            {
+              "id": "Slot14",
+              "index": 13
+            },
+            {
+              "id": "Slot15",
+              "index": 14
+            },
+            {
+              "id": "Slot16",
+              "index": 15
+            },
+            {
+              "id": "Slot17",
+              "index": 16
+            },
+            {
+              "id": "Slot18",
+              "index": 17
+            },
+            {
+              "id": "Slot19",
+              "index": 18
+            },
+            {
+              "id": "Slot20",
+              "index": 19
+            },
+            {
+              "id": "Slot21",
+              "index": 20
+            },
+            {
+              "id": "Slot22",
+              "index": 21
+            },
+            {
+              "id": "Slot23",
+              "index": 22
+            },
+            {
+              "id": "Slot24",
+              "index": 23
+            }
+          ],
+          "masteryPoolBonuses": [
+            {
+              "realm": "melvorD:Melvor",
+              "percent": 10,
+              "modifiers": {
+                "worker_folks:folkWageDiscount": 5
+              }
+            },
+            {
+              "realm": "melvorD:Melvor",
+              "percent": 25,
+              "modifiers": {
+                "worker_folks:folkStrikeGrace": 15
+              }
+            },
+            {
+              "realm": "melvorD:Melvor",
+              "percent": 50,
+              "modifiers": {
+                "worker_folks:folkAutoSettle": 1
+              }
+            },
+            {
+              "realm": "melvorD:Melvor",
+              "percent": 95,
+              "modifiers": {
+                "worker_folks:folkCooldown": -25
+              }
+            }
+          ],
+          "masteryLevelUnlocks": [
+            {
+              "level": 1,
+              "descriptionID": 0,
+              "description": "Every mastery level lowers this Folk's wage by 0.3%."
+            },
+            {
+              "level": 20,
+              "descriptionID": 1,
+              "description": "Trainee may be promoted to Apprentice."
+            },
+            {
+              "level": 25,
+              "descriptionID": 2,
+              "description": "Strike grace 3 → 5 unpaid actions."
+            },
+            {
+              "level": 30,
+              "descriptionID": 3,
+              "description": "Overtime: −20% action interval for double wages (toggle on the card)."
+            },
+            {
+              "level": 40,
+              "descriptionID": 4,
+              "description": "Apprentice may be promoted to Journeyman."
+            },
+            {
+              "level": 60,
+              "descriptionID": 5,
+              "description": "Journeyman may be promoted to Master. Strike cooldown −25%."
+            },
+            {
+              "level": 75,
+              "descriptionID": 6,
+              "description": "+5% skill XP for this Folk's actions."
+            },
+            {
+              "level": 80,
+              "descriptionID": 7,
+              "description": "Master may be promoted to Foreman."
+            },
+            {
+              "level": 90,
+              "descriptionID": 8,
+              "description": "Strike cooldown −50% in total."
+            },
+            {
+              "level": 99,
+              "descriptionID": 9,
+              "description": "Wages −50% in total. Trusted: strikes cost owed wages only, no severance."
+            }
+          ]
+        }
+      }
+    ],
+    "shopCategories": [
+      {
+        "id": "WorkerFolks",
+        "name": "Worker Folks",
+        "media": "img/icon.png"
+      }
+    ],
+    "shopCategoryOrder": [
+      {
+        "insertAt": "After",
+        "afterID": "melvorD:SkillUpgrades",
+        "ids": [
+          "worker_folks:WorkerFolks"
+        ]
+      }
+    ],
+    "modifiers": [
+      {
+        "id": "folkWageDiscount",
+        "allowedScopes": [
+          {
+            "scopes": {},
+            "descriptions": [
+              {
+                "text": "-${value}% Folk wages",
+                "includeSign": false,
+                "lang": "MOD_WF_MODIFIER_folkWageDiscount"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "folkStrikeGrace",
+        "allowedScopes": [
+          {
+            "scopes": {},
+            "descriptions": [
+              {
+                "text": "+${value} action of strike grace for every Folk",
+                "includeSign": false,
+                "lang": "MOD_WF_MODIFIER_folkStrikeGrace"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "folkAutoSettle",
+        "allowedScopes": [
+          {
+            "scopes": {},
+            "descriptions": [
+              {
+                "text": "Strikes settle themselves when your bank can pay",
+                "includeSign": false,
+                "lang": "MOD_WF_MODIFIER_folkAutoSettle"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "folkCooldown",
+        "inverted": true,
+        "allowedScopes": [
+          {
+            "scopes": {},
+            "descriptions": [
+              {
+                "text": "-${value}% strike cooldown for every Folk",
+                "includeSign": false,
+                "lang": "MOD_WF_MODIFIER_folkCooldown"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "items": [
+      {
+        "id": "Mastery_Token_Hiring",
+        "name": "Mastery Token (Hiring)",
+        "category": "Mastery",
+        "type": "Token",
+        "media": "img/mastery_token.png",
+        "ignoreCompletion": false,
+        "obtainFromItemLog": false,
+        "golbinRaidExclusive": false,
+        "sellsFor": 1500,
+        "itemType": "MasteryToken",
+        "skill": "worker_folks:Hiring",
+        "realm": "melvorD:Melvor",
+        "percent": 0.1
+      }
+    ]
+  }
+}
