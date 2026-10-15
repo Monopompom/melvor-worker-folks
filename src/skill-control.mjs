@@ -56,7 +56,7 @@ export function install(ctx, { getHiring, isDisabled = () => false, log }) {
     log(`worker controls mounted on ${mounted} skill page(s)`);
   };
 
-  /** Modal: one tile per choice (You + every Folk), three columns, one on phones. */
+  /** Modal: one tile per choice (You + every Folk), up to three per row, popup hugs the tiles; one column on phones. */
   const openWorkerModal = (skill) => {
     const holder = hiring.crew.bySkill(skill.id);
     const pending = hiring.pendingFor(skill);
@@ -128,8 +128,9 @@ export function install(ctx, { getHiring, isDisabled = () => false, log }) {
       onClick: () => hiring.setWorker(skill, opt.id),
     }));
     if (options.length === 0) {
-      const none = document.createElement('small');
-      none.className = 'text-muted d-block wf-worker-none';
+      // No Folk hired yet: a tile-shaped hint beside "You" until the first hire.
+      const none = document.createElement('div');
+      none.className = 'wf-worker-none';
       none.textContent = getLangString('MOD_WF_CTRL_NO_FOLKS');
       root.append(none);
     }
