@@ -35,6 +35,12 @@ export const LICENCE_DUNGEON = {
   Expert: 'melvorF:Into_the_Mist',
 };
 
+/**
+ * Items per licence. Within one licence no two items are of the same kind (one amulet, one bar, one weapon of each
+ * sort...) in any expansion mix (decided 15 Oct 2026); the Expert expansion extras come from less played skills:
+ * AoD Runecrafting 90 (Mystic Pure Crystal Staff) and Crafting 99 (Imbued Elder Dragonhide), ItA abyssal Crafting 51
+ * (Obzurian Unnatural Vitality Ring) and abyssal Harvesting 55 (Voidfire Quartz, the Voidfire vein's 80% product).
+ */
 export function licenceItems(tier, { hasTotH = false, hasAoD = false, hasItA = false } = {}) {
   switch (tier) {
     case 'Newbie':
@@ -49,8 +55,8 @@ export function licenceItems(tier, { hasTotH = false, hasAoD = false, hasItA = f
       const items = hasTotH
         ? [item('melvorTotH:FrostSpark_Amulet', 1), item('melvorTotH:Divine_Platebody', 5), item('melvorTotH:Ethereal_Arrows', 5000)]
         : [item('melvorF:Ultima_Godsword', 1), item('melvorF:Elder_Crown', 1)];
-      if (hasAoD) items.push(item('melvorAoD:Nullifying_Amulet', 1), item('melvorAoD:Imbued_Dragonite_Bar', 100));
-      if (hasItA) items.push(item('melvorItA:Strange_Sword', 1), item('melvorItA:Abyssium_Bar', 250));
+      if (hasAoD) items.push(item('melvorAoD:Mystic_Pure_Crystal_Staff', 1), item('melvorAoD:Imbued_Elder_Dragonhide', 100));
+      if (hasItA) items.push(item('melvorItA:Obzurian_Unnatural_Vitality_Ring', 1), item('melvorItA:Voidfire_Quartz', 100));
       return items;
     }
     default:

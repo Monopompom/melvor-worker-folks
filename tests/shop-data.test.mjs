@@ -7,7 +7,7 @@ test('Expert licence items follow the expansion variants', () => {
   assert.deepEqual(licenceItems('Expert').map((i) => i.id), ['melvorF:Ultima_Godsword', 'melvorF:Elder_Crown']);
   assert.deepEqual(licenceItems('Expert', { hasTotH: true }).map((i) => i.id), ['melvorTotH:FrostSpark_Amulet', 'melvorTotH:Divine_Platebody', 'melvorTotH:Ethereal_Arrows']);
   const all = licenceItems('Expert', { hasTotH: true, hasAoD: true, hasItA: true }).map((i) => i.id);
-  assert.ok(all.includes('melvorAoD:Nullifying_Amulet') && all.includes('melvorItA:Abyssium_Bar'));
+  assert.ok(all.includes('melvorAoD:Mystic_Pure_Crystal_Staff') && all.includes('melvorItA:Voidfire_Quartz'));
   assert.equal(all.length, 7);
   const aodOnly = licenceItems('Expert', { hasAoD: true }).map((i) => i.id);
   assert.deepEqual(aodOnly.slice(0, 2), ['melvorF:Ultima_Godsword', 'melvorF:Elder_Crown']);
