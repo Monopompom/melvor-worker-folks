@@ -313,7 +313,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
             b.append(q);
           }
           const e = api.entry(folk, slot.id);
-          if (!tip(b, { content: e === undefined ? slot.name : createItemInformationTooltip(e.item), allowHTML: true, placement: 'top', interactive: false })) b.title = slot.name;
+          if (!tip(b, { content: e === undefined ? slot.name : e.item.name, placement: 'top', interactive: false })) b.title = slot.name;
           b.onclick = () => showPicker(slot.id);
           grid.append(b);
         }
@@ -501,7 +501,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
             b.innerHTML = `<img src="${item.media}" alt=""><small>${count}</small>`;
             b.setAttribute('aria-label', `${item.name} ×${count}`);
             b.setAttribute('aria-pressed', 'false');
-            tip(b, { content: createItemInformationTooltip(item), allowHTML: true, placement: 'top', interactive: false });
+            tip(b, { content: item.name, placement: 'top', interactive: false });
             b.onclick = () => select(item, b);
             grid.append(b);
           });

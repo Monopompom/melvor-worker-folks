@@ -38,7 +38,8 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
   class Hiring extends SkillWithMastery {
     constructor(namespace, game) {
       super(namespace, 'Hiring', game, 'FolkSlot');
-      this._media = 'img/icon_no_bg.png';
+      // The gold-ringed icon, as Voyage's in the sidebar (the user, build .90).
+      this._media = 'img/icon.png';
       this.renderQueue = new MasterySkillRenderQueue();
       /** Active actions a Folk may hold, computed on character load. */
       this.delegableSkills = [];
