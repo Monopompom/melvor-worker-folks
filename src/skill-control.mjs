@@ -165,7 +165,7 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
     root.style.setProperty('--wf-cols2', `${Math.max(1, Math.min(n, 2))}`);
     SwalLocale.fire({
       didRender: popupDidRender,
-      title: templateLangString('MOD_WF_CTRL_PICK_TITLE', { skill: skill.name }),
+      title: templateLangString('MOD_WF_CTRL_PICK_TITLE', { skill: hiring.skillName(skill) }),
       html: root,
       showConfirmButton: false,
       showCloseButton: true,
@@ -205,7 +205,14 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
       status = `${templateLangString('MOD_WF_CTRL_PENDING', { name: pending.name, skill: from })} · ${slots}`;
       tone = 'text-warning font-w600';
     } else if (holder === undefined) status = slots;
-    else if (!working) {
+    else if (!working && hiring.struck(holder)) {
+      // A striking or resting Folk isn't ready to work (build .81: the box said "ready" through the whole strike).
+      status = `${templateLangString('MOD_WF_CTRL_STRIKE', { name: holder.name })} · ${slots}`;
+      tone = 'text-danger font-w600';
+    } else if (!working && holder.cooldownTicks > 0) {
+      status = `${templateLangString('MOD_WF_CTRL_RESTING', { name: holder.name })} · ${slots}`;
+      tone = 'text-warning font-w600';
+    } else if (!working) {
       // Ready to work is news, not a footnote: normal text, not muted (build .55).
       status = `${templateLangString('MOD_WF_CTRL_READY', { name: holder.name })} · ${slots}`;
       tone = 'font-w600';
@@ -239,5 +246,21 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
     mount();
     renderAll();
     EVENTS.forEach((name) => hiring.events.on(name, renderAll));
+    // Debt has no event of its own per action (build .81): the box showed "is working on" for a whole debt episode.
+    // Re-render a skill's box after each action while its Folk owes wages (the minutes count down), and once more on
+    // the action that clears the debt. Deferred, so the payroll listener on the same event has charged first.
+    const owing = new Set();
+    hiring.events.on('folkActionDone', ({ skill, folk, offline }) => {
+      if (offline || folk === undefined) return;
+      queueMicrotask(() => {
+        const inDebt = folk.debt > 0 || folk.onStrike;
+        if (!inDebt && !owing.has(skill)) return;
+        if (inDebt) owing.add(skill);
+        else owing.delete(skill);
+        const root = controls.get(skill);
+        if (root !== undefined) renderOne(skill, root);
+      });
+    });
+    hiring.events.on('folkStruck', renderAll);
   });
 }

@@ -32,6 +32,8 @@ export function splitNames(text, pattern) {
 const build = () => {
   byName = new Map();
   for (const s of game.skills.allObjects) if (s?.name && s?.media) byName.set(s.name, s);
+  // The mod names Magic "Alt. Magic" (Hiring.skillName); give that name the Alt. Magic icon too.
+  if (game.altMagic?.media) byName.set(getLangString('PAGE_NAME_AltMagic'), { media: game.altMagic.media });
   pattern = namePattern(byName.keys());
 };
 

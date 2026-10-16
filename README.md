@@ -165,7 +165,8 @@ game's own Lesser Relics.
 ## Settings
 
 Mod Settings → Worker Folks: wage difficulty, a preset from **No sweat** (free labour, no
-strikes) through Easy (¼), Relaxed (½), **Standard** (full wages, the default), Tense (×1.5),
+strikes; a strike or unpaid wages from before are only on hold and come back if you switch to a paid
+difficulty) through Easy (¼), Relaxed (½), **Standard** (full wages, the default), Tense (×1.5),
 Hard (×2), Brutal (×3) to **Evil hardcore** (×5); Abyssal
 Pieces wages on/off, Hiring XP share of Folk skill XP (default 5%).
 
@@ -193,8 +194,14 @@ classes. Mods that only add items, modifiers or UI are unaffected.
 
 ## Removing the mod
 
-Your save stays loadable without the mod. Folk data is kept inside the Hiring skill's save
-slot and is ignored by the game when the mod is absent.
+Your save stays loadable without the mod, but the game drops everything the mod added the
+first time it saves without it: your Hiring level, your Folks, licences, Shift Slots, the
+Payroll Reserve and anything Worker Folks added to your bank. Turning the mod back on later
+starts Hiring from scratch.
+
+Before removing it: open each Folk's **Gear** and take its items back (or Fire the Folk,
+which returns them), and stop every Folk. A skill a Folk was working when you saved may
+otherwise look busy without progressing until you click its action once.
 
 ## Credits
 

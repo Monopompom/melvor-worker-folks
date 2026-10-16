@@ -57,11 +57,11 @@ export function install(ctx, { getHiring, log }) {
     const describe = (skillId) => {
       const folk = hiring.crew.bySkill(skillId);
       const skill = this.skills.getObjectByID(skillId);
-      return { name: folk?.name ?? '?', skill: skill?.name ?? skillId, media: skill?.media };
+      return { name: folk?.name ?? '?', skill: skill !== undefined ? hiring.skillName(skill) : skillId, media: skill?.media };
     };
     tracker.actions.forEach((count, skillId) => {
       const d = describe(skillId);
-      lines.push({ media: d.media, text: templateLangString('MOD_WF_OFFLINE_LINE', { name: d.name, skill: d.skill, count: numberWithCommas(count) }) });
+      lines.push({ media: d.media, text: templateLangString(count === 1 ? 'MOD_WF_OFFLINE_LINE_ONE' : 'MOD_WF_OFFLINE_LINE', { name: d.name, skill: d.skill, count: numberWithCommas(count) }) });
     });
     tracker.released.forEach((skillId) => {
       const d = describe(skillId);
@@ -104,15 +104,15 @@ export function install(ctx, { getHiring, log }) {
     });
     hiring.events.on('folkDied', ({ folk, skill }) => {
       if (!tracker.active) return;
-      tracker.died.push({ name: folk.name, skill: skill?.name ?? '', media: hiring.portrait(folk.tier) });
+      tracker.died.push({ name: folk.name, skill: hiring.skillName(skill), media: hiring.portrait(folk.tier) });
     });
     hiring.events.on('folkInDebt', ({ folk, skill }) => {
       if (!tracker.active) return;
-      tracker.debts.push({ folk, skill: skill?.name ?? '', media: hiring.portrait(folk.tier) });
+      tracker.debts.push({ folk, skill: hiring.skillName(skill), media: hiring.portrait(folk.tier) });
     });
     hiring.events.on('folkStruck', ({ folk, skill }) => {
       if (!tracker.active) return;
-      tracker.struck.push({ folk, skill: skill?.name ?? '', media: hiring.portrait(folk.tier) });
+      tracker.struck.push({ folk, skill: hiring.skillName(skill), media: hiring.portrait(folk.tier) });
     });
   });
 }

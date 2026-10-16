@@ -15,7 +15,9 @@ export function install(ctx, { getHiring, rules, log }) {
     return a !== undefined && a.folk === folk;
   };
   const intervalOf = (e) => (typeof IntervaledGameEvent !== 'undefined' && e instanceof IntervaledGameEvent ? e.interval : 0);
-  const notify = (text) => game.notifications.createErrorNotification('worker_folks:loadout', text);
+  // A stack running out is a heads-up, not an error: info (blue). The game has only error, success and info toasts;
+  // build .83 called a createWarningNotification that doesn't exist and threw inside the Folk's tick (fixed .86).
+  const notify = (text) => game.notifications.createInfoNotification('worker_folks:loadout', text);
 
   const clearSlot = (folk, slotId, item) => {
     delete folk.loadout[slotId];

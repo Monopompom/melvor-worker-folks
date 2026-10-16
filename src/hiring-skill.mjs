@@ -58,6 +58,8 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
       this.delegated = new Set();
       /** The delegated skill whose stop() is in progress (delegation.mjs). */
       this.stopping = undefined;
+      /** True while forceStop runs: the mod stops a skill, not the player (delegation.mjs hand-over). */
+      this.forcing = false;
       /**
        * skill → folk id | null: a working Folk picked on another page moves when that page
        * starts; null means the player takes the skill over at its next start.
@@ -121,10 +123,22 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
       return this.getMediaURL(`img/worker_folk_${tier.toLowerCase()}.png`);
     }
 
+    /**
+     * On strike / owing wages right now. With wages off (No sweat) both are parked, not forgiven: the Folk works free
+     * and the state comes back when a paid difficulty returns, so No sweat is no free way out of a strike (build .86).
+     */
+    struck(folk) {
+      return folk.onStrike && this.payroll?.enabled !== false;
+    }
+
+    owing(folk) {
+      return folk.debt > 0 && this.payroll?.enabled !== false;
+    }
+
     statusOf(folk) {
-      if (folk.onStrike) return 'strike';
+      if (this.struck(folk)) return 'strike';
       if (folk.cooldownTicks > 0) return 'cooldown';
-      if (folk.debt > 0) return 'debt';
+      if (this.owing(folk)) return 'debt';
       const skill = this.skillOf(folk);
       if (skill === undefined || !this.delegated.has(skill)) return 'idle';
       return this.perksOf(folk).overtimeActive ? 'overtime' : 'working';
@@ -156,7 +170,14 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
         skill.stunState = 0;
         skill.stunTimer.stop();
       }
-      if (!skill.stop()) this.release(skill);
+      // forcing: the mod's own stop (strike, fire, reassign…), never the player's hand-over click (delegation.mjs).
+      const previous = this.forcing;
+      this.forcing = true;
+      try {
+        if (!skill.stop()) this.release(skill);
+      } finally {
+        this.forcing = previous;
+      }
       // stop() inside an action: GatheringSkill.action restarts the timer afterwards
       // (acting.mjs clears it); outside one, nothing should keep ticking.
       if (!skill.isActive && skill.actionTimer?.isActive && this.acting?.skill !== skill) skill.actionTimer.stop();
@@ -221,9 +242,15 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
       return lines;
     }
 
-    skillName(skillId) {
-      const skill = this.game.skills.getObjectByID(skillId);
-      return skill !== undefined ? skill.name : skillId;
+    /**
+     * A skill's name as the mod prints it (a skill or its id). Magic is one skill shared by combat and Alt. Magic, and
+     * the game names it "Magic"; a Folk only ever does Alt. Magic, so it is named after its page (build .83).
+     */
+    skillName(skillOrId) {
+      const skill = typeof skillOrId === 'string' ? this.game.skills.getObjectByID(skillOrId) : skillOrId;
+      if (skill === undefined || skill === null) return typeof skillOrId === 'string' ? skillOrId : '';
+      if (typeof AltMagic !== 'undefined' && skill instanceof AltMagic) return getLangString('PAGE_NAME_AltMagic');
+      return skill.name;
     }
 
     /** Entries for a skill page's Worker dropdown. */
@@ -302,8 +329,7 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
 
     assignmentText(folk) {
       if (folk.skillId === null) return getLangString('MOD_WF_UNASSIGNED');
-      const skill = this.game.skills.getObjectByID(folk.skillId);
-      return skill !== undefined ? skill.name : folk.skillId;
+      return this.skillName(folk.skillId);
     }
 
     /** The "?" buttons on the Hiring page (reserve, frozen slot): explanations live behind them. */
@@ -399,7 +425,18 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
         onOpenShop: () => {
           // false, false: a page link must not toggle the game menu open on narrow screens (the plain changePage call does that below 992px).
           const page = this.game.pages.getObjectByID('melvorD:Shop');
-          if (page !== undefined) changePage(page, -1, undefined, false, false);
+          if (page === undefined) return;
+          changePage(page, -1, undefined, false, false);
+          // The Shop opens on its last tab (General Upgrades on a fresh character); show ours (build .83).
+          try {
+            const category = this.game.shop.categories.getObjectByID('worker_folks:WorkerFolks');
+            if (category !== undefined) shopMenu.showSingleTab(category);
+          } catch (err) { log('shop tab failed', err); }
+          // Below 992px a page link left the game menu open over the page (Voyage's lesson, build .83).
+          try {
+            const narrow = !window.matchMedia('(min-width: 992px)').matches;
+            if (narrow && document.getElementById('page-container')?.classList.contains('sidebar-o-xs')) One.layout('sidebar_close');
+          } catch (err) { log('menu close failed', err); }
         },
         status: (folk) => this.statusOf(folk),
         statusIcon: (status) => this.getMediaURL(`img/status_${status}.png`),
@@ -417,7 +454,12 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
         detailText: (folk) => {
           const skill = this.skillOf(folk);
           if (skill === undefined) return getLangString('MOD_WF_CARD_SKILL_NONE_HINT');
-          if (!this.delegated.has(skill)) return templateLangString('MOD_WF_CARD_READY', { skill: skill.name });
+          if (!this.delegated.has(skill)) {
+            // Not "ready" while striking or resting (build .81); the strike band and the cooldown line say the rest.
+            if (this.struck(folk)) return templateLangString('MOD_WF_CARD_STOPPED_STRIKE', { skill: this.skillName(skill) });
+            if (folk.cooldownTicks > 0) return getLangString('MOD_WF_CARD_STOPPED_RESTING');
+            return templateLangString('MOD_WF_CARD_READY', { skill: this.skillName(skill) });
+          }
           const action = this.currentActionName(skill);
           return action === null ? getLangString('MOD_WF_CARD_WORKING') : templateLangString('MOD_WF_CARD_WORKING_ON', { action });
         },
@@ -428,7 +470,7 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
         strikeInfo: (folk) => {
           const payroll = this.payroll;
           if (payroll === undefined) return null;
-          if (!folk.onStrike) {
+          if (!this.struck(folk)) {
             const d = this.debtText(folk);
             return d === null ? null : { debtOnly: true, owedText: templateLangString('MOD_WF_DEBT_OWED', { amount: d.amount, minutes: d.minutes }) };
           }
@@ -645,7 +687,8 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
     // Hooks read by payroll.mjs and acting.mjs
     wageDiscount(folk) {
       const p = this.perksOf(folk);
-      return perks.totalWageDiscount(p.wageRaise, p.wageDiscount, this.levels?.wageDiscount() ?? 0);
+      // The Hiring 100 milestone is in percent (10), the other parts are fractions: it used to fill the cap on its own.
+      return perks.totalWageDiscount(p.wageRaise, p.wageDiscount, (this.levels?.wageDiscount() ?? 0) / 100);
     }
 
     /** Multiplier on the tier wage: the seniority raise (40% → 100% by mastery) times the overtime factor. */
@@ -665,7 +708,7 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
     /** "In debt" details for the card, the Worker box and the offline summary, or null. */
     debtText(folk) {
       const payroll = this.payroll;
-      if (payroll === undefined || folk.onStrike || !(folk.debt > 0)) return null;
+      if (payroll === undefined || this.struck(folk) || !this.owing(folk)) return null;
       const currency = this.game.currencies.getObjectByID(folk.debtCurrency ?? 'melvorD:GP');
       const minutes = Math.ceil(payroll.graceLeftMs(folk) / 60000);
       return { amount: `${numberWithCommas(folk.debt)} ${currency?.name ?? ''}`.trim(), minutes: `${minutes}` };
@@ -785,7 +828,7 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
         this.crew.promote(folk.id, fresh.nextTier);
         this.game.notifications.createSuccessNotification(
           'worker_folks:promoted',
-          templateLangString('MOD_WF_PROMOTED', { name: folk.name, role: this.roleName(fresh.nextTier) }),
+          templateLangString('MOD_WF_PROMOTED', { name: folk.name, role: this.roleName(fresh.nextTier), aRole: getLangString(`MOD_WF_A_ROLE_${fresh.nextTier}`) }),
           this.portrait(fresh.nextTier),
         );
       });
@@ -836,7 +879,9 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
       const level = this.masteryLevelOf(folk);
       const lines = [];
       lines.push({ met: true, text: templateLangString('MOD_WF_PERK_WAGE', { value: (this.wageRaise(folk) * 100).toFixed(0) }) });
-      lines.push({ met: true, text: templateLangString('MOD_WF_PERK_RELIEF', { value: (this.wageDiscount(folk) * 100).toFixed(1) }) });
+      // No cut yet read "−0.0%" (regression pass, build .83).
+      const relief = (this.wageDiscount(folk) * 100).toFixed(1);
+      lines.push({ met: true, text: relief === '0.0' ? getLangString('MOD_WF_PERK_RELIEF_NONE') : templateLangString('MOD_WF_PERK_RELIEF', { value: relief }) });
       perks.LEVEL_MILESTONES.forEach(([at, key]) => {
         lines.push({ met: level >= at, text: `${at}: ${getLangString(`MOD_WF_PERK_${key}`)}` });
       });

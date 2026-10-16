@@ -67,10 +67,12 @@ export function licenceItems(tier, { hasTotH = false, hasAoD = false, hasItA = f
 /** English fallback templates (the game build passes templateLangString). */
 const FALLBACK = {
   MOD_WF_ROLE_Newbie: 'Trainee', MOD_WF_ROLE_Junior: 'Apprentice', MOD_WF_ROLE_Middle: 'Journeyman', MOD_WF_ROLE_Senior: 'Master', MOD_WF_ROLE_Expert: 'Foreman',
+  MOD_WF_ROLES_Newbie: 'Trainees', MOD_WF_ROLES_Junior: 'Apprentices', MOD_WF_ROLES_Middle: 'Journeymen', MOD_WF_ROLES_Senior: 'Masters', MOD_WF_ROLES_Expert: 'Foremen',
+  MOD_WF_A_ROLE_Newbie: 'a Trainee', MOD_WF_A_ROLE_Junior: 'an Apprentice', MOD_WF_A_ROLE_Middle: 'a Journeyman', MOD_WF_A_ROLE_Senior: 'a Master', MOD_WF_A_ROLE_Expert: 'a Foreman',
   MOD_WF_SHOP_LICENCE_NAME: '${role} Licence',
-  MOD_WF_SHOP_LICENCE_DESC: 'Allows hiring and promoting ${role}s (Produce Rate ${rate}).',
+  MOD_WF_SHOP_LICENCE_DESC: 'Allows hiring and promoting ${roles} (Produce Rate ${rate}).',
   MOD_WF_SHOP_LICENCE_SLOT: 'Grants 1 Shift Slot (Folks working at the same time).',
-  MOD_WF_SHOP_HIRE_NAME: 'Hire a ${role}',
+  MOD_WF_SHOP_HIRE_NAME: 'Hire ${aRole}',
   MOD_WF_SHOP_HIRE_DESC: 'Adds one unassigned ${role} (Produce Rate ${rate}) to your crew. The price rises by 20% for every ${role} you own. Your crew can never exceed the number of skills Folks can hold.',
   MOD_WF_SHOP_SLOT_NAME: 'Shift Slot',
   MOD_WF_SHOP_SLOT_DESC: 'One more Folk may work at the same time. The price rises by 40% per slot. Your highest licence caps the slots: Trainee 2, Apprentice 4, Journeyman 7, Master 10, Foreman unlimited.',
@@ -94,7 +96,7 @@ export function licencePurchase(tier, expansions, t = fallbackText) {
     purchaseRequirements,
     defaultBuyLimit: 1,
     customName: t('MOD_WF_SHOP_LICENCE_NAME', { role }),
-    customDescription: `${t('MOD_WF_SHOP_LICENCE_DESC', { role, rate: `${RATE[tier]}` })}${extra}`,
+    customDescription: `${t('MOD_WF_SHOP_LICENCE_DESC', { role, roles: t(`MOD_WF_ROLES_${tier}`), rate: `${RATE[tier]}` })}${extra}`,
   };
 }
 
@@ -108,7 +110,7 @@ export function hirePurchase(tier, t = fallbackText) {
     unlockRequirements: [],
     purchaseRequirements: [{ type: 'ShopPurchase', purchaseID: `worker_folks:Licence_${tier}`, count: 1 }],
     defaultBuyLimit: 0,
-    customName: t('MOD_WF_SHOP_HIRE_NAME', { role }),
+    customName: t('MOD_WF_SHOP_HIRE_NAME', { role, aRole: t(`MOD_WF_A_ROLE_${tier}`) }),
     customDescription: t('MOD_WF_SHOP_HIRE_DESC', { role, rate: `${RATE[tier]}` }),
   };
 }

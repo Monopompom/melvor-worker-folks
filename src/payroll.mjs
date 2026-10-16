@@ -5,7 +5,8 @@ const GP_ID = 'melvorD:GP';
 const AP_ID = 'melvorItA:AbyssalPieces';
 const ABYSSAL_REALM = 'melvorItA:Abyssal';
 
-export function install(ctx, { getHiring, wages, pricing, milestones, log }) {
+export function install(ctx, { getHiring, wages, pricing, milestones, resume, log }) {
+  const { selectionOf, startAgain } = resume;
   let hiring;
   const section = ctx.settings.section('Wages');
   section.add([
@@ -137,22 +138,36 @@ export function install(ctx, { getHiring, wages, pricing, milestones, log }) {
     },
   };
 
+  // What the Folk was working on when it struck (build .81-.82; helpers in resume.mjs). Kept for this session only:
+  // after a reload a skill without a pick isn't restarted.
+  const strikeSelection = new Map();
+
   /** Starts the Folk's last skill again (online only); clears the flag either way. */
   const restartFolk = (folk) => {
     folk.restartWhenReady = false;
+    const pick = strikeSelection.get(folk.id);
+    strikeSelection.delete(folk.id);
     if (!game._isInOnlineLoop || !(hiring.levels?.autoRestart())) return false;
     const skill = folk.skillId === null ? undefined : game.skills.getObjectByID(folk.skillId);
-    if (skill === undefined || skill.isActive || hiring.delegated.has(skill) || typeof skill.start !== 'function') return false;
+    if (skill === undefined || skill.isActive || hiring.delegated.has(skill)) return false;
     if (!hiring.folkAvailable(folk)) return false;
     try {
-      skill.start();
+      startAgain(skill, pick);
     } catch (err) {
       console.warn('[Worker Folks] auto-restart failed', err);
     }
-    if (!hiring.delegated.has(skill)) return false;
+    if (!hiring.delegated.has(skill)) {
+      // A start that didn't reach the Folk (nothing picked) must not leave the skill half-started: isActive with no
+      // timer blocked the player's own use of the skill (build .81).
+      if (skill.isActive && game.activeAction !== skill) {
+        try { skill.stop(); } catch { skill.isActive = false; }
+      }
+      log(`${folk.name} could not restart ${skill.id}: nothing picked to work on`);
+      return false;
+    }
     game.notifications.createSuccessNotification(
       'worker_folks:restart',
-      templateLangString('MOD_WF_AUTO_RESTARTED', { name: folk.name, skill: skill.name }),
+      templateLangString('MOD_WF_AUTO_RESTARTED', { name: folk.name, skill: hiring.skillName(skill) }),
       hiring.portrait(folk.tier),
     );
     log(`${folk.name} restarted ${skill.id} after settlement`);
@@ -217,7 +232,7 @@ export function install(ctx, { getHiring, wages, pricing, milestones, log }) {
     if (d === null) return;
     game.notifications.createInfoNotification(
       'worker_folks:debt',
-      templateLangString('MOD_WF_DEBT_NOTIFICATION', { name: folk.name, skill: skill.name, amount: d.amount, minutes: d.minutes }),
+      templateLangString('MOD_WF_DEBT_NOTIFICATION', { name: folk.name, skill: hiring.skillName(skill), amount: d.amount, minutes: d.minutes }),
       hiring.portrait(folk.tier),
     );
   };
@@ -233,10 +248,11 @@ export function install(ctx, { getHiring, wages, pricing, milestones, log }) {
     }
     if (reserveWarned.has(id) || !game._isInOnlineLoop) return;
     reserveWarned.add(id);
+    // Rounded down: under an hour must not read "covers 1.0 h" (build .81).
     const cur = currency(id);
     game.notifications.createInfoNotification(
       'worker_folks:reserve-low',
-      templateLangString('MOD_WF_RESERVE_LOW', { hours: hours.toFixed(1), amount: numberWithCommas(reserve), currency: cur?.name ?? id }),
+      templateLangString('MOD_WF_RESERVE_LOW', { hours: (Math.floor(hours * 10) / 10).toFixed(1), amount: numberWithCommas(reserve), currency: cur?.name ?? id }),
       hiring.getMediaURL('img/payroll_reserve.png'),
     );
   };
@@ -245,29 +261,74 @@ export function install(ctx, { getHiring, wages, pricing, milestones, log }) {
     folk.onStrike = true;
     folk.strikes += 1;
     log(`${folk.name} strikes on ${skill.id}, owed ${folk.debt} ${folk.debtCurrency}`);
+    const pick = selectionOf(skill);
+    if (pick !== null) strikeSelection.set(folk.id, pick);
     hiring.forceStop(skill);
     game.notifications.createErrorNotification(
       'worker_folks:strike',
-      templateLangString('MOD_WF_STRIKE_NOTIFICATION', { name: folk.name, skill: skill.name }),
+      templateLangString('MOD_WF_STRIKE_NOTIFICATION', { name: folk.name, skill: hiring.skillName(skill) }),
       hiring.portrait(folk.tier),
     );
     hiring.events.emit('folkStruck', { folk, skill, debt: folk.debt, offline: !game._isInOnlineLoop });
-    // 50% pool checkpoint: the strike settles itself when the bank can pay (cooldown still applies).
-    if (hiring.autoSettle?.() && api.settle(folk)) {
+    selfSettle(folk);
+    hiring.crew.touch();
+  };
+
+  /**
+   * 50% pool checkpoint: a strike settles itself when the bank can pay (cooldown still applies). Tried at the strike
+   * and then on every tick while it lasts (build .81: only the strike-time try existed, and a strike happens exactly
+   * when the bank can't pay, so the perk never fired).
+   */
+  const selfSettle = (folk) => {
+    if (!folk.onStrike || !hiring.autoSettle?.() || !api.canSettle(folk) || !api.settle(folk)) return false;
+    if (game._isInOnlineLoop) {
       game.notifications.createSuccessNotification(
         'worker_folks:autosettle',
         templateLangString('MOD_WF_AUTO_SETTLED', { name: folk.name }),
         hiring.portrait(folk.tier),
       );
     }
+    return true;
+  };
+
+  /**
+   * Wages off (No sweat) parks debts and strikes instead of forgiving them (the user's call, build .86: otherwise a
+   * player on a hard difficulty switches to No sweat for a moment to walk out of a strike). While off, `charge` returns
+   * before any debt moves, `hiring.struck` / `hiring.owing` read false, so a struck Folk may work and nothing shows.
+   * When wages come back, a struck Folk that is working stops again (the strike toast once more) and a debt's grace
+   * clock goes on from where it stood. One info toast when wages go off with something parked.
+   */
+  let wagesWereOn;
+  const parkedCount = () => hiring.crew.all.filter((f) => f.onStrike || f.debt > 0).length;
+  const wagesSwitched = (on) => {
+    if (on) {
+      hiring.crew.all.forEach((folk) => {
+        const skill = hiring.skillOf(folk);
+        if (!folk.onStrike || skill === undefined || !hiring.delegated.has(skill)) return;
+        log(`${folk.name}: wages are back, the strike on ${skill.id} resumes`);
+        hiring.forceStop(skill);
+        if (!game._isInOnlineLoop) return;
+        game.notifications.createErrorNotification(
+          'worker_folks:strike',
+          templateLangString('MOD_WF_STRIKE_NOTIFICATION', { name: folk.name, skill: hiring.skillName(skill) }),
+          hiring.portrait(folk.tier),
+        );
+      });
+    } else if (parkedCount() > 0 && game._isInOnlineLoop) {
+      game.notifications.createInfoNotification('worker_folks:parked', getLangString('MOD_WF_NO_SWEAT_PARKED'), hiring.getMediaURL('img/payroll_reserve.png'));
+    }
     hiring.crew.touch();
   };
 
-  // Cooldowns run on game ticks, online and offline alike.
+  // Cooldowns and self-settling strikes run on game ticks, online and offline alike.
   ctx.patch(Game, 'tick').after(function () {
     if (hiring === undefined) return;
+    const on = api.enabled;
+    if (wagesWereOn !== undefined && on !== wagesWereOn) wagesSwitched(on);
+    wagesWereOn = on;
     let changed = false;
     hiring.crew.all.forEach((folk) => {
+      if (on && folk.onStrike && selfSettle(folk)) changed = true;
       if (folk.cooldownTicks > 0) {
         folk.cooldownTicks = wages.tickCooldown(folk.cooldownTicks, 1);
         if (folk.cooldownTicks === 0) changed = true;
@@ -283,9 +344,15 @@ export function install(ctx, { getHiring, wages, pricing, milestones, log }) {
   });
   ctx.onCharacterLoaded(() => {
     hiring.events.on('folkActionDone', charge);
-    // Cooldown countdown on cards: refresh once a second while someone cools down.
+    // Once a second on the Hiring page: the cooldown countdown, and the bank's GP / AP (build .81: Settle stayed
+    // disabled with "Need … more" and the reserve said "no GP in your bank" after the bank filled up, until something
+    // else re-rendered the page).
+    let bankSeen = '';
     setInterval(() => {
-      if (hiring.crew.all.some((f) => f.cooldownTicks > 0) && game.openPage?.id === 'worker_folks:Hiring') hiring.renderQueue.folks = true;
+      if (game.openPage?.id !== 'worker_folks:Hiring') return;
+      const bank = [GP_ID, AP_ID].map((id) => currency(id)?.amount ?? 0).join('|');
+      if (bank !== bankSeen || hiring.crew.all.some((f) => f.cooldownTicks > 0)) hiring.renderQueue.folks = true;
+      bankSeen = bank;
     }, 1000);
   });
 

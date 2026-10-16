@@ -320,7 +320,8 @@ function fillCard(col, folk, view) {
   set('status-text', (el) => setText(el, view.statusText(status)));
   const badge = col.querySelector('.wf-status');
   if (badge !== null) {
-    const className = `badge wf-status wf-badge-${status}`;
+    // wf-card-status keeps the badge clear of a long name; rewriting the class used to drop it (build .83).
+    const className = `badge wf-status wf-card-status wf-badge-${status}`;
     if (badge.className !== className) badge.className = className;
   }
   const card = col.querySelector('.wf-card');

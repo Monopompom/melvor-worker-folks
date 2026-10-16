@@ -8,8 +8,13 @@
 // instance: a start that should be delegated lands in `hiring.delegated`, a stop
 // of a delegated skill removes it, and the main slot is left untouched.
 
-export function install(ctx, { getHiring, rules, isDisabled = () => false, log }) {
+export function install(ctx, { getHiring, rules, resume, isDisabled = () => false, log }) {
   let hiring;
+  // The pick each Folk-held skill started on (tree, rock, dig site…), for the hand-over below. Taken at the start:
+  // Woodcutting drops the clicked tree before it stops, so a snapshot at the stop would be empty.
+  const picks = new Map();
+  // True while delegated skills tick: a stop from inside an action (out of materials…) is not the player's click.
+  let ticking = false;
   const skillFor = (action) => (hiring === undefined ? undefined : hiring.delegableSkills.find((s) => s === action));
   const folkFor = (skill) => (skill === undefined ? undefined : hiring.crew.bySkill(skill.id));
   const decide = (action) => {
@@ -38,6 +43,7 @@ export function install(ctx, { getHiring, rules, isDisabled = () => false, log }
         if (hiring !== undefined) {
           if (value !== undefined && decide(value) === 'delegate') {
             hiring.delegated.add(value);
+            picks.set(value, resume.selectionOf(value));
             hiring.renderQueue.folks = true;
             log(`delegated: ${value.id}`);
             hiring.events.emit('folkStarted', { skill: value, folk: folkFor(value) });
@@ -90,37 +96,71 @@ export function install(ctx, { getHiring, rules, isDisabled = () => false, log }
 
   // 2. A stopping delegated skill must not clear the main slot. Wrapped per
   //    instance so skills from other mods (any class with stop()) are covered too.
+  //    The player picked You while the Folk works (pending null) and clicks the Folk's tree, area button or
+  //    recipe: the game toggles it off and stops, which hands the skill to the player but started nothing, so it
+  //    took a second click. The same click now starts the player on the Folk's pick (build .83, the user's call).
   const WRAPPED = Symbol('worker_folks.stopWrapped');
+  const takeOver = (skill, pick) => {
+    if (skill.isActive || hiring.delegated.has(skill) || hiring.crew.bySkill(skill.id) !== undefined) return;
+    try {
+      resume.startAgain(skill, pick);
+      log(`hand-over: you took ${skill.id}`);
+    } catch (err) {
+      log('hand-over start failed', err);
+    }
+  };
   const wrapStop = (skill) => {
     if (skill[WRAPPED]) return;
     const proto = Object.getPrototypeOf(skill);
     skill.stop = function (...args) {
       if (hiring === undefined || !hiring.delegated.has(this)) return proto.stop.apply(this, args);
+      const handOver = !hiring.forcing && !ticking && game._isInOnlineLoop && hiring.pending.get(this) === null;
+      const pick = handOver ? (picks.get(this) ?? resume.selectionOf(this)) : null;
       const previous = hiring.stopping;
       hiring.stopping = this;
+      let stopped;
       try {
-        return proto.stop.apply(this, args);
+        stopped = proto.stop.apply(this, args);
       } finally {
         hiring.stopping = previous;
       }
+      // After the click handler: a click that also starts something (another area's Start) has run by then.
+      if (handOver && stopped !== false) queueMicrotask(() => takeOver(this, pick));
+      return stopped;
     };
     skill[WRAPPED] = true;
   };
+
+  //    Woodcutting at its cut limit refuses another tree ("Tree cutting limit reached") while the Folk still holds
+  //    its trees: with You picked, a click on another tree hands the skill over first, so the game then starts the
+  //    player on that tree (build .83).
+  if (typeof Woodcutting !== 'undefined') {
+    ctx.patch(Woodcutting, 'selectTree').before(function (tree) {
+      if (hiring === undefined || !hiring.delegated.has(this) || hiring.pending.get(this) !== null) return;
+      if (tree === undefined || this.activeTrees.has(tree) || this.activeTrees.size < this.treeCutLimit) return;
+      hiring.applyPending(this);
+    });
+  }
 
   // 3. Tick every delegated skill after the main action (online and offline
   //    loops both come through Game.tick). Golbin Raid and pauses skip them.
   ctx.patch(Game, 'tick').after(function () {
     if (hiring === undefined || this.isGolbinRaid || this._isPaused || hiring.delegated.size === 0) return;
-    for (const skill of Array.from(hiring.delegated)) {
-      if (!skill.isActive) {
-        hiring.release(skill);
-        continue;
+    ticking = true;
+    try {
+      for (const skill of Array.from(hiring.delegated)) {
+        if (!skill.isActive) {
+          hiring.release(skill);
+          continue;
+        }
+        // The timer fires its action on the tick that brings ticksLeft to 0.
+        const fires = skill.actionTimer.isActive && skill.actionTimer.ticksLeft === 1;
+        const intervalMs = skill.actionTimer.maxTicks * TICK_INTERVAL;
+        skill.activeTick();
+        if (fires) hiring.delegatedActionDone(skill, intervalMs);
       }
-      // The timer fires its action on the tick that brings ticksLeft to 0.
-      const fires = skill.actionTimer.isActive && skill.actionTimer.ticksLeft === 1;
-      const intervalMs = skill.actionTimer.maxTicks * TICK_INTERVAL;
-      skill.activeTick();
-      if (fires) hiring.delegatedActionDone(skill, intervalMs);
+    } finally {
+      ticking = false;
     }
   });
 

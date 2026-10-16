@@ -263,7 +263,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
         root.replaceChildren();
         const head = document.createElement('small');
         head.className = 'wf-subtle d-block text-center wf-gear-head';
-        head.textContent = `${hiring.roleName(folk.tier)} · ${skill === undefined ? getLangString('MOD_WF_UNASSIGNED') : skill.name} · ${getLangString('MOD_WF_GEAR_HINT')}`;
+        head.textContent = `${hiring.roleName(folk.tier)} · ${skill === undefined ? getLangString('MOD_WF_UNASSIGNED') : hiring.skillName(skill)} · ${getLangString('MOD_WF_GEAR_HINT')}`;
         root.append(head);
         // Laid out like the character's equipment (build .65, user request): every slot at the game's own grid
         // position; slots this tier hasn't opened yet greyed out in place, a tap saying which tier opens them.
@@ -453,12 +453,24 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
           });
           refreshPicked();
         };
+        // Your levels gate what a Folk may wear: such items stay listed (greyed, last) and say what they need,
+        // instead of Equip ending in the game's level toast (regression pass, build .83).
+        const needs = (item) => {
+          if (game.checkRequirements(item.equipRequirements, false)) return null;
+          const levels = (item.equipRequirements ?? [])
+            .filter((r) => r.type === 'SkillLevel' && r.skill !== undefined && r.skill.level < r.level)
+            .map((r) => `${hiring.skillName(r.skill)} ${r.level}`);
+          return levels.length > 0 ? levels.join(', ') : getLangString('MOD_WF_PICKER_LOCKED_OTHER');
+        };
         const refreshPicked = () => {
-          equip.disabled = picked === undefined;
-          if (allQty !== undefined) allQty.disabled = picked === undefined;
+          const missing = picked === undefined ? null : needs(picked);
+          equip.disabled = picked === undefined || missing !== null;
+          if (allQty !== undefined) allQty.disabled = picked === undefined || missing !== null;
           pickedLine.classList.toggle('font-w600', picked !== undefined);
+          pickedLine.classList.toggle('text-warning', missing !== null);
           pickedLine.textContent = picked === undefined ? getLangString('MOD_WF_PICKER_PICK')
-            : templateLangString('MOD_WF_PICKER_PICKED', { item: picked.name, count: numberWithCommas(game.bank.getQty(picked)) });
+            : missing !== null ? templateLangString('MOD_WF_PICKER_LOCKED', { item: picked.name, needs: missing })
+              : templateLangString('MOD_WF_PICKER_PICKED', { item: picked.name, count: numberWithCommas(game.bank.getQty(picked)) });
         };
         const fill = () => {
           clearTips();
@@ -466,7 +478,8 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
           picked = undefined;
           refreshPicked();
           const narrowed = !showAll.checked && skill !== undefined;
-          const items = api.candidates(folk, slotId, { showAll: showAll.checked });
+          const all = api.candidates(folk, slotId, { showAll: showAll.checked });
+          const items = [...all.filter((it) => needs(it) === null), ...all.filter((it) => needs(it) !== null)];
           pickedLine.classList.toggle('d-none', items.length === 0);
           equip.classList.toggle('d-none', items.length === 0);
           hint.classList.toggle('d-none', items.length === 0);
@@ -475,16 +488,16 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
             // The reason fills the empty grid, centred both ways (build .62, user layout).
             const none = document.createElement('div');
             none.className = 'wf-picker-none';
-            none.textContent = narrowed ? templateLangString('MOD_WF_PICKER_NONE_FOR_SKILL', { skill: skill.name }) : getLangString('MOD_WF_PICKER_NONE');
+            none.textContent = narrowed ? templateLangString('MOD_WF_PICKER_NONE_FOR_SKILL', { skill: hiring.skillName(skill) }) : getLangString('MOD_WF_PICKER_NONE');
             grid.append(none);
             return;
           }
-          hint.textContent = narrowed ? templateLangString('MOD_WF_PICKER_FOR_SKILL', { skill: skill.name }) : getLangString('MOD_WF_PICKER_ALL');
+          hint.textContent = narrowed ? templateLangString('MOD_WF_PICKER_FOR_SKILL', { skill: hiring.skillName(skill) }) : getLangString('MOD_WF_PICKER_ALL');
           items.forEach((item) => {
             const count = numberWithCommas(game.bank.getQty(item));
             const b = document.createElement('button');
             b.type = 'button';
-            b.className = 'btn btn-sm btn-outline-info wf-picker-item';
+            b.className = `btn btn-sm btn-outline-info wf-picker-item${needs(item) !== null ? ' wf-picker-locked' : ''}`;
             b.innerHTML = `<img src="${item.media}" alt=""><small>${count}</small>`;
             b.setAttribute('aria-label', `${item.name} ×${count}`);
             b.setAttribute('aria-pressed', 'false');
@@ -522,7 +535,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
           // Not d-block: Bootstrap's d-block outranks d-none, so the text never hid and "?" did nothing (build .63).
           desc.className = 'wf-picker-desc mt-2 d-none';
           desc.id = `${showAll.id}-desc`;
-          desc.textContent = templateLangString('MOD_WF_PICKER_SHOW_ALL_DESC', { skill: skill.name });
+          desc.textContent = templateLangString('MOD_WF_PICKER_SHOW_ALL_DESC', { skill: hiring.skillName(skill) });
           const help = document.createElement('button');
           help.type = 'button';
           help.className = 'btn btn-sm wf-help ml-2';

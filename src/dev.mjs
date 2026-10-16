@@ -185,7 +185,10 @@ export function install({ hiring, log, tiers }) {
       return rows;
     },
     clear() {
+      // Like firing everyone: the slots' mastery goes back to 1 too (it stayed, regression pass, build .83).
+      const slots = hiring.crew.all.map((folk) => folk.slot);
       hiring.crew.clear();
+      slots.forEach((slot) => hiring.resetSlotMastery(slot));
     },
     /** The exact JSON that goes into the save. */
     dump() {

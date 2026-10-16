@@ -53,3 +53,14 @@ test('Shift Slot price ladder and licence caps', () => {
   assert.equal(shiftSlotCap('Expert', 15), 15);
   assert.equal(shiftSlotCap('Expert', 18), 18);
 });
+
+test('shop text uses each tier\'s plural and article (Journeymen, an Apprentice)', () => {
+  const { shopPurchases } = buildShopData();
+  const byId = Object.fromEntries(shopPurchases.map((p) => [p.id, p]));
+  const names = shopPurchases.map((p) => `${p.customName} ${p.customDescription}`).join(' ');
+  assert.ok(!/Journeymans|Foremans|a Apprentice/.test(names));
+  assert.match(Object.values(byId).find((p) => /Apprentice Licence/.test(p.customName)).customDescription, /promoting Apprentices/);
+  assert.match(names, /promoting Journeymen/);
+  assert.ok(shopPurchases.some((p) => p.customName === 'Hire an Apprentice'));
+  assert.ok(shopPurchases.some((p) => p.customName === 'Hire a Foreman'));
+});

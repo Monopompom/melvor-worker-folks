@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-10-16.75';
+export const BUILD = '2026-10-16.86';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -74,6 +74,7 @@ export async function setup(ctx) {
   const levels = await ctx.loadModule('src/levels.mjs');
   const healthRules = await ctx.loadModule('src/health-rules.mjs');
   const health = await ctx.loadModule('src/health.mjs');
+  const resume = await ctx.loadModule('src/resume.mjs');
   const payroll = await ctx.loadModule('src/payroll.mjs');
   const dev = DEV ? await ctx.loadModule('src/dev.mjs') : null;
   const pricing = await ctx.loadModule('src/pricing.mjs');
@@ -168,6 +169,7 @@ export async function setup(ctx) {
   delegation.install(ctx, {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     rules: delegationRules,
+    resume,
     isDisabled: () => state.disabled,
     log,
   });
@@ -203,6 +205,7 @@ export async function setup(ctx) {
     wages,
     pricing,
     milestones,
+    resume,
     log,
   });
 

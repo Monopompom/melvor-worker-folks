@@ -43,6 +43,8 @@
 .wf-status-strike { border-color: #bf1f1f !important; }
 .wf-status { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-size: 0.9em; }
 .wf-status-icon { width: 18px; height: 18px; }
+/* A long name truncates with room to spare: the badge never shrinks and keeps 12px from it (build .83). */
+.wf-card-status { margin-left: 12px; flex-shrink: 0; }
 /* Status colours: the card badge (wf-badge-*) and the dropdown status line (wf-text-*). */
 .wf-badge-working { background-color: #2f8a3c; color: #fff; }
 .wf-badge-idle { background-color: #5c6873; color: #fff; }
@@ -88,10 +90,31 @@
 .wf-worker-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 /* Worn gear on a Worker popup tile (build .54): 20px icons; amber ring when a charge item ran out. */
 .wf-worker-none { display: flex; align-items: center; justify-content: center; text-align: center; padding: 8px; border-radius: 6px; background: rgba(255,255,255,0.05); font-size: 1rem; line-height: 1.3; }
-/* Reserve: one block per currency like the bank's Sell block; a 40px field, presets with even gaps, Deposit ~75%. */
-.wf-reserve-input { min-height: 40px; width: 100%; }
-.wf-reserve-presets { display: flex; flex-wrap: wrap; gap: 8px; }
-.wf-reserve-deposit { width: 75%; min-height: 40px; }
+/* Reserve (build .76): one block per currency like the bank's Sell block: name left and amount right, a fill bar,
+   the 40px field (7 digits wide) with its presets on one row (presets drop under it when it can't fit), a thin rule,
+   Deposit the full width of the block (the user's call, build .78). */
+#worker-folks-reserve > .block-content { padding: 20px !important; }
+#worker-folks-reserve [data-wf="reserve-capacity"] { margin-bottom: 16px !important; }
+#worker-folks-reserve [data-wf="reserve-rows"] .row { row-gap: 12px; }
+.wf-reserve-block.wf-band { padding: 16px 18px; }
+.wf-reserve-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.wf-reserve-bar { height: 6px; margin-top: 10px !important; background: rgba(255,255,255,0.08); }
+.wf-reserve-covers { margin-top: 8px; }
+.wf-reserve-rule { margin: 14px 0; border-top: 1px solid rgba(255,255,255,0.1); }
+.wf-reserve-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.wf-reserve-input { min-height: 40px; flex: 1 1 8rem; min-width: 8rem; width: auto; }
+.wf-reserve-presets { display: flex; gap: 6px; flex: 0 0 auto; }
+.wf-reserve-presets .btn { min-height: 32px; min-width: 40px; }
+.wf-reserve-deposit { width: 100%; min-height: 40px; margin-top: 14px !important; }
+/* Top row (build .79): reserve and Tips one height (row-deck); Tips is a grid of bands, as many side by side as fit
+   at 15rem each, two rows a page; the pager buttons are 32px squares. */
+.wf-top-row > [class*="col"] > .block { margin-bottom: 24px; }
+#worker-folks-tips > .wf-tips-content { padding: 20px !important; display: flex; flex-direction: column; }
+.wf-tips-icon { font-size: 1.25rem; width: 24px; text-align: center; }
+.wf-tips-pager .btn { min-width: 32px; min-height: 32px; }
+.wf-tips-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 12px; flex: 1 1 auto; align-content: start; }
+.wf-tip.wf-band { padding: 14px 16px; }
+.wf-tip-body { margin-top: 4px; line-height: 1.4; }
 /* Gear picker (build .62): Equip and Back stacked, one width, centred. */
 /* One line (build .71): Back left, Equip centred, Show all with its "?" right in a frame that only lines it up
    with the buttons (no hover, no pointer of its own). Columns are fixed, so a hidden Equip leaves its gap. */
@@ -130,6 +153,7 @@
 .wf-picker-item { position: relative; width: 52px; height: 52px; padding: 0; display: flex; align-items: center; justify-content: center; line-height: 1; }
 .wf-picker-item img { width: 40px; height: 40px; object-fit: contain; display: block; }
 .wf-picker-item small { position: absolute; right: 2px; bottom: 0; font-size: 0.8rem !important; line-height: 1; background: rgba(0,0,0,0.6); border-radius: 3px; padding: 1px 2px; }
+.wf-picker-item.wf-picker-locked img { opacity: 0.4; filter: grayscale(0.8); }
 .wf-picker-qty-row { gap: 8px; }
 .wf-picker-qty { width: 7rem; min-height: 40px; }
 .wf-picker-controls { margin-top: 0.75rem; }
