@@ -8,10 +8,10 @@
         <div class="block block-rounded border-top border-worker-folks border-4x" id="worker-folks-reserve">
           <div class="block-content p-3">
             <div class="d-flex align-items-center mb-2">
-              <img class="skill-icon-sm mr-2" data-wf="reserve-icon" />
+              <img class="skill-icon-sm mr-2" data-wf="reserve-icon" alt="" />
               <h5 class="font-w600 mb-0"><lang-string lang-id="MOD_WF_RESERVE_TITLE"></lang-string></h5>
+              <button type="button" class="btn btn-sm wf-help" data-wf-help="reserve"><i class="fa fa-question-circle"></i></button>
             </div>
-            <small class="text-muted d-block mb-2"><lang-string lang-id="MOD_WF_RESERVE_DESC"></lang-string></small>
             <div data-wf="reserve-rows"></div>
           </div>
         </div>
@@ -21,7 +21,8 @@
       <div class="col-12" id="worker-folks-empty">
         <div class="block block-rounded border-top border-worker-folks border-4x text-center p-3">
           <h5 class="font-w600 mb-1"><lang-string lang-id="MOD_WF_NO_WORKERS"></lang-string></h5>
-          <small class="text-muted"><lang-string lang-id="MOD_WF_NO_WORKERS_DESC"></lang-string></small>
+          <div class="mb-2" data-wf="empty-desc"><lang-string lang-id="MOD_WF_NO_WORKERS_DESC"></lang-string></div>
+          <button type="button" class="btn btn-outline-info" data-wf="open-shop"><lang-string lang-id="MOD_WF_BUTTON_OPEN_SHOP"></lang-string></button>
         </div>
       </div>
     </div>
@@ -30,56 +31,64 @@
 
 <template id="wf-folk-card-template">
   <div class="col-12 col-md-6 col-xl-4">
+    <!-- Sections: who, work, health, strike (only on a strike or debt), actions.
+         The card is a flex column and the actions band sits at the bottom, so cards in a row line up. -->
     <div class="block block-rounded border-top border-worker-folks border-4x wf-card">
-      <div class="block-content p-3">
-        <div class="d-flex align-items-start">
-          <img class="wf-card-portrait mr-3" data-wf="portrait" />
-          <div class="flex-fill wf-min0">
-            <div class="d-flex justify-content-between align-items-start">
-              <div class="wf-min0">
-                <h5 class="font-w600 mb-0 text-truncate" data-wf="name"></h5>
-                <small class="text-muted"><span data-wf="role"></span> &middot; <span data-wf="slot"></span></small>
+      <div class="block-content p-2 wf-card-body">
+        <div class="wf-band wf-band-who">
+          <div class="d-flex align-items-start">
+            <img class="wf-card-portrait mr-3" data-wf="portrait" alt="" />
+            <div class="flex-fill wf-min0">
+              <div class="d-flex justify-content-between align-items-start">
+                <div class="wf-min0">
+                  <h5 class="font-w600 mb-0 text-truncate" data-wf="name"></h5>
+                  <small class="wf-subtle"><span data-wf="role"></span> &middot; <span data-wf="slot"></span></small>
+                </div>
+                <span class="badge wf-status ml-2">
+                  <img class="wf-status-icon" data-wf="status-icon" alt="" />
+                  <span data-wf="status-text"></span>
+                </span>
               </div>
-              <span class="badge wf-status ml-2">
-                <img class="wf-status-icon" data-wf="status-icon" />
-                <span data-wf="status-text"></span>
-              </span>
+              <div class="wf-card-badges">
+                <span class="badge badge-info" data-wf="rate"></span>
+                <span class="badge badge-warning" data-wf="wage"></span>
+              </div>
+              <small class="wf-subtle d-block" data-wf="effects"></small>
             </div>
-            <div class="mt-1 font-size-sm">
-              <span class="badge badge-info" data-wf="rate"></span>
-              <span class="badge badge-warning" data-wf="wage"></span>
-            </div>
-            <small class="text-muted d-block" data-wf="effects"></small>
           </div>
         </div>
-        <div class="wf-hp mt-2" data-wf="hp">
-          <div class="progress wf-hp-bar"><div class="progress-bar bg-danger" role="progressbar" data-wf="hp-bar"></div></div>
-          <small class="text-muted" data-wf="hp-text"></small>
-        </div>
-        <mastery-display class="wf-mastery mt-1" data-wf="mastery"></mastery-display>
-        <div class="font-size-sm d-none wf-strike-block mt-2" data-wf="strike">
-          <small class="text-danger d-block font-w600" data-wf="strike-owed"></small>
-          <button type="button" class="btn btn-sm btn-success mt-1 mr-1" data-wf="settle"></button>
-          <button type="button" class="btn btn-sm btn-outline-success mt-1" data-wf="apologise"></button>
-        </div>
-        <div class="wf-card-section font-size-sm">
-          <div class="d-flex align-items-center justify-content-between">
+        <div class="wf-band wf-band-work">
+          <div class="d-flex align-items-center justify-content-between wf-gap">
             <span class="font-w700 wf-card-skill" data-wf="skill"></span>
             <button type="button" class="btn btn-sm btn-danger d-none" data-wf="stop"></button>
           </div>
-          <small class="text-muted d-block" data-wf="detail"></small>
+          <small class="d-block" data-wf="detail"></small>
+          <mastery-display class="wf-mastery mt-1" data-wf="mastery"></mastery-display>
         </div>
-        <div class="wf-card-section">
+        <div class="wf-band wf-band-health" data-wf="hp">
+          <div class="progress wf-hp-bar"><div class="progress-bar bg-danger" role="progressbar" data-wf="hp-bar"></div></div>
+          <small class="d-block" data-wf="hp-text"></small>
+          <small class="d-block" data-wf="food"></small>
+        </div>
+        <div class="wf-band wf-band-strike d-none" data-wf="strike">
+          <div class="d-block font-w600" data-wf="strike-owed"></div>
+          <div class="wf-card-actions mt-1">
+            <button type="button" class="btn btn-sm btn-success" data-wf="settle"></button>
+            <button type="button" class="btn btn-sm btn-outline-success" data-wf="apologise"></button>
+          </div>
+          <small class="d-block text-warning mt-1 d-none" data-wf="strike-why"></small>
+        </div>
+        <div class="wf-band wf-band-actions">
           <div class="wf-card-actions">
-            <button type="button" class="btn btn-sm btn-outline-info" data-wf="expand"></button>
+            <button type="button" class="btn btn-sm btn-outline-info" data-wf="expand" aria-expanded="false"></button>
             <button type="button" class="btn btn-sm btn-outline-info" data-wf="gear"></button>
             <button type="button" class="btn btn-sm btn-outline-primary" data-wf="promote"></button>
             <button type="button" class="btn btn-sm btn-outline-danger ml-auto" data-wf="fire"></button>
           </div>
-          <div class="wf-details d-none mt-2 font-size-sm" data-wf="details">
+          <div class="wf-details d-none mt-2" data-wf="details">
             <div class="font-w600 mb-1" data-wf="perks-title"></div>
             <ul class="pl-3 mb-2" data-wf="perks"></ul>
-            <button type="button" class="btn btn-sm btn-outline-warning d-none" data-wf="overtime"></button>
+            <button type="button" class="btn btn-sm btn-outline-warning d-none" data-wf="overtime" aria-pressed="false"></button>
           </div>
         </div>
       </div>
@@ -91,11 +100,10 @@
   <div class="col-12 col-md-6 col-xl-4">
     <div class="block block-rounded border-top border-secondary border-4x wf-card wf-frozen">
       <div class="block-content p-3 d-flex align-items-center">
-        <img class="wf-card-portrait mr-3 wf-frozen-portrait" data-wf="portrait" />
+        <img class="wf-card-portrait mr-3 wf-frozen-portrait" data-wf="portrait" alt="" />
         <div>
-          <h5 class="font-w600 mb-0 text-muted" data-wf="title"></h5>
-          <small class="text-muted d-block" data-wf="text"></small>
-          <small class="text-danger d-block wf-frozen-why" data-wf="why"></small>
+          <h5 class="font-w600 mb-0" data-wf="title"><span data-wf="title-text"></span><button type="button" class="btn btn-sm wf-help" data-wf-help="frozen"><i class="fa fa-question-circle"></i></button></h5>
+          <div class="text-warning font-w600" data-wf="text"></div>
         </div>
       </div>
     </div>
@@ -105,7 +113,7 @@
 <template id="wf-skill-control-template">
   <div class="block block-rounded border-top border-worker-folks border-4x wf-skill-control wf-ui mb-3">
     <div class="block-content p-2 d-flex align-items-center flex-wrap">
-      <img class="skill-icon-xs mr-2" data-wf="icon" />
+      <img class="skill-icon-xs mr-2" data-wf="icon" alt="" />
       <span class="font-w600 mr-2"><lang-string lang-id="MOD_WF_CTRL_LABEL"></lang-string>:</span>
       <button type="button" class="btn btn-sm btn-outline-info wf-ctrl-button mr-3 my-1" data-wf="folk-button"></button>
       <small class="text-muted mr-3 my-1" data-wf="status"></small>

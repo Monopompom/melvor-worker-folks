@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { slotsForTier, isSkillingItem, helpsSkill, normalizeLoadout, reconcileLoadout, equipQuantity, isFolkGear } from '../src/loadout-rules.mjs';
+import { slotsForTier, isSkillingItem, helpsSkill, normalizeLoadout, reconcileLoadout, equipQuantity, isFolkGear, gearSummary } from '../src/loadout-rules.mjs';
 
 test('slots open cumulatively by tier; expansion slots need the expansion', () => {
   assert.deepEqual(slotsForTier('Newbie'), ['melvorD:Cape', 'melvorD:Gloves']);
@@ -58,4 +58,19 @@ test('equipQuantity caps stacks to what the bank holds and forces 1 for single s
   assert.equal(equipQuantity(0, { allowQuantity: true, available: 20 }), 0);
   assert.equal(equipQuantity(99, { allowQuantity: false, available: 3 }), 1);
   assert.equal(equipQuantity(1, { allowQuantity: false, available: 0 }), 0);
+});
+
+test('gearSummary counts filled of open slots and flags charge items at zero', () => {
+  const tiles = [
+    { name: 'Cape', empty: true },
+    { name: 'Gem Gloves', empty: false, qty: 0, charges: 0 },
+    { name: 'Scroll', empty: false, qty: 500, charges: undefined },
+    { name: 'Mining Gloves', empty: false, qty: 0, charges: 12 },
+  ];
+  const s = gearSummary(tiles);
+  assert.equal(s.filled, 3);
+  assert.equal(s.open, 4);
+  assert.deepEqual(s.out.map((t) => t.name), ['Gem Gloves']);
+  assert.deepEqual(gearSummary([]), { filled: 0, open: 0, worn: [], out: [] });
+  assert.deepEqual(gearSummary(undefined), { filled: 0, open: 0, worn: [], out: [] });
 });

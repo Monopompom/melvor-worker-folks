@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   maxHpFor, currentHp, damageRoll, applyDamage, shouldEat, foodHeal, eatPlan, regenAmount,
-  freezeUntil, freezeRemaining, activeFreezes, FREEZE_MS,
+  freezeUntil, freezeRemaining, activeFreezes, FREEZE_MS, foodLineState, FOOD_LOW,
 } from '../src/health-rules.mjs';
 
 test('max HP rises with tier; saved null hp means full', () => {
@@ -43,4 +43,14 @@ test('regen and freezes', () => {
   assert.equal(freezeRemaining(5000, 2000), 3000);
   assert.equal(freezeRemaining(1000, 2000), 0);
   assert.deepEqual(activeFreezes({ 0: 10, 1: 5000, 2: 'x' }, 100), { 1: 5000 });
+});
+
+test('foodLineState: food matters on Thieving only', () => {
+  assert.equal(foodLineState({ skillId: 'melvorD:Woodcutting', foodQty: 0 }), 'off');
+  assert.equal(foodLineState({ skillId: null, foodQty: 500 }), 'off');
+  assert.equal(foodLineState({}), 'off');
+  assert.equal(foodLineState({ skillId: 'melvorD:Thieving', foodQty: 0 }), 'none');
+  assert.equal(foodLineState({ skillId: 'melvorD:Thieving', foodQty: undefined }), 'none');
+  assert.equal(foodLineState({ skillId: 'melvorD:Thieving', foodQty: FOOD_LOW - 1 }), 'low');
+  assert.equal(foodLineState({ skillId: 'melvorD:Thieving', foodQty: FOOD_LOW }), 'ok');
 });

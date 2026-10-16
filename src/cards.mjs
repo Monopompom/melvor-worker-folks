@@ -20,7 +20,17 @@ export function renderFolkCards(folks, view) {
   const template = document.getElementById(CARD_TEMPLATE_ID);
   if (list === null || template === null) return false;
   const empty = document.getElementById(EMPTY_ID);
-  if (empty !== null) empty.classList.toggle('d-none', folks.length > 0);
+  if (empty !== null) {
+    empty.classList.toggle('d-none', folks.length > 0);
+    // What to buy next depends on the licence (build .55); the button opens the Shop.
+    const desc = empty.querySelector('[data-wf="empty-desc"]');
+    if (desc !== null && typeof view.emptyText === 'function') {
+      const text = view.emptyText();
+      if (desc.textContent !== text) desc.textContent = text;
+    }
+    const shop = empty.querySelector('[data-wf="open-shop"]');
+    if (shop !== null && typeof view.onOpenShop === 'function') shop.onclick = () => view.onOpenShop();
+  }
 
   const existing = new Map();
   list.querySelectorAll(':scope > [data-wf-folk]').forEach((el) => existing.set(el.dataset.wfFolk, el));
@@ -45,12 +55,12 @@ export function renderFolkCards(folks, view) {
       const col = take(`frozen-${f.slot}`, frozenTemplate);
       const portrait = col.querySelector('[data-wf="portrait"]');
       if (portrait !== null) portrait.src = view.portrait('Newbie');
-      const title = col.querySelector('[data-wf="title"]');
+      const title = col.querySelector('[data-wf="title-text"]');
       if (title !== null) title.textContent = view.frozenTitle();
+      const help = col.querySelector('[data-wf-help]');
+      if (help !== null) help.setAttribute('aria-label', view.helpLabel?.() ?? '?');
       const text = col.querySelector('[data-wf="text"]');
       if (text !== null) text.textContent = f.text;
-      const why = col.querySelector('[data-wf="why"]');
-      if (why !== null) why.textContent = typeof view.frozenReason === 'function' ? view.frozenReason() : '';
     });
   }
 
@@ -71,7 +81,7 @@ function fillCard(col, folk, view) {
   set('portrait', (el) => { if (el.getAttribute('src') !== view.portrait(folk.tier)) el.src = view.portrait(folk.tier); el.alt = folk.name; });
   set('name', (el) => setText(el, folk.name));
   set('role', (el) => setText(el, view.roleName(folk.tier)));
-  set('slot', (el) => setText(el, `#${folk.slot + 1}`));
+  set('slot', (el) => setText(el, view.slotText(folk)));
   set('rate', (el) => setText(el, view.rateText(folk)));
   set('effects', (el) => setText(el, view.effectTexts(folk).join(' · ')));
   set('skill', (el) => {
@@ -86,6 +96,7 @@ function fillCard(col, folk, view) {
       if (img === null) {
         img = document.createElement('img');
         img.className = 'skill-icon-xs mr-1';
+        img.alt = '';
         el.prepend(img);
       }
       if (img.getAttribute('src') !== media) img.src = media;
@@ -101,6 +112,9 @@ function fillCard(col, folk, view) {
     const cooldown = view.cooldownText(folk);
     setText(el, cooldown !== '' ? cooldown : view.detailText(folk));
   });
+  // Health is always shown, so cards in a row keep one height (user, build .55). Food matters on Thieving only:
+  // muted elsewhere, amber when low, red with an amber card border when there is none.
+  let foodAlert = false;
   set('hp', (el) => {
     const hp = view.hp?.(folk);
     el.classList.toggle('d-none', hp === undefined);
@@ -112,6 +126,14 @@ function fillCard(col, folk, view) {
     }
     const text = el.querySelector('[data-wf="hp-text"]');
     if (text !== null) setText(text, hp.text);
+    const food = el.querySelector('[data-wf="food"]');
+    if (food !== null && hp.food !== undefined) {
+      setText(food, hp.food.text);
+      const tone = { off: 'wf-subtle', ok: '', low: 'text-warning', none: 'text-danger font-w600' }[hp.food.state] ?? '';
+      const className = `d-block ${tone}`.trim();
+      if (food.className !== className) food.className = className;
+      foodAlert = hp.food.state === 'none';
+    }
   });
   set('mastery', (el) => {
     const slot = view.masterySlot(folk);
@@ -127,10 +149,16 @@ function fillCard(col, folk, view) {
   const expanded = view.isExpanded(folk);
   set('expand', (el) => {
     setText(el, `${view.detailsText()} ${expanded ? '▴' : '▾'}`);
+    el.setAttribute('aria-expanded', `${expanded}`);
     el.onclick = () => view.onToggleExpand(folk);
   });
   set('gear', (el) => {
-    setText(el, view.gearText());
+    const gear = view.gear(folk);
+    setText(el, gear.text);
+    if (el.title !== gear.title) el.title = gear.title;
+    // Amber when a worn item ran out (needs attention); blue outline otherwise, like Details.
+    const className = `btn btn-sm ${gear.out ? 'btn-outline-warning' : 'btn-outline-info'}`;
+    if (el.className !== className) el.className = className;
     el.onclick = () => view.onGear(folk);
   });
   set('promote', (el) => {
@@ -159,7 +187,7 @@ function fillCard(col, folk, view) {
           li = document.createElement('li');
           perks.append(li);
         }
-        const className = line.met ? 'text-success' : 'text-muted';
+        const className = line.met ? 'text-success' : 'wf-subtle';
         if (li.className !== className) li.className = className;
         setText(li, line.text);
       });
@@ -171,6 +199,7 @@ function fillCard(col, folk, view) {
       const className = `btn btn-sm ${ot.on ? 'btn-warning' : 'btn-outline-warning'} mr-2`;
       if (otButton.className !== className) otButton.className = className;
       otButton.classList.toggle('d-none', !ot.unlocked);
+      otButton.setAttribute('aria-pressed', `${ot.on}`);
       otButton.onclick = () => view.onToggleOvertime(folk);
     }
   });
@@ -209,6 +238,13 @@ function fillCard(col, folk, view) {
         apology.onclick = info.onApologise;
       }
     }
+    // A disabled Settle / Apologise says why (grey only with the reason next to it).
+    const why = el.querySelector('[data-wf="strike-why"]');
+    if (why !== null) {
+      const reason = debtOnly ? '' : info.reason ?? '';
+      setText(why, reason);
+      why.classList.toggle('d-none', reason === '');
+    }
   });
   set('stop', (el) => {
     const working = view.isWorking(folk);
@@ -224,5 +260,7 @@ function fillCard(col, folk, view) {
     const className = `badge wf-status wf-badge-${status}`;
     if (badge.className !== className) badge.className = className;
   }
-  col.querySelector('.wf-card')?.classList.toggle('wf-status-strike', status === 'strike');
+  const card = col.querySelector('.wf-card');
+  card?.classList.toggle('wf-status-strike', status === 'strike');
+  card?.classList.toggle('wf-card-alert', status !== 'strike' && foodAlert);
 }

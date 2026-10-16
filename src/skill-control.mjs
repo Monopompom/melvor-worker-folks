@@ -63,7 +63,7 @@ export function install(ctx, { getHiring, isDisabled = () => false, log }) {
     const shown = pending === undefined ? holder : pending ?? undefined;
     const root = document.createElement('div');
     root.className = 'wf-worker-grid';
-    const tile = ({ media, title, lines = [], active = false, disabled = false, onClick }) => {
+    const tile = ({ media, title, lines = [], gear, active = false, disabled = false, onClick }) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = `wf-worker-tile${active ? ' wf-worker-tile-active' : ''}`;
@@ -71,6 +71,7 @@ export function install(ctx, { getHiring, isDisabled = () => false, log }) {
       const img = document.createElement('img');
       img.className = 'wf-worker-portrait';
       img.src = media;
+      img.alt = '';
       b.append(img);
       const text = document.createElement('div');
       text.className = 'wf-worker-text';
@@ -101,11 +102,27 @@ export function install(ctx, { getHiring, isDisabled = () => false, log }) {
             const icon = document.createElement('img');
             icon.className = 'wf-line-icon';
             icon.src = seg.icon;
+            icon.alt = '';
             s.append(icon);
           }
           if (seg.text) s.append(document.createTextNode(seg.text));
         }
         text.append(s);
+      }
+      // What the Folk wears (build .54): small icons under the status, the item name on hover, amber ring when it
+      // ran out. Nothing when the Folk wears nothing.
+      if (gear !== undefined && gear.worn.length > 0) {
+        const row = document.createElement('div');
+        row.className = 'wf-worker-gear';
+        for (const t of gear.worn) {
+          const icon = document.createElement('img');
+          icon.src = t.media;
+          icon.title = t.name;
+          icon.alt = t.name;
+          if (t.charges === 0) icon.className = 'wf-worker-gear-out';
+          row.append(icon);
+        }
+        text.append(row);
       }
       b.append(text);
       if (!disabled) b.onclick = () => { onClick(); Swal.close(); };
@@ -123,6 +140,7 @@ export function install(ctx, { getHiring, isDisabled = () => false, log }) {
       media: hiring.portrait(opt.tier),
       title: `${opt.name} (${hiring.roleName(opt.tier)})`,
       lines: opt.lines,
+      gear: (() => { const f = hiring.crew.byId(opt.id); return f === undefined ? undefined : hiring.loadout?.summary(f); })(),
       active: shown !== undefined && opt.id === shown.id,
       disabled: !opt.available,
       onClick: () => hiring.setWorker(skill, opt.id),
@@ -134,6 +152,11 @@ export function install(ctx, { getHiring, isDisabled = () => false, log }) {
       none.textContent = getLangString('MOD_WF_CTRL_NO_FOLKS');
       root.append(none);
     }
+    // Columns: up to three, never more than there are tiles, so the popup hugs the grid (build .52, user report:
+    // on a ~960px window two columns sat left with an empty third on the right). The CSS picks 3, 2 or 1 by width.
+    const n = root.childElementCount;
+    root.style.setProperty('--wf-cols3', `${Math.max(1, Math.min(n, 3))}`);
+    root.style.setProperty('--wf-cols2', `${Math.max(1, Math.min(n, 2))}`);
     SwalLocale.fire({
       title: templateLangString('MOD_WF_CTRL_PICK_TITLE', { skill: skill.name }),
       html: root,
@@ -156,6 +179,7 @@ export function install(ctx, { getHiring, isDisabled = () => false, log }) {
     if (shown !== undefined) {
       const img = document.createElement('img');
       img.className = 'wf-ctrl-portrait mr-1';
+      img.alt = '';
       img.src = hiring.portrait(shown.tier);
       button.append(img);
     }
@@ -174,7 +198,11 @@ export function install(ctx, { getHiring, isDisabled = () => false, log }) {
       status = `${templateLangString('MOD_WF_CTRL_PENDING', { name: pending.name, skill: from })} · ${slots}`;
       tone = 'text-warning font-w600';
     } else if (holder === undefined) status = slots;
-    else if (!working) status = `${templateLangString('MOD_WF_CTRL_READY', { name: holder.name })} · ${slots}`;
+    else if (!working) {
+      // Ready to work is news, not a footnote: normal text, not muted (build .55).
+      status = `${templateLangString('MOD_WF_CTRL_READY', { name: holder.name })} · ${slots}`;
+      tone = 'font-w600';
+    }
     else if (hiring.debtText(holder) !== null) {
       const d = hiring.debtText(holder);
       status = `${templateLangString('MOD_WF_CTRL_DEBT', { name: holder.name, amount: d.amount, minutes: d.minutes })} · ${slots}`;

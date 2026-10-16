@@ -120,3 +120,17 @@ export function cooldownAfterSettlement(tier, { apology = false } = {}) {
 export function tickCooldown(cooldownTicks, ticks) {
   return Math.max(0, cooldownTicks - Math.max(0, ticks));
 }
+
+/**
+ * A Payroll Reserve deposit (build .55): what actually goes in and why, so the panel can say so instead of failing
+ * silently. `room` is Infinity without a level cap. outcome: 'empty' (no amount), 'full' (no room), 'short' (the bank
+ * can't cover the amount), 'cut' (more than the room: the room goes in), 'ok'.
+ */
+export function depositPlan({ amount, bank, room = Infinity }) {
+  const want = Math.floor(Number(amount));
+  if (!(want > 0)) return { deposit: 0, outcome: 'empty' };
+  if (!(room > 0)) return { deposit: 0, outcome: 'full' };
+  if (want > bank) return { deposit: 0, outcome: 'short' };
+  if (want > room) return { deposit: Math.floor(room), outcome: 'cut' };
+  return { deposit: want, outcome: 'ok' };
+}

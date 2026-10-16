@@ -110,6 +110,41 @@ export function install({ hiring, log, tiers }) {
       console.log('summary:', hiring.loadout.summaryLines(folk, skill).map((l) => l.text));
       return true;
     },
+    /**
+     * workerFolksDev.gear(id, skillId?, { replace, qty }) — fills every open slot of a Folk with the best item for its
+     * skill (or `skillId`), taken from the whole game: the item is added to the bank, then equipped through the normal
+     * equip path, so every Folk-gear rule still applies. Items made for that skill win over all-skill ones, then the
+     * higher sell price. Stackable slots (consumable, familiars) get `qty` (1000). Filled slots are kept unless
+     * `replace` is true. Prints and returns what went where.
+     */
+    gear(id, skillId, { replace = false, qty = 1000 } = {}) {
+      const folk = hiring.crew.byId(id);
+      if (folk === undefined || hiring.loadout === undefined) { console.error(`[Worker Folks] no Folk "${id}"; see workerFolksDev.list()`); return false; }
+      const skill = skillId !== undefined ? game.skills.getObjectByID(skillId) : hiring.skillOf(folk);
+      if (skill === undefined) { console.error('[Worker Folks] the Folk has no skill: assign one or pass a skill id, e.g. gear(id, "melvorD:Woodcutting")'); return false; }
+      const L = hiring.loadout;
+      const isGear = (item) => typeof EquipmentItem !== 'undefined' && item instanceof EquipmentItem;
+      const own = (item) => L.skillScopes(item).includes(skill.id);
+      const used = new Set(L.items(folk).map((e) => e.item.id));
+      const rows = [];
+      for (const slot of L.slotsFor(folk)) {
+        if (L.entry(folk, slot.id) !== undefined && !replace) { rows.push({ slot: slot.id, item: L.entry(folk, slot.id).item.id, result: 'kept' }); continue; }
+        const pool = game.items.allObjects
+          .filter((item) => isGear(item) && item.fitsInSlot(slot.id) && !used.has(item.id) && L.helpsSkill(item, skill))
+          .filter((item) => game.checkRequirements(item.equipRequirements, false))
+          .sort((a, b) => (own(b) - own(a)) || ((b.sellsFor ?? 0) - (a.sellsFor ?? 0)));
+        let done;
+        for (const item of pool) {
+          const n = slot.allowQuantity ? qty : 1;
+          if (!game.bank.addItem(item, n, false, false, true, false, 'worker_folks:Dev')) continue;
+          if (L.equip(folk, slot.id, item, n)) { done = { item: item.id, qty: n }; used.add(item.id); break; }
+          game.bank.removeItemQuantity(item, n, false); // not Folk gear after all: take it back and try the next
+        }
+        rows.push({ slot: slot.id, item: done?.item ?? '-', qty: done?.qty ?? '-', result: done ? 'equipped' : `nothing fits for ${skill.name}` });
+      }
+      console.table(rows);
+      return rows;
+    },
     /** Sets a Folk's mastery level directly (XP of that level). */
     mastery(id, level) {
       const folk = hiring.crew.byId(id);
@@ -170,6 +205,6 @@ export function install({ hiring, log, tiers }) {
     tiers: tiers.slice(),
   };
   globalThis.workerFolksDev = api;
-  log('dev commands: workerFolksDev.spawn(tier, name?) | fire(id) | assign(id, skillId) | strike(id, debt?) | debt(id, gp?) | cooldown(id, ticks) | reset(id) | hp(id, hp) | kill(id) | thaw(slot?) | loadout(id) | reserve() | mastery(id, level) | poolXP(xp) | list() | clear() | dump() | load(root) | shiftSlots(n) | delegated() | pet() | relics(n)');
+  log('dev commands: workerFolksDev.spawn(tier, name?) | fire(id) | assign(id, skillId) | strike(id, debt?) | debt(id, gp?) | cooldown(id, ticks) | reset(id) | hp(id, hp) | kill(id) | thaw(slot?) | loadout(id) | gear(id, skillId?, {replace, qty}) | reserve() | mastery(id, level) | poolXP(xp) | list() | clear() | dump() | load(root) | shiftSlots(n) | delegated() | pet() | relics(n)');
   return api;
 }

@@ -72,6 +72,14 @@ export function install(ctx, { getHiring, wages, pricing, milestones, log }) {
       if (hours === Infinity) return Infinity;
       return milestones.reserveRoom({ hours, perHour: api.crewPerHour({ all: true })[currencyId] ?? 0, reserve: hiring.crew.reserveOf(currencyId) }).room;
     },
+    /** What a deposit of `amount` would do (wages.depositPlan): the panel reports refusals instead of failing silently. */
+    planDeposit(currencyId, amount) {
+      return wages.depositPlan({ amount, bank: currency(currencyId)?.amount ?? 0, room: api.roomFor(currencyId) });
+    },
+    /** True while a non-empty reserve covers less than an hour of the working crew (the panel's amber hours). */
+    reserveLow(currencyId) {
+      return wages.reserveLow(api.hoursCovered(currencyId), hiring.crew.reserveOf(currencyId));
+    },
     /** Moves `amount` of a currency from the bank into the reserve, clamped to the level capacity. */
     deposit(currencyId, amount) {
       const cur = currency(currencyId);

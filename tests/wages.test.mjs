@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  hourlyWage, wageForAction, wholeCharge, splitPayment, hoursCovered, onUnpaid,
+  depositPlan, hourlyWage, wageForAction, wholeCharge, splitPayment, hoursCovered, onUnpaid,
   severance, settlement, cooldownAfterSettlement, tickCooldown, COOLDOWN_TICKS,
   WAGE_PRESETS, DEFAULT_WAGE_PRESET, presetMultiplier, repayDebt, graceLeftMs, reserveLow, STRIKE_GRACE_MS,
 } from '../src/wages.mjs';
@@ -96,4 +96,13 @@ test('settlement is debt plus 5% severance; apology triples the severance and sk
   assert.equal(cooldownAfterSettlement('Expert', { apology: true }), 0);
   assert.equal(tickCooldown(100, 30), 70);
   assert.equal(tickCooldown(100, 500), 0);
+});
+
+test('depositPlan says what goes in and why', () => {
+  assert.deepEqual(depositPlan({ amount: '', bank: 100 }), { deposit: 0, outcome: 'empty' });
+  assert.deepEqual(depositPlan({ amount: 0, bank: 100 }), { deposit: 0, outcome: 'empty' });
+  assert.deepEqual(depositPlan({ amount: 50, bank: 100, room: 0 }), { deposit: 0, outcome: 'full' });
+  assert.deepEqual(depositPlan({ amount: 500, bank: 100 }), { deposit: 0, outcome: 'short' });
+  assert.deepEqual(depositPlan({ amount: 80, bank: 100, room: 30.7 }), { deposit: 30, outcome: 'cut' });
+  assert.deepEqual(depositPlan({ amount: '80.9', bank: 100, room: Infinity }), { deposit: 80, outcome: 'ok' });
 });

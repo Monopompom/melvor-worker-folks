@@ -92,3 +92,13 @@ export function equipQuantity(requested, { allowQuantity, available }) {
   if (!(q > 0)) return 0;
   return Math.min(q, available);
 }
+
+/**
+ * What a Folk wears, for the card's Gear button and the Worker popup (build .54): `tiles` are the gear modal's slot
+ * tiles ({ name, media, qty, charges, empty }). Filled of open slots, the worn ones, and the worn ones that ran out
+ * (charge items at 0 charges; a used-up stack leaves its slot empty instead).
+ */
+export function gearSummary(tiles) {
+  const worn = (tiles ?? []).filter((t) => !t.empty);
+  return { filled: worn.length, open: (tiles ?? []).length, worn, out: worn.filter((t) => t.charges === 0) };
+}

@@ -68,7 +68,7 @@ export function install(ctx, { getHiring, log }) {
       lines.push({ media: d.media, text: templateLangString('MOD_WF_OFFLINE_STOPPED', { name: d.name, skill: d.skill }), warn: true });
     });
     tracker.died.forEach(({ name, skill, media }) => {
-      lines.push({ media, text: templateLangString('MOD_WF_OFFLINE_DIED', { name, skill }), warn: true });
+      lines.push({ media, text: templateLangString('MOD_WF_OFFLINE_DIED', { name, skill }), tone: 'text-danger' });
     });
     // Debt and strikes are reported with their state on return (a strike may have settled itself).
     tracker.debts.forEach(({ folk, skill, media }) => {
@@ -80,15 +80,16 @@ export function install(ctx, { getHiring, log }) {
       const text = folk.onStrike
         ? templateLangString('MOD_WF_OFFLINE_STRUCK', { name: folk.name, skill, amount: `${numberWithCommas(folk.debt)} ${currency?.name ?? ''}`.trim() })
         : templateLangString('MOD_WF_OFFLINE_STRUCK_SETTLED', { name: folk.name, skill });
-      lines.push({ media, text, warn: true });
+      // Still on strike: red (work stopped); it settled itself from the reserve: plain, nothing to do (build .55).
+      lines.push({ media, text, tone: folk.onStrike ? 'text-danger' : '' });
     });
     // Icon and text on one centred flex row: an inline icon in a heading hangs below the baseline.
     const row = (className, media, text) => {
       const el = createElement('h5', { className: `d-flex align-items-center justify-content-center mb-1 ${className}`, parent: container });
-      el.innerHTML = `${media ? `<img class="skill-icon-xs mr-1" src="${media}">` : ''}<span>${text}</span>`;
+      el.innerHTML = `${media ? `<img class="skill-icon-xs mr-1" src="${media}" alt="">` : ''}<span>${text}</span>`;
     };
     row('font-w600 font-size-sm mt-2 text-info', hiring.media, getLangString('MOD_WF_OFFLINE_HEADER'));
-    lines.forEach((line) => row(`font-w400 font-size-sm${line.warn ? ' text-warning' : ''}`, line.media, line.text));
+    lines.forEach((line) => row(`font-w400 font-size-sm ${line.tone ?? (line.warn ? 'text-warning' : '')}`, line.media, line.text));
     log(`offline: ${ticks} ticks, ${tracker.actions.size} delegated skill(s) acted`);
   });
 

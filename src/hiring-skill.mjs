@@ -11,6 +11,14 @@ export const HIRE_PURCHASE = { Newbie: 'Hire_Newbie', Junior: 'Hire_Junior', Mid
 export const SHIFT_SLOT_PURCHASE = 'Shift_Slot';
 /** Marks the start of mod data inside the skill's save region ("WOLK"). */
 export const SAVE_MAGIC = 0x574f4c4b;
+/**
+ * Popup buttons (build .55): confirm green, cancel blue outline (the game's default cancel is red and grey
+ * means disabled). Promote is an upgrade and stays the game's primary blue; Fire loses the Folk, so its confirm is red.
+ */
+const swalClass = (extra = {}) => {
+  const cls = { popup: 'wf-ui', confirmButton: 'btn btn-success m-1', cancelButton: 'btn btn-outline-info m-1', ...extra };
+  return typeof createSwalCustomClass === 'function' ? createSwalCustomClass(cls) : cls;
+};
 
 export function createHiringClass({ selectDelegable, log, createCrew, createEventBus, folkModel, pickName, renderFolkCards, renderReservePanel, produceRate, rules, perks, promotion, pricing }) {
   class FolkSlotAction extends MasteryAction {
@@ -200,6 +208,9 @@ export function createHiringClass({ selectDelegable, log, createCrew, createEven
       const skill = this.skillOf(folk);
       const cls = `wf-text-${status} font-w700`;
       lines.push({ icon: this.getMediaURL(`img/status_${status}.png`), text: getLangString(`MOD_WF_STATUS_${status}`), cls });
+      // A Folk that can't be picked says how to get it back (build .55).
+      if (status === 'strike') lines.push({ text: getLangString('MOD_WF_TILE_FIX_strike'), cls: 'text-warning' });
+      if (status === 'cooldown') lines.push({ text: templateLangString('MOD_WF_TILE_FIX_cooldown', { time: formatAsShorthandTimePeriod(folk.cooldownTicks * TICK_INTERVAL, true) }), cls: 'text-warning' });
       if (folk.skillId !== null) {
         // "⛏ Woodcutting (🌳 Oak Tree)": skill icon + name, then the current action in brackets.
         const segments = [{ icon: this.game.skills.getObjectByID(folk.skillId)?.media, text: this.skillName(folk.skillId) }];
@@ -295,6 +306,28 @@ export function createHiringClass({ selectDelegable, log, createCrew, createEven
       return skill !== undefined ? skill.name : folk.skillId;
     }
 
+    /** The "?" buttons on the Hiring page (reserve, frozen slot): explanations live behind them. */
+    wireHelp() {
+      const container = document.getElementById('worker-folks-container');
+      if (container === null || container.dataset.wfHelp === '1') return;
+      container.dataset.wfHelp = '1';
+      container.querySelectorAll('[data-wf-help]').forEach((b) => b.setAttribute('aria-label', getLangString('MOD_WF_HELP_BUTTON')));
+      container.addEventListener('click', (e) => {
+        const button = e.target instanceof Element ? e.target.closest('[data-wf-help]') : null;
+        if (button === null) return;
+        const topic = button.dataset.wfHelp;
+        const capacity = this.payroll?.capacityHours?.() ?? 0;
+        const lines = topic === 'reserve'
+          ? [getLangString('MOD_WF_RESERVE_DESC'), capacity > 0 && capacity !== Infinity ? templateLangString('MOD_WF_RESERVE_CAPACITY', { hours: `${capacity}` }) : '']
+          : [this.health?.freezeReason() ?? ''];
+        SwalLocale.fire({
+          title: getLangString(topic === 'reserve' ? 'MOD_WF_RESERVE_TITLE' : 'MOD_WF_SLOT_FROZEN_TITLE'),
+          html: `<div class="text-left">${lines.filter(Boolean).map((l) => `<p class="mb-2">${l}</p>`).join('')}</div>`,
+          customClass: swalClass(),
+        });
+      });
+    }
+
     renderReserve() {
       const payroll = this.payroll;
       if (payroll === undefined) return;
@@ -314,20 +347,45 @@ export function createHiringClass({ selectDelegable, log, createCrew, createEven
             amount: this.crew.reserveOf(id),
             perHour: Math.round(payroll.crewPerHour()[id] ?? 0),
             hours: payroll.hoursCovered(id),
+            low: payroll.reserveLow?.(id) ?? false,
             capacity: payroll.capacityOf(id),
             room: payroll.roomFor(id),
             bank: currency.amount,
           })),
-        onDeposit: (id, amount) => payroll.deposit(id, amount),
+        // A deposit says what happened (build .55): refused, cut to the room, or done.
+        onDeposit: (id, amount) => {
+          const plan = payroll.planDeposit(id, amount);
+          const cur = this.game.currencies.getObjectByID(id);
+          const name = cur?.name ?? id;
+          const n = (v) => numberWithCommas(Math.floor(v));
+          const error = (key, args) => { this.game.notifications.createErrorNotification('worker_folks:reserve', templateLangString(key, { currency: name, ...args })); return false; };
+          if (plan.outcome === 'empty') return error('MOD_WF_RESERVE_NO_AMOUNT', {});
+          if (plan.outcome === 'full') return error('MOD_WF_RESERVE_FULL', { capacity: n(payroll.capacityOf(id)) });
+          if (plan.outcome === 'short') return error('MOD_WF_RESERVE_SHORT', { amount: n(cur?.amount ?? 0) });
+          if (!payroll.deposit(id, plan.deposit)) return false;
+          this.game.notifications.createSuccessNotification('worker_folks:reserve',
+            templateLangString(plan.outcome === 'cut' ? 'MOD_WF_RESERVE_CUT' : 'MOD_WF_RESERVE_DONE', { amount: n(plan.deposit), currency: name }),
+            this.getMediaURL('img/payroll_reserve.png'));
+          return true;
+        },
       });
     }
 
     renderFolks() {
       if (!this.renderQueue.folks) return;
+      this.wireHelp();
       this.renderReserve();
       const done = renderFolkCards(this.crew.all, {
         roleName: (tier) => this.roleName(tier),
         portrait: (tier) => this.portrait(tier),
+        slotText: (folk) => templateLangString('MOD_WF_CARD_SLOT', { slot: `${folk.slot + 1}` }),
+        helpLabel: () => getLangString('MOD_WF_HELP_BUTTON'),
+        emptyText: () => getLangString(this.hasLicence('Newbie') ? 'MOD_WF_NO_WORKERS_DESC_LICENSED' : 'MOD_WF_NO_WORKERS_DESC'),
+        onOpenShop: () => {
+          // false, false: a page link must not toggle the game menu open on narrow screens (engine facts).
+          const page = this.game.pages.getObjectByID('melvorD:Shop');
+          if (page !== undefined) changePage(page, -1, undefined, false, false);
+        },
         status: (folk) => this.statusOf(folk),
         statusIcon: (status) => this.getMediaURL(`img/status_${status}.png`),
         statusText: (status) => getLangString(`MOD_WF_STATUS_${status}`),
@@ -348,11 +406,8 @@ export function createHiringClass({ selectDelegable, log, createCrew, createEven
         },
         onStop: (folk) => this.stopFolk(folk),
         stopText: () => getLangString('MOD_WF_BUTTON_STOP'),
-        wageText: (folk) => {
-          const payroll = this.payroll;
-          if (payroll === undefined || !payroll.enabled) return '';
-          return templateLangString('MOD_WF_CARD_WAGE', { wage: numberWithCommas(Math.round(payroll.hourlyWageOf(folk))) });
-        },
+        // In the currency the Folk's skill pays right now (AP on an Abyssal action), like the Worker popup (build .55).
+        wageText: (folk) => this.wageLine(folk, this.skillOf(folk))?.text ?? '',
         strikeInfo: (folk) => {
           const payroll = this.payroll;
           if (payroll === undefined) return null;
@@ -363,14 +418,25 @@ export function createHiringClass({ selectDelegable, log, createCrew, createEven
           const fmt = (parts) => Object.entries(parts).map(([id, amount]) => `${numberWithCommas(amount)} ${this.game.currencies.getObjectByID(id)?.name ?? id}`).join(' + ');
           const plain = payroll.settlementOf(folk);
           const apology = payroll.settlementOf(folk, { apology: true });
+          // What is missing, per currency, for a settlement the bank can't cover.
+          const shortOf = (parts) => fmt(Object.fromEntries(Object.entries(parts)
+            .map(([id, amount]) => [id, Math.ceil(amount - (this.game.currencies.getObjectByID(id)?.amount ?? 0))])
+            .filter(([, missing]) => missing > 0)));
+          const canSettle = payroll.canSettle(folk);
+          const apologyOpen = this.levels === undefined || this.levels.apologyUnlocked();
+          const canApologise = payroll.canSettle(folk, { apology: true });
+          const reason = !canSettle ? templateLangString('MOD_WF_SETTLE_NEED', { amount: shortOf(plain.parts) })
+            : apologyOpen && !canApologise ? templateLangString('MOD_WF_APOLOGY_NEED', { amount: shortOf(apology.parts) })
+              : '';
           return {
+            reason,
             owedText: templateLangString('MOD_WF_STRIKE_OWED', { amount: fmt({ [plain.debtCurrency]: plain.debt }), severance: numberWithCommas(plain.severance) }),
             settleText: templateLangString('MOD_WF_BUTTON_SETTLE', { amount: fmt(plain.parts) }),
             apologyText: this.levels !== undefined && !this.levels.apologyUnlocked()
               ? `${templateLangString('MOD_WF_BUTTON_APOLOGY', { amount: fmt(apology.parts) })} (${this.levels.lockText(this.levels.apologyLevel)})`
               : templateLangString('MOD_WF_BUTTON_APOLOGY', { amount: fmt(apology.parts) }),
-            canSettle: payroll.canSettle(folk),
-            canApologise: payroll.canSettle(folk, { apology: true }),
+            canSettle,
+            canApologise,
             onSettle: () => payroll.settle(folk),
             onApologise: () => payroll.settle(folk, { apology: true }),
           };
@@ -400,7 +466,15 @@ export function createHiringClass({ selectDelegable, log, createCrew, createEven
         },
         onToggleOvertime: (folk) => this.setOvertime(folk, !folk.overtime),
         perksTitle: () => getLangString('MOD_WF_PERKS_TITLE'),
-        gearText: () => getLangString('MOD_WF_BUTTON_GEAR'),
+        /** The card's Gear button: "Gear 3/9", worn items in the tooltip, amber when something ran out (build .54). */
+        gear: (folk) => {
+          const s = this.loadout?.summary(folk);
+          if (s === undefined) return { text: getLangString('MOD_WF_BUTTON_GEAR'), title: '', out: false };
+          const line = (t) => `${t.name}${t.qty > 0 ? ` ×${numberWithCommas(t.qty)}` : ''}${t.charges !== undefined ? ` (${templateLangString('MOD_WF_GEAR_TIP_CHARGES', { count: numberWithCommas(t.charges) })})` : ''}`;
+          const lines = s.filled === 0 ? [getLangString('MOD_WF_GEAR_TIP_EMPTY')] : s.worn.map(line);
+          if (s.out.length > 0) lines.push(templateLangString('MOD_WF_GEAR_TIP_OUT', { items: s.out.map((t) => t.name).join(', ') }));
+          return { text: templateLangString('MOD_WF_BUTTON_GEAR_COUNT', { filled: `${s.filled}`, open: `${s.open}` }), title: lines.join('\n'), out: s.out.length > 0 };
+        },
         onGear: (folk) => this.loadout?.openLoadout(folk),
         hp: (folk) => this.health?.hpView(folk),
         frozenSlots: () => this.health?.frozenSlotsView() ?? [],
@@ -657,7 +731,7 @@ export function createHiringClass({ selectDelegable, log, createCrew, createEven
       const plan = this.promotionPlanFor(folk);
       if (plan.nextTier === null) return;
       const row = (met, text) => `<div class="${met ? 'text-success' : 'text-danger'} font-size-sm">${met ? '✓' : '✗'} ${text}</div>`;
-      const diplomaText = plan.diploma === undefined ? '?' : `<img class="skill-icon-xs mr-1" src="${plan.diploma.media}">${plan.diploma.name}`;
+      const diplomaText = plan.diploma === undefined ? '?' : `<img class="skill-icon-xs mr-1" src="${plan.diploma.media}" alt="">${plan.diploma.name}`;
       const html = `
         <div class="text-left">
           ${this.levels === undefined ? '' : row(!plan.blockers.includes('level'), templateLangString('MOD_WF_PROMO_LEVEL', { level: `${this.levels.promotionLevel}`, now: `${this.level}` }))}
@@ -665,7 +739,8 @@ export function createHiringClass({ selectDelegable, log, createCrew, createEven
           ${row(!plan.blockers.includes('mastery'), templateLangString('MOD_WF_PROMO_MASTERY', { gate: `${plan.gate}`, level: `${this.masteryLevelOf(folk)}` }))}
           ${row(!plan.blockers.includes('diploma'), templateLangString('MOD_WF_PROMO_DIPLOMA', { item: diplomaText }))}
           ${row(!plan.blockers.includes('gp'), templateLangString('MOD_WF_PROMO_COST', { cost: numberWithCommas(plan.cost), percent: `${Math.round((this.levels?.promotionCostRate() ?? promotion.PROMOTION_COST_RATE) * 100)}` }))}
-          <div class="text-muted font-size-sm mt-2">${getLangString('MOD_WF_PROMO_KEEPS')}</div>
+          ${plan.ok ? '' : `<div class="text-warning font-size-sm mt-2">${this.promotionNeedsText(folk, plan)}</div>`}
+          <div class="font-size-sm mt-2">${getLangString('MOD_WF_PROMO_KEEPS')}</div>
         </div>`;
       SwalLocale.fire({
         title: templateLangString('MOD_WF_PROMO_TITLE', { name: folk.name, role: this.roleName(plan.nextTier) }),
@@ -673,14 +748,18 @@ export function createHiringClass({ selectDelegable, log, createCrew, createEven
         imageUrl: this.portrait(plan.nextTier),
         imageWidth: 64,
         imageHeight: 64,
-        customClass: (typeof createSwalCustomClass === 'function' ? createSwalCustomClass({ popup: 'wf-ui' }) : { popup: 'wf-ui' }),
+        imageAlt: folk.name,
+        // Promote is an upgrade: the game's primary blue, not the green of agreeing (user, build .55).
+        customClass: swalClass({ confirmButton: 'btn btn-primary m-1' }),
         showCancelButton: true,
         confirmButtonText: getLangString('MOD_WF_BUTTON_PROMOTE'),
+        // Disabled while a requirement is missing: the red rows and the amber line say which.
+        didOpen: () => { if (!plan.ok) { const b = Swal.getConfirmButton(); if (b) b.disabled = true; } },
       }).then((result) => {
         if (!result.isConfirmed) return;
         const fresh = this.promotionPlanFor(folk);
         if (!fresh.ok) {
-          this.game.notifications.createErrorNotification('worker_folks:promo', getLangString('MOD_WF_PROMO_BLOCKED'));
+          this.game.notifications.createErrorNotification('worker_folks:promo', this.promotionNeedsText(folk, fresh));
           return;
         }
         this.game.gp.remove(fresh.cost);
@@ -694,6 +773,21 @@ export function createHiringClass({ selectDelegable, log, createCrew, createEven
       });
     }
 
+    /** "Can't promote X yet. Still needed: …", naming each missing requirement. */
+    promotionNeedsText(folk, plan) {
+      const needs = plan.blockers.map((b) => {
+        switch (b) {
+          case 'level': return templateLangString('MOD_WF_PROMO_NEED_level', { level: `${this.levels?.promotionLevel ?? ''}` });
+          case 'licence': return templateLangString('MOD_WF_PROMO_NEED_licence', { role: this.roleName(plan.nextTier) });
+          case 'mastery': return templateLangString('MOD_WF_PROMO_NEED_mastery', { gate: `${plan.gate}` });
+          case 'diploma': return templateLangString('MOD_WF_PROMO_NEED_diploma', { item: plan.diploma?.name ?? '?' });
+          case 'gp': return templateLangString('MOD_WF_PROMO_NEED_gp', { cost: numberWithCommas(plan.cost) });
+          default: return b;
+        }
+      });
+      return templateLangString('MOD_WF_PROMO_BLOCKED', { name: folk.name, needs: needs.join(', ') });
+    }
+
     returnLoadout(folk) {
       this.loadout?.returnAll(folk);
     }
@@ -702,12 +796,13 @@ export function createHiringClass({ selectDelegable, log, createCrew, createEven
     fire(folk) {
       SwalLocale.fire({
         title: templateLangString('MOD_WF_FIRE_TITLE', { name: folk.name }),
-        html: `<div class="font-size-sm">${getLangString('MOD_WF_FIRE_TEXT')}</div>`,
+        html: `<div class="text-warning">${getLangString('MOD_WF_FIRE_TEXT')}</div>`,
         imageUrl: this.portrait(folk.tier),
         imageWidth: 64,
         imageHeight: 64,
-        customClass: (typeof createSwalCustomClass === 'function' ? createSwalCustomClass({ popup: 'wf-ui' }) : { popup: 'wf-ui' }),
-        icon: 'warning',
+        imageAlt: folk.name,
+        // Firing loses the Folk for good: red confirm, blue-outline cancel; the portrait alone, no second icon.
+        customClass: swalClass({ confirmButton: 'btn btn-danger m-1' }),
         showCancelButton: true,
         confirmButtonText: getLangString('MOD_WF_BUTTON_FIRE'),
       }).then((result) => {

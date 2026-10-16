@@ -95,9 +95,12 @@ export function install(ctx, { getHiring, rules, log }) {
       const max = api.maxHpOf(folk);
       const hp = api.hpOf(folk);
       const food = api.food();
-      let text = templateLangString('MOD_WF_CARD_HP', { hp: numberWithCommas(hp), max: numberWithCommas(max) });
-      text += ` · ${food === undefined ? getLangString('MOD_WF_CARD_NO_FOOD') : templateLangString('MOD_WF_CARD_FOOD', { count: numberWithCommas(food.qty), item: food.item.name })}`;
-      return { hp, max, percent: Math.round((hp / max) * 100), text };
+      const text = templateLangString('MOD_WF_CARD_HP', { hp: numberWithCommas(hp), max: numberWithCommas(max) });
+      // Folks lose HP only on Thieving, so the food line only matters there (build .55).
+      const state = rules.foodLineState({ skillId: folk.skillId, foodQty: food?.qty ?? 0 });
+      const args = { name: folk.name, item: food?.item.name ?? '', count: numberWithCommas(food?.qty ?? 0) };
+      const key = { off: 'MOD_WF_CARD_FOOD_OFF', none: 'MOD_WF_CARD_NO_FOOD', low: 'MOD_WF_CARD_FOOD_LOW', ok: 'MOD_WF_CARD_FOOD' }[state];
+      return { hp, max, percent: Math.round((hp / max) * 100), text, food: { state, text: templateLangString(key, args) } };
     },
     /** Frozen slots for the Hiring page: [{ slot, text }]. */
     frozenSlotsView() {

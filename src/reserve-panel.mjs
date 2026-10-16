@@ -3,7 +3,8 @@
 export const PANEL_ID = 'worker-folks-reserve';
 
 /**
- * `model`: { enabled, lockedText?, capacityText, media, currencies: [{ id, name, media, amount, perHour, hours, capacity, room, bank }], onDeposit(id, amount) }
+ * `model`: { enabled, lockedText?, capacityText, media, currencies: [{ id, name, media, amount, perHour, hours, low, capacity, room, bank }], onDeposit(id, amount) }
+ * onDeposit reports its own outcome (notifications) and returns true when something went in.
  * The deposit input keeps its value across re-renders.
  */
 export function renderReservePanel(model) {
@@ -30,62 +31,82 @@ export function renderReservePanel(model) {
   }
   if (model.capacityText) {
     const cap = document.createElement('small');
-    cap.className = 'text-muted d-block mb-1';
+    cap.className = 'd-block mb-2';
     cap.textContent = model.capacityText;
     rows.append(cap);
   }
+  // One block per currency, laid out like the bank's Sell block: what you hold, the amount field, presets
+  // that fill it, one green Deposit, and an amber line saying why it can't be used (build .55).
+  const grid = document.createElement('div');
+  grid.className = 'row';
   for (const c of model.currencies) {
-    const row = document.createElement('div');
-    row.className = 'd-flex align-items-center flex-wrap mb-2';
-    row.dataset.wfCurrency = c.id;
-    const hours = c.hours === Infinity ? getLangString('MOD_WF_RESERVE_IDLE') : templateLangString('MOD_WF_RESERVE_COVERS', { hours: c.hours >= 100 ? `${Math.floor(c.hours)}` : c.hours.toFixed(1), perHour: numberWithCommas(c.perHour) });
-    const info = document.createElement('span');
-    info.className = 'mr-3 my-1';
-    const capacity = c.capacity !== undefined && c.capacity !== Infinity ? ` / ${numberWithCommas(c.capacity)}` : '';
-    info.innerHTML = `<img class="skill-icon-xs mr-1" src="${c.media}"><span class="font-w600">${numberWithCommas(c.amount)}</span>${capacity} ${c.name} <small class="text-muted">· ${hours}</small>`;
-    row.append(info);
+    const col = document.createElement('div');
+    col.className = 'col-12 col-md-6 col-xl-4';
+    const block = document.createElement('div');
+    block.className = 'wf-band wf-reserve-block mb-2';
+    block.dataset.wfCurrency = c.id;
+    col.append(block);
 
-    const group = document.createElement('div');
-    group.className = 'input-group input-group-sm wf-reserve-input my-1';
+    const room = c.room === undefined ? Infinity : c.room;
+    const capacity = c.capacity !== undefined && c.capacity !== Infinity ? ` / ${numberWithCommas(c.capacity)}` : '';
+    const info = document.createElement('div');
+    info.innerHTML = `<img class="skill-icon-xs mr-1" src="${c.media}" alt=""><span class="font-w600">${numberWithCommas(c.amount)}</span>${capacity} ${c.name}`;
+    const hours = document.createElement('div');
+    hours.className = c.low ? 'text-warning font-w600' : 'wf-subtle';
+    hours.textContent = c.hours === Infinity ? getLangString('MOD_WF_RESERVE_IDLE') : templateLangString('MOD_WF_RESERVE_COVERS', { hours: c.hours >= 100 ? `${Math.floor(c.hours)}` : c.hours.toFixed(1), perHour: numberWithCommas(c.perHour) });
+    block.append(info, hours);
+
     const input = document.createElement('input');
     input.type = 'number';
     input.min = '0';
-    input.className = 'form-control';
+    input.inputMode = 'numeric';
+    input.className = 'form-control wf-reserve-input mt-2';
     input.placeholder = getLangString('MOD_WF_RESERVE_AMOUNT');
+    input.setAttribute('aria-label', `${getLangString('MOD_WF_RESERVE_AMOUNT')} (${c.name})`);
     input.value = drafts.get(c.id) ?? '';
-    const append = document.createElement('div');
-    append.className = 'input-group-append';
-    const deposit = document.createElement('button');
-    deposit.type = 'button';
-    deposit.className = 'btn btn-success';
-    deposit.textContent = getLangString('MOD_WF_BUTTON_DEPOSIT');
-    deposit.onclick = () => {
-      const amount = Math.floor(Number(input.value));
-      if (amount > 0 && model.onDeposit(c.id, amount)) input.value = '';
-    };
-    append.append(deposit);
-    group.append(input, append);
-    row.append(group);
+    block.append(input);
 
-    const quick = document.createElement('div');
-    quick.className = 'ml-2 my-1';
-    const addQuick = (label, amount) => {
+    const most = Math.max(0, Math.floor(Math.min(c.bank, room)));
+    const why = room <= 0 ? templateLangString('MOD_WF_RESERVE_FULL', { capacity: numberWithCommas(c.capacity ?? 0), currency: c.name })
+      : !(c.bank >= 1) ? templateLangString('MOD_WF_RESERVE_NOTHING', { currency: c.name })
+        : '';
+
+    const presets = document.createElement('div');
+    presets.className = 'wf-reserve-presets mt-2';
+    // Presets fill the field (the bank's All / All but 1 do the same); Deposit commits.
+    const addPreset = (label, value) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'btn btn-sm btn-outline-info mr-1';
+      b.className = 'btn btn-sm btn-info';
       b.textContent = label;
-      const room = c.room === undefined ? Infinity : c.room;
-      b.disabled = !(amount > 0) || amount > c.bank || room <= 0;
-      b.onclick = () => model.onDeposit(c.id, amount);
-      quick.append(b);
+      b.disabled = why !== '';
+      b.onclick = () => { input.value = `${value()}`; };
+      presets.append(b);
     };
+    const current = () => Math.max(0, Math.floor(Number(input.value) || 0));
     if (c.perHour > 0) {
-      addQuick(templateLangString('MOD_WF_RESERVE_QUICK_HOURS', { hours: '1' }), c.perHour);
-      addQuick(templateLangString('MOD_WF_RESERVE_QUICK_HOURS', { hours: '10' }), c.perHour * 10);
+      addPreset(templateLangString('MOD_WF_RESERVE_QUICK_HOURS', { hours: '1' }), () => Math.min(most, current() + Math.ceil(c.perHour)));
+      addPreset(templateLangString('MOD_WF_RESERVE_QUICK_HOURS', { hours: '10' }), () => Math.min(most, current() + Math.ceil(c.perHour * 10)));
     }
-    addQuick(getLangString('MOD_WF_RESERVE_QUICK_ALL'), Math.min(c.bank, c.room === undefined ? Infinity : c.room));
-    row.append(quick);
-    rows.append(row);
+    addPreset(getLangString('MOD_WF_RESERVE_QUICK_ALL'), () => most);
+    block.append(presets);
+
+    const deposit = document.createElement('button');
+    deposit.type = 'button';
+    deposit.className = 'btn btn-success d-block mx-auto mt-2 wf-reserve-deposit';
+    deposit.textContent = getLangString('MOD_WF_BUTTON_DEPOSIT');
+    deposit.disabled = why !== '';
+    deposit.onclick = () => { if (model.onDeposit(c.id, input.value)) input.value = ''; };
+    block.append(deposit);
+
+    if (why !== '') {
+      const line = document.createElement('small');
+      line.className = 'd-block text-warning mt-2';
+      line.textContent = why;
+      block.append(line);
+    }
+    grid.append(col);
   }
+  rows.append(grid);
   return true;
 }

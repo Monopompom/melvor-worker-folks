@@ -81,3 +81,18 @@ export function activeFreezes(frozen, now) {
   }
   return out;
 }
+
+/** Food left under this many items is shown amber on a Thieving Folk's card. */
+export const FOOD_LOW = 20;
+export const THIEVING_ID = 'melvorD:Thieving';
+
+/**
+ * The card's food line (build .55). Folks lose HP only on Thieving and eat the player's combat food slot, so the line
+ * is 'off' for every other skill (or none), 'none' on Thieving without food (red, card border amber), 'low' under
+ * FOOD_LOW items (amber), else 'ok'.
+ */
+export function foodLineState({ skillId = null, foodQty = 0 } = {}) {
+  if (skillId !== THIEVING_ID) return 'off';
+  if (!(foodQty > 0)) return 'none';
+  return foodQty < FOOD_LOW ? 'low' : 'ok';
+}
