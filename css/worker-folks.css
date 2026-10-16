@@ -19,7 +19,7 @@
 #worker-folks-folks { align-items: flex-start; }
 .wf-card { min-height: 160px; display: flex; flex-direction: column; }
 .wf-card-body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; }
-.wf-band { background: rgba(255,255,255,0.045); border-radius: 6px; padding: 8px; }
+.wf-band { background: rgba(255,255,255,0.045); border-radius: 6px; padding: 12px; } /* 12px on the page (build .87); 20px in popups */
 .wf-band-actions { margin-top: auto; }
 .wf-band-strike { box-shadow: inset 3px 0 0 #bf1f1f; }
 .wf-band-strike.wf-debt-block { box-shadow: inset 3px 0 0 #c98a16; }
@@ -93,10 +93,9 @@
 /* Reserve (build .76): one block per currency like the bank's Sell block: name left and amount right, a fill bar,
    the 40px field (7 digits wide) with its presets on one row (presets drop under it when it can't fit), a thin rule,
    Deposit the full width of the block (the user's call, build .78). */
-#worker-folks-reserve > .block-content { padding: 20px !important; }
+#worker-folks-reserve > .block-content { padding: 16px !important; }
 #worker-folks-reserve [data-wf="reserve-capacity"] { margin-bottom: 16px !important; }
 #worker-folks-reserve [data-wf="reserve-rows"] .row { row-gap: 12px; }
-.wf-reserve-block.wf-band { padding: 16px 18px; }
 .wf-reserve-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .wf-reserve-bar { height: 6px; margin-top: 10px !important; background: rgba(255,255,255,0.08); }
 .wf-reserve-covers { margin-top: 8px; }
@@ -108,12 +107,16 @@
 .wf-reserve-deposit { width: 100%; min-height: 40px; margin-top: 14px !important; }
 /* Top row (build .79): reserve and Tips one height (row-deck); Tips is a grid of bands, as many side by side as fit
    at 15rem each, two rows a page; the pager buttons are 32px squares. */
-.wf-top-row > [class*="col"] > .block { margin-bottom: 24px; }
-#worker-folks-tips > .wf-tips-content { padding: 20px !important; display: flex; flex-direction: column; }
+.wf-top-row > [class*="col"] > .block { margin-bottom: 12px; }
+/* Build .88 (the user): block content 16px in, blocks 12px apart both ways (the game's .block keeps 30px
+   under it and rows a 28px gutter). */
+#worker-folks-container > .row { margin-left: -6px; margin-right: -6px; }
+#worker-folks-container > .row > [class*="col"] { padding-left: 6px; padding-right: 6px; }
+#worker-folks-container > .row .block { margin-bottom: 12px; }
+#worker-folks-tips > .wf-tips-content { padding: 16px !important; display: flex; flex-direction: column; }
 .wf-tips-icon { font-size: 1.25rem; width: 24px; text-align: center; }
 .wf-tips-pager .btn { min-width: 32px; min-height: 32px; }
 .wf-tips-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 12px; flex: 1 1 auto; align-content: start; }
-.wf-tip.wf-band { padding: 14px 16px; }
 .wf-tip-body { margin-top: 4px; line-height: 1.4; }
 /* Gear picker (build .62): Equip and Back stacked, one width, centred. */
 /* One line (build .71): Back left, Equip centred, Show all with its "?" right in a frame that only lines it up
