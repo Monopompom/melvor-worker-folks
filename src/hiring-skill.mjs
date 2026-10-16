@@ -20,7 +20,7 @@ const swalClass = (extra = {}) => {
   return typeof createSwalCustomClass === 'function' ? createSwalCustomClass(cls) : cls;
 };
 
-export function createHiringClass({ selectDelegable, log, createCrew, createEventBus, folkModel, pickName, renderFolkCards, renderReservePanel, produceRate, rules, perks, promotion, pricing }) {
+export function createHiringClass({ popupDidRender, selectDelegable, log, createCrew, createEventBus, folkModel, pickName, renderFolkCards, renderReservePanel, produceRate, rules, perks, promotion, pricing }) {
   class FolkSlotAction extends MasteryAction {
     constructor(namespace, data, game, skill) {
       super(namespace, data, game);
@@ -202,8 +202,8 @@ export function createHiringClass({ selectDelegable, log, createCrew, createEven
       const lines = [{ badges: [{ cls: 'badge badge-info', text: templateLangString('MOD_WF_CARD_RATE', { rate: `${produceRate.produceRate(folk.tier)}` }) }] }];
       const wage = this.wageLine(folk, pageSkill);
       if (wage !== null) lines.push({ badges: [{ cls: 'badge badge-warning', text: wage.text }] });
-      const effects = this.tierEffectTexts(folk.tier);
-      if (effects.length > 0) lines.push({ text: effects.join(' · '), cls: 'font-italic text-muted' });
+      const effects = this.tierEffects(folk.tier);
+      if (effects.length > 0) lines.push({ effects });
       const status = this.statusOf(folk);
       const skill = this.skillOf(folk);
       const cls = `wf-text-${status} font-w700`;
@@ -309,20 +309,35 @@ export function createHiringClass({ selectDelegable, log, createCrew, createEven
     /** The "?" buttons on the Hiring page (reserve, frozen slot): explanations live behind them. */
     wireHelp() {
       const container = document.getElementById('worker-folks-container');
-      if (container === null || container.dataset.wfHelp === '1') return;
-      container.dataset.wfHelp = '1';
+      // Its own flag: `dataset.wfHelp` would be `data-wf-help`, the "?" buttons' own attribute, so closest() below
+      // matched the page itself and every click on it opened the frozen-slot popup (user report, build .57).
+      if (container === null || container.dataset.wfHelpWired === '1') return;
+      container.dataset.wfHelpWired = '1';
       container.querySelectorAll('[data-wf-help]').forEach((b) => b.setAttribute('aria-label', getLangString('MOD_WF_HELP_BUTTON')));
       container.addEventListener('click', (e) => {
         const button = e.target instanceof Element ? e.target.closest('[data-wf-help]') : null;
         if (button === null) return;
         const topic = button.dataset.wfHelp;
+        if (topic !== 'reserve' && topic !== 'frozen') return;
         const capacity = this.payroll?.capacityHours?.() ?? 0;
-        const lines = topic === 'reserve'
-          ? [getLangString('MOD_WF_RESERVE_DESC'), capacity > 0 && capacity !== Infinity ? templateLangString('MOD_WF_RESERVE_CAPACITY', { hours: `${capacity}` }) : '']
-          : [this.health?.freezeReason() ?? ''];
+        // Help popup layout: a grey band per idea, a heading, one sentence a line.
+        const sections = topic === 'reserve'
+          ? [
+            { body: [getLangString('MOD_WF_RESERVE_HELP_ORDER'), getLangString('MOD_WF_RESERVE_HELP_STRIKE')] },
+            ...(capacity > 0 && capacity !== Infinity ? [{
+              head: getLangString('MOD_WF_RESERVE_HELP_CAP_HEAD'),
+              body: [templateLangString('MOD_WF_RESERVE_HELP_CAP', { hours: `${capacity}` }), getLangString('MOD_WF_RESERVE_HELP_GROWS')],
+            }] : []),
+          ]
+          : [{ body: (this.health?.freezeReason() ?? '').split(/(?<=[.!?])\s+/) }]; // one sentence a line
+        const html = sections.map((sec) => `<div class="wf-band">${sec.head ? `<div class="wf-help-head">${sec.head}</div>` : ''}`
+          + `${sec.body.filter(Boolean).map((l) => `<p class="wf-help-p">${l}</p>`).join('')}</div>`).join('');
         SwalLocale.fire({
+          didRender: popupDidRender,
           title: getLangString(topic === 'reserve' ? 'MOD_WF_RESERVE_TITLE' : 'MOD_WF_SLOT_FROZEN_TITLE'),
-          html: `<div class="text-left">${lines.filter(Boolean).map((l) => `<p class="mb-2">${l}</p>`).join('')}</div>`,
+          width: '38rem', // a little wider than the game's 32em default
+          html: `<div class="text-left wf-help-body">${html}</div>`,
+          confirmButtonText: getLangString('MOD_WF_BUTTON_GOT_IT'),
           customClass: swalClass(),
         });
       });
@@ -382,7 +397,7 @@ export function createHiringClass({ selectDelegable, log, createCrew, createEven
         helpLabel: () => getLangString('MOD_WF_HELP_BUTTON'),
         emptyText: () => getLangString(this.hasLicence('Newbie') ? 'MOD_WF_NO_WORKERS_DESC_LICENSED' : 'MOD_WF_NO_WORKERS_DESC'),
         onOpenShop: () => {
-          // false, false: a page link must not toggle the game menu open on narrow screens (engine facts).
+          // false, false: a page link must not toggle the game menu open on narrow screens (the plain changePage call does that below 992px).
           const page = this.game.pages.getObjectByID('melvorD:Shop');
           if (page !== undefined) changePage(page, -1, undefined, false, false);
         },
@@ -390,16 +405,18 @@ export function createHiringClass({ selectDelegable, log, createCrew, createEven
         statusIcon: (status) => this.getMediaURL(`img/status_${status}.png`),
         statusText: (status) => getLangString(`MOD_WF_STATUS_${status}`),
         assignmentText: (folk) => this.assignmentText(folk),
+        // The assignment line says it on its own; the line under it says how (build .61, user layout).
+        unassignedText: () => getLangString('MOD_WF_CARD_SKILL_NONE'),
         skillMedia: (folk) => this.skillOf(folk)?.media,
         rateText: (folk) => templateLangString('MOD_WF_CARD_RATE', { rate: `${produceRate.produceRate(folk.tier)}` }),
-        effectTexts: (folk) => this.tierEffectTexts(folk.tier),
+        effects: (folk) => this.tierEffects(folk.tier),
         isWorking: (folk) => {
           const skill = this.skillOf(folk);
           return skill !== undefined && this.delegated.has(skill);
         },
         detailText: (folk) => {
           const skill = this.skillOf(folk);
-          if (skill === undefined) return getLangString('MOD_WF_CARD_SKILL_NONE');
+          if (skill === undefined) return getLangString('MOD_WF_CARD_SKILL_NONE_HINT');
           if (!this.delegated.has(skill)) return templateLangString('MOD_WF_CARD_READY', { skill: skill.name });
           const action = this.currentActionName(skill);
           return action === null ? getLangString('MOD_WF_CARD_WORKING') : templateLangString('MOD_WF_CARD_WORKING_ON', { action });
@@ -743,6 +760,7 @@ export function createHiringClass({ selectDelegable, log, createCrew, createEven
           <div class="font-size-sm mt-2">${getLangString('MOD_WF_PROMO_KEEPS')}</div>
         </div>`;
       SwalLocale.fire({
+        didRender: popupDidRender,
         title: templateLangString('MOD_WF_PROMO_TITLE', { name: folk.name, role: this.roleName(plan.nextTier) }),
         html,
         imageUrl: this.portrait(plan.nextTier),
@@ -795,6 +813,7 @@ export function createHiringClass({ selectDelegable, log, createCrew, createEven
     /** Confirms, returns the loadout, then fires. */
     fire(folk) {
       SwalLocale.fire({
+        didRender: popupDidRender,
         title: templateLangString('MOD_WF_FIRE_TITLE', { name: folk.name }),
         html: `<div class="text-warning">${getLangString('MOD_WF_FIRE_TEXT')}</div>`,
         imageUrl: this.portrait(folk.tier),
@@ -824,16 +843,25 @@ export function createHiringClass({ selectDelegable, log, createCrew, createEven
       return lines;
     }
 
-    /** Card text for a tier's effects (Produce Rate is shown separately). */
-    tierEffectTexts(tier) {
+    /**
+     * A tier's effects (Produce Rate is shown separately) as { before, value, after, tone } pieces, so the value can
+     * stand out in its colour: 'good' green, 'bad' amber (build .73). The value's place comes from the language string.
+     */
+    tierEffects(tier) {
       const mods = produceRate.tierModifiers(tier, { preservationDisabled: !!this.game.currentGamemode.disablePreservation });
-      const lines = [];
-      if (mods.skillInterval !== 0) lines.push(templateLangString('MOD_WF_EFFECT_INTERVAL', { value: `${mods.skillInterval > 0 ? '+' : ''}${mods.skillInterval}` }));
-      if (mods.skillPreservationChance !== 0) lines.push(templateLangString('MOD_WF_EFFECT_PRESERVATION', { value: `${mods.skillPreservationChance}` }));
-      if (mods.skillXP !== 0) lines.push(templateLangString('MOD_WF_EFFECT_XP', { value: `${mods.skillXP}` }));
-      if (!produceRate.rollsPets(tier)) lines.push(getLangString('MOD_WF_EFFECT_NO_PETS'));
-      if (tier === 'Expert') lines.push(getLangString('MOD_WF_EFFECT_CREW_BONUS'));
-      return lines;
+      const pct = (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n)}%`;
+      const piece = (key, value, tone, extra = {}) => {
+        const [before, after = ''] = templateLangString(key, { ...extra, value: '\u0001' }).split('\u0001');
+        return { before, value, after, tone };
+      };
+      const out = [];
+      // A shorter action is the good direction for the interval.
+      if (mods.skillInterval !== 0) out.push(piece('MOD_WF_EFFECT_INTERVAL', pct(mods.skillInterval), mods.skillInterval < 0 ? 'good' : 'bad'));
+      if (mods.skillPreservationChance !== 0) out.push(piece('MOD_WF_EFFECT_PRESERVATION', pct(mods.skillPreservationChance), mods.skillPreservationChance > 0 ? 'good' : 'bad'));
+      if (mods.skillXP !== 0) out.push(piece('MOD_WF_EFFECT_XP', pct(mods.skillXP), mods.skillXP > 0 ? 'good' : 'bad'));
+      if (!produceRate.rollsPets(tier)) out.push({ before: '', value: getLangString('MOD_WF_EFFECT_NO_PETS'), after: '', tone: 'bad' });
+      if (tier === 'Expert') out.push(piece('MOD_WF_EFFECT_CREW_BONUS', pct(3), 'good', { max: pct(15) }));
+      return out;
     }
 
     skillOf(folk) {

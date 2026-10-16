@@ -2,6 +2,18 @@
 // tested before the shop exists. Ticket 14 decides whether to gate this.
 
 export function install({ hiring, log, tiers }) {
+  /**
+   * Which Folk a command means: its row in workerFolksDev.list() (0, 1, …), its id, or its name (any case). Returns
+   * the id, or the input unchanged so the command reports "no Folk".
+   */
+  const ref = (x) => {
+    const all = hiring.crew.all;
+    if (typeof x === 'number' && Number.isInteger(x)) return all[x]?.id ?? x;
+    if (typeof x !== 'string') return x;
+    if (all.some((f) => f.id === x)) return x;
+    const byName = all.filter((f) => f.name?.toLowerCase() === x.toLowerCase());
+    return byName.length === 1 ? byName[0].id : x;
+  };
   const api = {
     /** workerFolksDev.spawn('Middle', 'Ada') — adds a Folk and emits folkHired. */
     spawn(tier = 'Newbie', name) {
@@ -14,11 +26,11 @@ export function install({ hiring, log, tiers }) {
       return folk;
     },
     fire(id) {
-      return hiring.crew.fire(id, { reason: 'dev' });
+      return hiring.crew.fire(ref(id), { reason: 'dev' });
     },
     /** Sets a Folk's current HP (clamped to its tier max). */
     hp(id, hp) {
-      const folk = hiring.crew.byId(id);
+      const folk = hiring.crew.byId(ref(id));
       if (folk === undefined || hiring.health === undefined) return false;
       hiring.health.setHp(folk, hp);
       hiring.crew.touch();
@@ -26,7 +38,7 @@ export function install({ hiring, log, tiers }) {
     },
     /** Kills a Folk: slot frozen for 24 h. */
     kill(id) {
-      const folk = hiring.crew.byId(id);
+      const folk = hiring.crew.byId(ref(id));
       if (folk === undefined || hiring.health === undefined) return false;
       hiring.health.kill(folk);
       return true;
@@ -38,7 +50,7 @@ export function install({ hiring, log, tiers }) {
     },
     /** Forces a strike with the given debt (GP) for UI testing. */
     strike(id, debt = 1000) {
-      const folk = hiring.crew.byId(id);
+      const folk = hiring.crew.byId(ref(id));
       if (folk === undefined) return false;
       folk.debt = debt;
       folk.debtCurrency = 'melvorD:GP';
@@ -49,7 +61,7 @@ export function install({ hiring, log, tiers }) {
     },
     /** Puts the Folk in debt (unpaid wages, still allowed to work) without a strike; `minutesUsed` of the grace already spent. */
     debt(id, debt = 500, minutesUsed = 0) {
-      const folk = hiring.crew.byId(id);
+      const folk = hiring.crew.byId(ref(id));
       if (folk === undefined) return false;
       folk.debt = debt;
       folk.debtCurrency = 'melvorD:GP';
@@ -60,7 +72,7 @@ export function install({ hiring, log, tiers }) {
     },
     /** Clears strike, debt and cooldown: back to Idle (or Working if its skill still runs). */
     reset(id) {
-      const folk = hiring.crew.byId(id);
+      const folk = hiring.crew.byId(ref(id));
       if (folk === undefined) return false;
       folk.onStrike = false;
       folk.debt = 0;
@@ -69,7 +81,7 @@ export function install({ hiring, log, tiers }) {
       return true;
     },
     cooldown(id, ticks) {
-      const folk = hiring.crew.byId(id);
+      const folk = hiring.crew.byId(ref(id));
       if (folk === undefined) return false;
       folk.cooldownTicks = ticks;
       hiring.crew.touch();
@@ -81,7 +93,7 @@ export function install({ hiring, log, tiers }) {
      * those items put into the Folk's modifier table, and the Details summary lines.
      */
     loadout(id) {
-      const folk = hiring.crew.byId(id);
+      const folk = hiring.crew.byId(ref(id));
       if (folk === undefined || hiring.loadout === undefined) return false;
       const skill = hiring.skillOf(folk);
       const items = hiring.loadout.items(folk);
@@ -118,8 +130,9 @@ export function install({ hiring, log, tiers }) {
      * `replace` is true. Prints and returns what went where.
      */
     gear(id, skillId, { replace = false, qty = 1000 } = {}) {
-      const folk = hiring.crew.byId(id);
-      if (folk === undefined || hiring.loadout === undefined) { console.error(`[Worker Folks] no Folk "${id}"; see workerFolksDev.list()`); return false; }
+      const folk = hiring.crew.byId(ref(id));
+      if (folk === undefined || hiring.loadout === undefined) { console.error(`[Worker Folks] no Folk "${id}"; pass its row in workerFolksDev.list(), its name or its id`); return false; }
+      if (skillId !== undefined && typeof skillId !== 'string') { console.error('[Worker Folks] the second argument is a skill id, e.g. gear(0, "melvorD:Woodcutting"); leave it out for the Folk\'s own skill'); return false; }
       const skill = skillId !== undefined ? game.skills.getObjectByID(skillId) : hiring.skillOf(folk);
       if (skill === undefined) { console.error('[Worker Folks] the Folk has no skill: assign one or pass a skill id, e.g. gear(id, "melvorD:Woodcutting")'); return false; }
       const L = hiring.loadout;
@@ -147,7 +160,7 @@ export function install({ hiring, log, tiers }) {
     },
     /** Sets a Folk's mastery level directly (XP of that level). */
     mastery(id, level) {
-      const folk = hiring.crew.byId(id);
+      const folk = hiring.crew.byId(ref(id));
       const slot = folk === undefined ? undefined : hiring.slotOf(folk);
       if (slot === undefined) return false;
       hiring.actionMastery.delete(slot);
@@ -164,7 +177,7 @@ export function install({ hiring, log, tiers }) {
       return hiring.crew.reserveOf(currencyId);
     },
     assign(id, skillId) {
-      return hiring.crew.assign(id, skillId);
+      return hiring.crew.assign(ref(id), skillId);
     },
     list() {
       const rows = hiring.crew.all.map((f) => ({ id: f.id, slot: f.slot + 1, tier: f.tier, name: f.name, skill: f.skillId ?? '-' }));
@@ -205,6 +218,6 @@ export function install({ hiring, log, tiers }) {
     tiers: tiers.slice(),
   };
   globalThis.workerFolksDev = api;
-  log('dev commands: workerFolksDev.spawn(tier, name?) | fire(id) | assign(id, skillId) | strike(id, debt?) | debt(id, gp?) | cooldown(id, ticks) | reset(id) | hp(id, hp) | kill(id) | thaw(slot?) | loadout(id) | gear(id, skillId?, {replace, qty}) | reserve() | mastery(id, level) | poolXP(xp) | list() | clear() | dump() | load(root) | shiftSlots(n) | delegated() | pet() | relics(n)');
+  log('dev commands (a Folk = its row in list(), its name or its id): workerFolksDev.spawn(tier, name?) | fire(id) | assign(id, skillId) | strike(id, debt?) | debt(id, gp?) | cooldown(id, ticks) | reset(id) | hp(id, hp) | kill(id) | thaw(slot?) | loadout(id) | gear(id, skillId?, {replace, qty}) | reserve() | mastery(id, level) | poolXP(xp) | list() | clear() | dump() | load(root) | shiftSlots(n) | delegated() | pet() | relics(n)');
   return api;
 }

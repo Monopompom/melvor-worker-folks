@@ -27,6 +27,19 @@ export function slotsForTier(tier, { hasAoD = false, hasItA = false } = {}) {
 }
 
 /**
+ * Every slot a Folk can ever have (expansion slots only when present), each with whether this tier has it open and
+ * the tier that opens it: the gear window draws locked slots greyed out in their place (build .65, user request).
+ */
+export function slotLayout(tier, { hasAoD = false, hasItA = false } = {}) {
+  const index = TIERS.indexOf(tier);
+  if (index < 0) throw new Error(`Unknown tier: ${tier}`);
+  const flags = { hasAoD, hasItA };
+  const opensAt = (s) => TIERS.find((t) => SLOTS_BY_TIER[t].includes(s));
+  return SLOT_ORDER.filter((s) => EXPANSION_SLOTS[s] === undefined || flags[EXPANSION_SLOTS[s]])
+    .map((id) => ({ id, opensAt: opensAt(id), open: TIERS.indexOf(opensAt(id)) <= index }));
+}
+
+/**
  * Hiring gear (the mod's own items: outfit, capes, Lesser Relic) is worn by the player; its
  * modifiers are read from the player's table and its charges spent there, so a Folk can never
  * hold it. Everything else may go into a loadout.

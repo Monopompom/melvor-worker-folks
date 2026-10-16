@@ -12,7 +12,7 @@ const FROZEN_TEMPLATE_ID = 'wf-frozen-slot-template';
  * the order follows `folks`, then the frozen slots.
  * `view` supplies: roleName(tier), portrait(tier), status(folk), statusIcon(key),
  * statusText(key), assignmentText(folk), skillMedia(folk), rateText(folk),
- * effectTexts(folk), detailText(folk), isWorking(folk), onStop(folk), stopText(), ...
+ * effects(folk), detailText(folk), isWorking(folk), onStop(folk), stopText(), ...
  * Returns false when the page is not in the DOM yet.
  */
 export function renderFolkCards(folks, view) {
@@ -69,7 +69,65 @@ export function renderFolkCards(folks, view) {
   const current = Array.from(list.querySelectorAll(':scope > [data-wf-folk]'));
   const sameOrder = current.length === ordered.length && current.every((el, i) => el === ordered[i]);
   if (!sameOrder) ordered.forEach((col) => list.append(col));
+  scheduleEqualize(list);
   return true;
+}
+
+/**
+ * Closed cards in one row share one height, so their action bands line up; an open Details grows only its own card
+ * (user, build .61: "while details are expanded - do not pull other blocks"). The list no longer stretches its
+ * columns (CSS), so each row's height is measured here: the tallest card without its open Details sets the row.
+ */
+/**
+ * A tier's effects as one wrapping row of pieces, the value in its tone's colour (build .73): used by the cards and
+ * the worker popup. Each piece keeps together where it can; pieces wrap between them, no dots.
+ */
+export function effectsFragment(effects) {
+  const frag = document.createDocumentFragment();
+  for (const e of effects) {
+    const span = document.createElement('span');
+    span.className = 'wf-effect';
+    const value = document.createElement('span');
+    value.className = `font-w600 ${e.tone === 'bad' ? 'text-warning' : 'text-success'}`;
+    value.textContent = e.value;
+    span.append(document.createTextNode(e.before), value, document.createTextNode(e.after));
+    frag.append(span);
+  }
+  return frag;
+}
+
+export function equalizeCards(list) {
+  const cols = Array.from(list.querySelectorAll(':scope > [data-wf-folk]')).filter((col) => col.offsetParent !== null);
+  const cards = cols.map((col) => col.querySelector('.block'));
+  cards.forEach((card) => { if (card) card.style.minHeight = ''; });
+  const rows = new Map();
+  cols.forEach((col, i) => {
+    const card = cards[i];
+    if (!card) return;
+    const details = card.querySelector('[data-wf="details"]');
+    const extra = details !== null && !details.classList.contains('d-none')
+      ? details.offsetHeight + (parseFloat(getComputedStyle(details).marginTop) || 0) : 0;
+    const top = Math.round(col.offsetTop);
+    if (!rows.has(top)) rows.set(top, []);
+    rows.get(top).push({ card, base: card.offsetHeight - extra, extra });
+  });
+  rows.forEach((row) => {
+    const base = Math.max(...row.map((c) => c.base));
+    row.forEach((c) => { c.card.style.minHeight = `${base + c.extra}px`; });
+  });
+}
+
+let pending = false;
+/** Once per frame at most; again whenever the list's width changes (a resize, the page shown, the menu opened). */
+function scheduleEqualize(list) {
+  if (!list.dataset.wfEqualize && typeof ResizeObserver === 'function') {
+    list.dataset.wfEqualize = '1';
+    let width = -1;
+    new ResizeObserver(() => { if (list.clientWidth !== width) { width = list.clientWidth; scheduleEqualize(list); } }).observe(list);
+  }
+  if (pending) return;
+  pending = true;
+  requestAnimationFrame(() => { pending = false; try { equalizeCards(list); } catch {} });
 }
 
 function fillCard(col, folk, view) {
@@ -83,10 +141,14 @@ function fillCard(col, folk, view) {
   set('role', (el) => setText(el, view.roleName(folk.tier)));
   set('slot', (el) => setText(el, view.slotText(folk)));
   set('rate', (el) => setText(el, view.rateText(folk)));
-  set('effects', (el) => setText(el, view.effectTexts(folk).join(' · ')));
+  set('effects', (el) => {
+    const effects = view.effects(folk);
+    const key = JSON.stringify(effects);
+    if (el.dataset.wfKey !== key) { el.dataset.wfKey = key; el.replaceChildren(effectsFragment(effects)); }
+  });
   set('skill', (el) => {
     const media = view.skillMedia(folk);
-    const text = folk.skillId === null ? '' : view.assignmentText(folk);
+    const text = folk.skillId === null ? (view.unassignedText?.() ?? '') : view.assignmentText(folk);
     const className = `font-w700 wf-card-skill ${view.isWorking(folk) ? 'text-success' : ''}`.trim();
     if (el.className !== className) el.className = className;
     let img = el.querySelector('img');
@@ -164,7 +226,8 @@ function fillCard(col, folk, view) {
   set('promote', (el) => {
     const possible = view.canPromote(folk);
     setText(el, view.promoteText());
-    const className = `btn btn-sm ${view.promoteReady(folk) ? 'btn-primary' : 'btn-outline-primary'}${possible ? '' : ' d-none'}`;
+    const className = `btn btn-sm btn-block ${view.promoteReady(folk) ? 'btn-primary' : 'btn-outline-primary'}`;
+    el.closest('[data-wf="promote-row"]')?.classList.toggle('d-none', !possible);
     if (el.className !== className) el.className = className;
     el.onclick = () => view.onPromote(folk);
   });

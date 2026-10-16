@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-10-16.56';
+export const BUILD = '2026-10-16.75';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -21,6 +21,8 @@ export async function setup(ctx) {
   const { mergeLang } = await ctx.loadModule('src/lang-merge.mjs');
   const lang = await ctx.loadModule('src/lang.mjs');
   const conflicts = await ctx.loadModule('src/conflicts.mjs');
+  // Every popup we open runs this on render: skill names get their icon and bold.
+  const { didRender: popupDidRender } = await ctx.loadModule('src/skill-names.mjs');
 
   // 0. Incompatible mods (Multitasking): both change which skill the game treats as active.
   //    Checked now (mods loaded before us) and again once every mod is in (loaded after us).
@@ -36,8 +38,10 @@ export async function setup(ctx) {
       SwalLocale.fire({
         icon: 'warning',
         title: getLangString('MOD_WF_CONFLICT_TITLE'),
+        didRender: popupDidRender,
+        // Several sentences: left-aligned (message popup layout); OK is green like every agree (build .75).
         html: `<div class="text-left">${templateLangString('MOD_WF_CONFLICT_TEXT', { mod: conflict.title })}</div>`,
-        customClass: (typeof createSwalCustomClass === 'function' ? createSwalCustomClass({ popup: 'wf-ui' }) : { popup: 'wf-ui' }),
+        customClass: (() => { const c = { popup: 'wf-ui', confirmButton: 'btn btn-success m-1' }; return typeof createSwalCustomClass === 'function' ? createSwalCustomClass(c) : c; })(),
       });
     });
   };
@@ -57,7 +61,7 @@ export async function setup(ctx) {
   const { createEventBus } = await ctx.loadModule('src/events.mjs');
   const { pickName } = await ctx.loadModule('src/names.mjs');
   const { createCrew } = await ctx.loadModule('src/crew.mjs');
-  const { renderFolkCards } = await ctx.loadModule('src/cards.mjs');
+  const { renderFolkCards, effectsFragment } = await ctx.loadModule('src/cards.mjs');
   const { renderReservePanel } = await ctx.loadModule('src/reserve-panel.mjs');
   const wages = await ctx.loadModule('src/wages.mjs');
   const perks = await ctx.loadModule('src/mastery-perks.mjs');
@@ -94,6 +98,7 @@ export async function setup(ctx) {
 
   // 3. Register the skill class first, then the data package that references it.
   const { Hiring } = createHiringClass({
+    popupDidRender,
     selectDelegable, log, createCrew, createEventBus, folkModel, pickName, renderFolkCards, renderReservePanel, produceRate,
     rules: delegationRules,
     perks,
@@ -171,6 +176,8 @@ export async function setup(ctx) {
   skillControl.install(ctx, {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     isDisabled: () => state.disabled,
+    popupDidRender,
+    effectsFragment,
     log,
   });
 
@@ -179,6 +186,7 @@ export async function setup(ctx) {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     rules: loadoutRules,
     consumptionRules,
+    popupDidRender,
     log,
   });
 

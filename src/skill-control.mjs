@@ -4,7 +4,7 @@
 const TEMPLATE_ID = 'wf-skill-control-template';
 const EVENTS = ['crewChanged', 'folkAssigned', 'folkFired', 'folkHired', 'folkStarted', 'folkReleased', 'folkPromoted', 'folkPending'];
 
-export function install(ctx, { getHiring, isDisabled = () => false, log }) {
+export function install(ctx, { getHiring, isDisabled = () => false, popupDidRender, effectsFragment, log }) {
   let hiring;
   /** skill → control root element */
   const controls = new Map();
@@ -93,6 +93,13 @@ export function install(ctx, { getHiring, isDisabled = () => false, log }) {
           text.append(row);
           continue;
         }
+        if (Array.isArray(entry.effects)) {
+          const row = document.createElement('div');
+          row.className = 'wf-worker-line wf-effects wf-subtle';
+          row.append(effectsFragment(entry.effects));
+          text.append(row);
+          continue;
+        }
         const segments = Array.isArray(entry.segments) ? entry.segments : (entry.text ? [{ icon: entry.icon, text: entry.text }] : []);
         if (segments.length === 0) continue;
         const s = document.createElement('small');
@@ -109,20 +116,19 @@ export function install(ctx, { getHiring, isDisabled = () => false, log }) {
         }
         text.append(s);
       }
-      // What the Folk wears (build .54): small icons under the status, the item name on hover, amber ring when it
-      // ran out. Nothing when the Folk wears nothing.
-      if (gear !== undefined && gear.worn.length > 0) {
-        const row = document.createElement('div');
-        row.className = 'wf-worker-gear';
-        for (const t of gear.worn) {
-          const icon = document.createElement('img');
-          icon.src = t.media;
-          icon.title = t.name;
-          icon.alt = t.name;
-          if (t.charges === 0) icon.className = 'wf-worker-gear-out';
-          row.append(icon);
+      // What the Folk wears, as one short line like the card's Gear button: "Gear 13/15", then "1 ran out" in amber
+      // (build .74; the row of 20px item icons was too small to read). Nothing when the Folk wears nothing.
+      if (gear !== undefined && gear.filled > 0) {
+        const s = document.createElement('small');
+        s.className = 'd-block wf-worker-line wf-subtle';
+        s.textContent = templateLangString('MOD_WF_BUTTON_GEAR_COUNT', { filled: `${gear.filled}`, open: `${gear.open}` });
+        if (gear.out.length > 0) {
+          const out = document.createElement('span');
+          out.className = 'text-warning font-w600';
+          out.textContent = ` · ${templateLangString('MOD_WF_TILE_GEAR_OUT', { count: `${gear.out.length}` })}`;
+          s.append(out);
         }
-        text.append(row);
+        text.append(s);
       }
       b.append(text);
       if (!disabled) b.onclick = () => { onClick(); Swal.close(); };
@@ -158,6 +164,7 @@ export function install(ctx, { getHiring, isDisabled = () => false, log }) {
     root.style.setProperty('--wf-cols3', `${Math.max(1, Math.min(n, 3))}`);
     root.style.setProperty('--wf-cols2', `${Math.max(1, Math.min(n, 2))}`);
     SwalLocale.fire({
+      didRender: popupDidRender,
       title: templateLangString('MOD_WF_CTRL_PICK_TITLE', { skill: skill.name }),
       html: root,
       showConfirmButton: false,

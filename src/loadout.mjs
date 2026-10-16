@@ -14,7 +14,7 @@ const AOD_INHERIT = {
   'melvorAoD:Cartography': ['melvorAoD:Cartography_Skillcape', 'melvorAoD:Superior_Cartography_Skillcape'],
 };
 
-export function install(ctx, { getHiring, rules, consumptionRules, log }) {
+export function install(ctx, { getHiring, rules, consumptionRules, popupDidRender, log }) {
   let hiring;
   const expansions = () => ({
     hasAoD: game.registeredNamespaces.hasNamespace('melvorAoD'),
@@ -247,23 +247,59 @@ export function install(ctx, { getHiring, rules, consumptionRules, log }) {
       const tip = (el, opts) => { if (typeof tippy !== 'function') return false; tips.push(tippy(el, { touch: 'hold', ...opts })); return true; };
       const clearTips = () => { tips.splice(0).forEach((t) => { try { t.destroy(); } catch {} }); };
 
+      // The views redraw inside the open popup, so the skill-name pass (didRender) runs again after each one.
+      const names = () => { try { if (Swal.isVisible()) popupDidRender?.(Swal.getPopup()); } catch {} };
+      // The title names the slot while picking (build .64, user layout): "Jel's gear – [icon] Feet".
+      const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+      const baseTitle = esc(templateLangString('MOD_WF_GEAR_TITLE', { name: folk.name }));
+      let title = baseTitle;
+      const setTitle = (html) => {
+        title = html;
+        try { const el = Swal.isVisible() ? Swal.getTitle() : null; if (el !== null && el.innerHTML !== html) el.innerHTML = html; } catch {}
+      };
       const showGrid = () => {
+        setTitle(baseTitle);
         clearTips();
         root.replaceChildren();
         const head = document.createElement('small');
-        head.className = 'wf-subtle d-block wf-gear-head';
+        head.className = 'wf-subtle d-block text-center wf-gear-head';
         head.textContent = `${hiring.roleName(folk.tier)} · ${skill === undefined ? getLangString('MOD_WF_UNASSIGNED') : skill.name} · ${getLangString('MOD_WF_GEAR_HINT')}`;
         root.append(head);
+        // Laid out like the character's equipment (build .65, user request): every slot at the game's own grid
+        // position; slots this tier hasn't opened yet greyed out in place, a tap saying which tier opens them.
         const grid = document.createElement('div');
         grid.className = 'wf-slot-grid';
-        for (const slot of api.slotTiles(folk)) {
+        const lockedLine = document.createElement('div');
+        lockedLine.className = 'wf-slot-locked-line d-none';
+        const layout = rules.slotLayout(folk.tier, expansions())
+          .map((l) => ({ ...l, slot: slotObj(l.id) }))
+          .filter((l) => l.slot !== undefined);
+        const pos = (l) => l.slot.gridPosition ?? { col: 0, row: 0 };
+        const minCol = Math.min(...layout.map((l) => pos(l).col));
+        const rows = [...new Set(layout.map((l) => pos(l).row))].sort((x, y) => x - y);
+        const tiles = new Map(api.slotTiles(folk).map((t) => [t.id, t]));
+        for (const l of layout) {
           const b = document.createElement('button');
           b.type = 'button';
-          b.className = `btn btn-sm wf-slot${slot.empty ? ' btn-outline-info' : ' btn-info'}`;
+          b.style.gridColumn = `${pos(l).col - minCol + 1}`;
+          b.style.gridRow = `${rows.indexOf(pos(l).row) + 1}`;
           const img = document.createElement('img');
-          img.src = slot.media;
           img.alt = '';
           b.append(img);
+          if (!l.open) {
+            const reason = templateLangString('MOD_WF_GEAR_LOCKED', { slot: l.slot.emptyName, role: hiring.roleName(l.opensAt) });
+            b.className = 'btn btn-sm wf-slot wf-slot-locked';
+            b.setAttribute('aria-disabled', 'true');
+            b.setAttribute('aria-label', reason);
+            img.src = l.slot.emptyMedia;
+            if (!tip(b, { content: reason, placement: 'top', interactive: false })) b.title = reason;
+            b.onclick = () => { lockedLine.textContent = reason; lockedLine.classList.remove('d-none'); };
+            grid.append(b);
+            continue;
+          }
+          const slot = tiles.get(l.id);
+          b.className = `btn btn-sm wf-slot${slot.empty ? ' btn-outline-info' : ' btn-info'}`;
+          img.src = slot.media;
           b.setAttribute('aria-label', slot.empty ? slot.name : `${slot.name}${slot.qty > 0 ? ` ×${slot.qty}` : ''}`);
           if (slot.charges !== undefined) {
             const q = document.createElement('span');
@@ -281,73 +317,90 @@ export function install(ctx, { getHiring, rules, consumptionRules, log }) {
           b.onclick = () => showPicker(slot.id);
           grid.append(b);
         }
-        root.append(grid);
+        root.append(grid, lockedLine);
         // A worn item that ran out of charges does nothing: say so in the window, not only on the card's tooltip.
         const out = api.summary(folk).out;
         if (out.length > 0) {
           const warn = document.createElement('div');
-          warn.className = 'text-warning font-w600 mb-2';
+          warn.className = 'text-warning font-w600 text-center mt-2';
           warn.textContent = templateLangString('MOD_WF_GEAR_OUT', { items: out.map((t) => t.name).join(', ') });
           root.append(warn);
         }
+        // The bonuses fold behind a toggle at the bottom (build .65, user request), closed by default; the choice
+        // is a per-browser convenience.
+        const STATS_KEY = 'wf-gear-stats-open';
+        let statsOpen = false;
+        try { statsOpen = localStorage.getItem(STATS_KEY) === '1'; } catch {}
+        const lines = api.summaryLines(folk, skill);
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'wf-stats-toggle';
         const summary = document.createElement('div');
         summary.className = 'wf-gear-summary';
-        const lines = api.summaryLines(folk, skill);
+        summary.id = `wf-gear-stats-${String(folk.id).replace(/[^A-Za-z0-9_-]/g, '_')}`;
+        toggle.setAttribute('aria-controls', summary.id);
+        const drawToggle = () => {
+          toggle.textContent = `${statsOpen ? '▾' : '▸'} ${templateLangString('MOD_WF_GEAR_STATS', { count: `${lines.length}` })}`;
+          toggle.setAttribute('aria-expanded', statsOpen ? 'true' : 'false');
+          summary.classList.toggle('d-none', !statsOpen);
+        };
+        toggle.onclick = () => {
+          statsOpen = !statsOpen;
+          try { localStorage.setItem(STATS_KEY, statsOpen ? '1' : '0'); } catch {}
+          drawToggle();
+        };
         if (lines.length === 0) {
-          const s = document.createElement('small');
+          const s = document.createElement('div');
           s.className = 'wf-subtle';
           s.textContent = getLangString('MOD_WF_LOADOUT_EMPTY');
           summary.append(s);
         }
         for (const line of lines) {
-          const s = document.createElement('small');
-          s.className = `d-block ${line.isNegative ? 'text-danger' : 'text-success'}`;
+          const s = document.createElement('div');
+          s.className = line.isNegative ? 'text-danger' : 'text-success';
           s.textContent = line.text;
           summary.append(s);
         }
-        root.append(summary);
+        drawToggle();
+        root.append(toggle, summary);
+        names();
       };
 
-      const showPicker = (slotId) => {
+      const showPicker = (slotId, { all = false } = {}) => {
         const slot = slotObj(slotId);
         if (slot === undefined) return;
         clearTips();
         root.replaceChildren();
         const current = api.entry(folk, slotId);
-        // Order (build .55): title row (Back · slot icon · slot name) → current item → "Showing …" line → quantity
-        // with its All preset → item grid → picked item and the green Equip → Show all with its "?" explanation.
+        // Order (build .55, .62, .64): the popup title names the slot → current item, centred → "Showing …" line → quantity
+        // with its All preset → item grid on a grey band (when empty, the reason in its middle) → picked item → one
+        // row: Back, green Equip, Show all with its "?" (build .71) → the explanation under it.
         // A tap only selects; Equip commits, so a stray tap on a phone moves nothing out of the bank.
-        const head = document.createElement('div');
-        head.className = 'wf-picker-head';
+        setTitle(`${baseTitle} – <span class="wf-title-slot"><img src="${slot.emptyMedia}" alt="">${esc(slot.emptyName)}</span>`);
         const back = document.createElement('button');
         back.type = 'button';
-        back.className = 'btn btn-sm btn-outline-info';
+        back.className = 'btn btn-outline-info wf-picker-back';
         back.textContent = `← ${getLangString('MOD_WF_BUTTON_BACK')}`;
         back.onclick = showGrid;
-        const slotIcon = document.createElement('img');
-        slotIcon.className = 'skill-icon-xs';
-        slotIcon.src = slot.emptyMedia;
-        slotIcon.alt = '';
-        const slotName = document.createElement('span');
-        slotName.className = 'font-w600';
-        slotName.textContent = slot.emptyName;
-        head.append(back, slotIcon, slotName);
-        root.append(head);
         const showAll = document.createElement('input');
         showAll.type = 'checkbox';
         showAll.className = 'custom-control-input';
         showAll.id = `wf-show-all-${slotId.replace(/[^A-Za-z0-9_-]/g, '_')}`;
+        showAll.checked = all;
         const hint = document.createElement('small');
-        hint.className = 'd-block mb-2';
+        hint.className = 'wf-block text-center mb-2'; // not d-block: it outranks the d-none that hides this line (build .63)
         if (current !== undefined) {
           const cur = document.createElement('div');
-          cur.className = 'mb-2 d-flex align-items-center';
-          cur.innerHTML = `<img class="skill-icon-xs mr-1" src="${current.item.media}" alt="">${current.item.name}${slot.allowQuantity ? ` ×${numberWithCommas(current.qty)}` : ''}`;
+          cur.className = 'mb-2 d-flex align-items-center justify-content-center';
+          // The name in its own span: as a bare flex text run it lost its spaces around a skill-name chip, and an
+          // item name is not a skill mention ("Meteorite Woodcutting Amulet", build .67).
+          cur.innerHTML = `<img class="skill-icon-xs mr-1" src="${current.item.media}" alt=""><span data-no-skill-names>${esc(current.item.name)}${slot.allowQuantity ? ` ×${numberWithCommas(current.qty)}` : ''}</span>`;
           const un = document.createElement('button');
           un.type = 'button';
           un.className = 'btn btn-sm btn-outline-danger ml-2';
           un.textContent = getLangString('MOD_WF_BUTTON_UNEQUIP');
-          un.onclick = () => { if (api.unequip(folk, slotId)) showGrid(); };
+          // Stay on this slot's picker after Unequip, Show all as it was, so the next item can go straight in (build .69).
+          un.onclick = () => { if (api.unequip(folk, slotId)) showPicker(slotId, { all: showAll.checked }); };
           cur.append(un);
           root.append(cur);
         }
@@ -358,7 +411,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, log }) {
         let allQty;
         if (slot.allowQuantity) {
           const row = document.createElement('div');
-          row.className = 'd-flex align-items-center flex-wrap wf-picker-qty-row mb-2';
+          row.className = 'd-flex align-items-center justify-content-center flex-wrap wf-picker-qty-row mb-2';
           const qtyLabel = document.createElement('span');
           qtyLabel.className = 'font-w600';
           qtyLabel.textContent = getLangString('MOD_WF_PICKER_QTY');
@@ -382,10 +435,10 @@ export function install(ctx, { getHiring, rules, consumptionRules, log }) {
         const grid = document.createElement('div');
         grid.className = 'wf-picker-grid mb-2';
         const pickedLine = document.createElement('div');
-        pickedLine.className = 'wf-picked mb-2';
+        pickedLine.className = 'wf-picked text-center mb-2';
         const equip = document.createElement('button');
         equip.type = 'button';
-        equip.className = 'btn btn-success d-block mx-auto mb-2 wf-picker-equip';
+        equip.className = 'btn btn-success wf-picker-equip';
         equip.textContent = getLangString('MOD_WF_BUTTON_EQUIP');
         equip.onclick = () => {
           if (picked !== undefined && api.equip(folk, slotId, picked, qtyInput === undefined ? 1 : qtyInput.value)) showGrid();
@@ -416,8 +469,14 @@ export function install(ctx, { getHiring, rules, consumptionRules, log }) {
           const items = api.candidates(folk, slotId, { showAll: showAll.checked });
           pickedLine.classList.toggle('d-none', items.length === 0);
           equip.classList.toggle('d-none', items.length === 0);
+          hint.classList.toggle('d-none', items.length === 0);
+          grid.classList.toggle('wf-picker-grid-empty', items.length === 0);
           if (items.length === 0) {
-            hint.textContent = narrowed ? templateLangString('MOD_WF_PICKER_NONE_FOR_SKILL', { skill: skill.name }) : getLangString('MOD_WF_PICKER_NONE');
+            // The reason fills the empty grid, centred both ways (build .62, user layout).
+            const none = document.createElement('div');
+            none.className = 'wf-picker-none';
+            none.textContent = narrowed ? templateLangString('MOD_WF_PICKER_NONE_FOR_SKILL', { skill: skill.name }) : getLangString('MOD_WF_PICKER_NONE');
+            grid.append(none);
             return;
           }
           hint.textContent = narrowed ? templateLangString('MOD_WF_PICKER_FOR_SKILL', { skill: skill.name }) : getLangString('MOD_WF_PICKER_ALL');
@@ -434,15 +493,24 @@ export function install(ctx, { getHiring, rules, consumptionRules, log }) {
             grid.append(b);
           });
         };
-        showAll.addEventListener('change', fill);
+        showAll.addEventListener('change', () => { fill(); names(); });
         fill();
-        root.append(grid, pickedLine, equip);
+        root.append(grid, pickedLine);
+        const controls = document.createElement('div');
+        controls.className = 'wf-picker-controls';
+        const row = document.createElement('div');
+        row.className = 'wf-picker-foot';
+        // One line (build .71): Back left, Equip in the middle, Show all and its "?" right in a frame that only lines
+        // them up with the buttons (not a button itself). Phones: Equip on top, Back and Show all under it.
+        // Without Show all (no skill), Equip fills the rest of the line after Back, phones too (build .72).
+        row.append(back, equip);
+        row.classList.toggle('wf-picker-foot-solo', skill === undefined);
+        controls.append(row);
+        root.append(controls);
         // Show all, with its explanation behind "?". Inline, not a second popup: that would close this one.
         if (skill !== undefined) {
-          const controls = document.createElement('div');
-          controls.className = 'wf-picker-controls';
-          const row = document.createElement('div');
-          row.className = 'd-flex align-items-center';
+          const right = document.createElement('div');
+          right.className = 'wf-picker-showall';
           const box = document.createElement('div');
           box.className = 'custom-control custom-checkbox';
           const showAllLabel = document.createElement('label');
@@ -451,7 +519,8 @@ export function install(ctx, { getHiring, rules, consumptionRules, log }) {
           showAllLabel.textContent = getLangString('MOD_WF_PICKER_SHOW_ALL');
           box.append(showAll, showAllLabel);
           const desc = document.createElement('small');
-          desc.className = 'd-block mt-1 d-none';
+          // Not d-block: Bootstrap's d-block outranks d-none, so the text never hid and "?" did nothing (build .63).
+          desc.className = 'wf-picker-desc mt-2 d-none';
           desc.id = `${showAll.id}-desc`;
           desc.textContent = templateLangString('MOD_WF_PICKER_SHOW_ALL_DESC', { skill: skill.name });
           const help = document.createElement('button');
@@ -465,16 +534,18 @@ export function install(ctx, { getHiring, rules, consumptionRules, log }) {
             const open = desc.classList.toggle('d-none') === false;
             help.setAttribute('aria-expanded', open ? 'true' : 'false');
           };
-          row.append(box, help);
-          controls.append(row, desc);
-          root.append(controls);
+          right.append(box, help);
+          row.append(right);
+          controls.append(desc);
         }
+        names();
       };
 
       if (initialSlotId !== undefined) showPicker(initialSlotId);
       else showGrid();
       SwalLocale.fire({
-        title: templateLangString('MOD_WF_GEAR_TITLE', { name: folk.name }),
+        didRender: popupDidRender,
+        title,
         html: root,
         imageUrl: hiring.portrait(folk.tier),
         imageWidth: 48,
@@ -482,7 +553,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, log }) {
         showConfirmButton: false,
         showCloseButton: true,
         willClose: clearTips,
-        customClass: (typeof createSwalCustomClass === 'function' ? createSwalCustomClass({ popup: 'wf-gear-popup wf-ui' }) : { popup: 'wf-gear-popup wf-ui' }),
+        customClass: (typeof createSwalCustomClass === 'function' ? createSwalCustomClass({ popup: 'wf-ui' }) : { popup: 'wf-ui' }),
       });
     },
     /** Kept for callers that open one slot directly. */

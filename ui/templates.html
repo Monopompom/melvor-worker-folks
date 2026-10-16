@@ -32,7 +32,8 @@
 <template id="wf-folk-card-template">
   <div class="col-12 col-md-6 col-xl-4">
     <!-- Sections: who, work, health, strike (only on a strike or debt), actions.
-         The card is a flex column and the actions band sits at the bottom, so cards in a row line up. -->
+         The card is a flex column and the actions band sits at the bottom. Closed cards in a row share one height;
+         open Details grow only their own card (equalizeCards in cards.mjs, build .61). -->
     <div class="block block-rounded border-top border-worker-folks border-4x wf-card">
       <div class="block-content p-2 wf-card-body">
         <div class="wf-band wf-band-who">
@@ -53,19 +54,19 @@
                 <span class="badge badge-info" data-wf="rate"></span>
                 <span class="badge badge-warning" data-wf="wage"></span>
               </div>
-              <small class="wf-subtle d-block" data-wf="effects"></small>
+              <div class="wf-effects wf-subtle" data-wf="effects"></div>
             </div>
           </div>
         </div>
         <div class="wf-band wf-band-work">
-          <div class="d-flex align-items-center justify-content-between wf-gap">
+          <div class="d-flex align-items-center justify-content-center wf-gap">
             <span class="font-w700 wf-card-skill" data-wf="skill"></span>
             <button type="button" class="btn btn-sm btn-danger d-none" data-wf="stop"></button>
           </div>
-          <small class="d-block" data-wf="detail"></small>
+          <small class="d-block text-center" data-wf="detail"></small>
           <mastery-display class="wf-mastery mt-1" data-wf="mastery"></mastery-display>
         </div>
-        <div class="wf-band wf-band-health" data-wf="hp">
+        <div class="wf-band wf-band-health text-center" data-wf="hp">
           <div class="progress wf-hp-bar"><div class="progress-bar bg-danger" role="progressbar" data-wf="hp-bar"></div></div>
           <small class="d-block" data-wf="hp-text"></small>
           <small class="d-block" data-wf="food"></small>
@@ -76,13 +77,17 @@
             <button type="button" class="btn btn-sm btn-success" data-wf="settle"></button>
             <button type="button" class="btn btn-sm btn-outline-success" data-wf="apologise"></button>
           </div>
-          <small class="d-block text-warning mt-1 d-none" data-wf="strike-why"></small>
+          <small class="wf-block text-warning mt-1 d-none" data-wf="strike-why"></small>
         </div>
         <div class="wf-band wf-band-actions">
+          <!-- Promote on a line of its own, full width like the HP bar, so Fire never wraps (build .61, user layout);
+               above Details, Gear and Fire (build .66). -->
+          <div class="wf-promote-row mb-2" data-wf="promote-row">
+            <button type="button" class="btn btn-sm btn-outline-primary btn-block" data-wf="promote"></button>
+          </div>
           <div class="wf-card-actions">
             <button type="button" class="btn btn-sm btn-outline-info" data-wf="expand" aria-expanded="false"></button>
             <button type="button" class="btn btn-sm btn-outline-info" data-wf="gear"></button>
-            <button type="button" class="btn btn-sm btn-outline-primary" data-wf="promote"></button>
             <button type="button" class="btn btn-sm btn-outline-danger ml-auto" data-wf="fire"></button>
           </div>
           <div class="wf-details d-none mt-2" data-wf="details">

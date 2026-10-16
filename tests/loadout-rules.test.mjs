@@ -74,3 +74,15 @@ test('gearSummary counts filled of open slots and flags charge items at zero', (
   assert.deepEqual(gearSummary([]), { filled: 0, open: 0, worn: [], out: [] });
   assert.deepEqual(gearSummary(undefined), { filled: 0, open: 0, worn: [], out: [] });
 });
+
+test('slotLayout: every slot with the tier that opens it; expansion slots only when present', async () => {
+  const { slotLayout } = await import('../src/loadout-rules.mjs');
+  const junior = slotLayout('Junior');
+  assert.deepEqual(junior.filter((s) => s.open).map((s) => s.id), slotsForTier('Junior'));
+  assert.equal(junior.find((s) => s.id === 'melvorD:Ring').opensAt, 'Middle');
+  assert.equal(junior.find((s) => s.id === 'melvorD:Ring').open, false);
+  assert.equal(junior.some((s) => s.id === 'melvorD:Gem'), false);
+  const all = slotLayout('Expert', { hasAoD: true, hasItA: true });
+  assert.equal(all.length, 15);
+  assert.ok(all.every((s) => s.open));
+});
