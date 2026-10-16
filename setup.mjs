@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-10-16.55';
+export const BUILD = '2026-10-16.56';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -36,7 +36,7 @@ export async function setup(ctx) {
       SwalLocale.fire({
         icon: 'warning',
         title: getLangString('MOD_WF_CONFLICT_TITLE'),
-        html: `<div class="text-left font-size-sm">${templateLangString('MOD_WF_CONFLICT_TEXT', { mod: conflict.title })}</div>`,
+        html: `<div class="text-left">${templateLangString('MOD_WF_CONFLICT_TEXT', { mod: conflict.title })}</div>`,
         customClass: (typeof createSwalCustomClass === 'function' ? createSwalCustomClass({ popup: 'wf-ui' }) : { popup: 'wf-ui' }),
       });
     });
