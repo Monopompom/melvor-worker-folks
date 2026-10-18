@@ -132,6 +132,9 @@
 /* Card layout: full-width sections under the portrait row, a button row with even gaps. */
 .wf-min0 { min-width: 0; }
 .wf-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+/* The strike band's Apologise and Settle: each full width on its own line (the user, build .102; their labels are too
+   long to share a line on a card). */
+.wf-card-actions.wf-stack { flex-direction: column; align-items: stretch; }
 /* Gear modal: the game's popup width and padding, no extra of ours (build .68); the bonus band spans the popup. */
 .wf-gear-head { margin-bottom: 0.75rem; }
 .wf-picker-head { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
@@ -302,6 +305,7 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-dash-pay .wf-reserve-controls { margin-top: 10px; gap: 6px; }
 .wf-dash-pay .wf-reserve-input { min-height: 36px; flex-basis: 6rem; min-width: 6rem; }
 .wf-dash-pay .wf-reserve-deposit { min-height: 36px; margin-top: 10px !important; }
+@media (pointer: coarse) { .wf-dash-pay .wf-reserve-deposit { min-height: 40px; } } /* never under 40px on touch (.100) */
 /* Made: XP as skill chips, then the item chips in their own scroll box, so many kinds never grow the block */
 .wf-dash-xp { display: flex; flex-wrap: wrap; gap: 6px; flex: 0 0 auto; }
 .wf-dash-xp-chip { display: inline-flex; align-items: center; gap: 2px; padding: 2px 8px; border-radius: 6px; background: rgba(0,0,0,0.2); font-size: 0.85rem; }
