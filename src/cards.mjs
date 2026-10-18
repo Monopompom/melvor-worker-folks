@@ -284,6 +284,12 @@ function fillCard(col, folk, view) {
       const cls = `d-block font-w600 ${debtOnly ? 'text-warning' : 'text-danger'}`;
       if (owed.className !== cls) owed.className = cls;
     }
+    const sev = el.querySelector('[data-wf="strike-severance"]');
+    if (sev !== null) {
+      const text = debtOnly ? '' : (info.severanceText ?? '');
+      setText(sev, text);
+      sev.classList.toggle('d-none', text === '');
+    }
     const settle = el.querySelector('[data-wf="settle"]');
     if (settle !== null) {
       settle.classList.toggle('d-none', debtOnly);

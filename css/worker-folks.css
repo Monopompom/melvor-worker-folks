@@ -1,3 +1,48 @@
+/* Theme tokens (build .103, the user 18 Oct 2026; design canvas "Worker Folks Light Mode"): every tint follows the
+   game's theme. Light values are the default (the game's default theme has white blocks); body.darkMode swaps in the
+   dark set, which is the look the mod had before. On :root so popups and tooltips appended to <body> get them too.
+   Tints on a block (bands, lines, tracks, wells) are ink on light and light on dark; status text is darker on light to
+   keep 4.5:1 on white. Filled badges, quantity chips over item art and the teal selection stay one colour everywhere. */
+:root {
+  --wf-band: rgba(0,0,0,0.04); --wf-tile: rgba(0,0,0,0.025); --wf-well: rgba(0,0,0,0.05);
+  --wf-line: rgba(0,0,0,0.14); --wf-line-soft: rgba(0,0,0,0.09); --wf-row-line: rgba(0,0,0,0.07); --wf-locked-line: rgba(0,0,0,0.18);
+  --wf-track: rgba(0,0,0,0.1); --wf-thumb: rgba(0,0,0,0.25);
+  --wf-subtle: #5f6b77; --wf-head: #56616d; --wf-hover: #1b1f24; --wf-help: #4f6b88; --wf-grip: #9aa5b1;
+  --wf-working: #1e7b2e; --wf-idle: #5c6873; --wf-strike: #b42318; --wf-cooldown: #1d5fa8; --wf-debt: #8a5a00; --wf-alert: #d99a1e;
+  --wf-dis-text: #6c757d; --wf-dis-line: #b6bec7;
+}
+body.darkMode {
+  --wf-band: rgba(255,255,255,0.045); --wf-tile: rgba(255,255,255,0.03); --wf-well: rgba(0,0,0,0.2);
+  --wf-line: rgba(255,255,255,0.12); --wf-line-soft: rgba(255,255,255,0.1); --wf-row-line: rgba(255,255,255,0.06); --wf-locked-line: rgba(255,255,255,0.18);
+  --wf-track: rgba(255,255,255,0.08); --wf-thumb: rgba(255,255,255,0.25);
+  --wf-subtle: #b5bec7; --wf-head: #a0a8b4; --wf-hover: #fff; --wf-help: #8fa3b8; --wf-grip: #6c7a89;
+  --wf-working: #5ccf6b; --wf-idle: #aab4be; --wf-strike: #ff6b6b; --wf-cooldown: #6fb3ff; --wf-debt: #f0b84a; --wf-alert: #f0b84a;
+  --wf-dis-text: #8a949e; --wf-dis-line: #5c6873;
+}
+/* Super Dark (body.darkMode.superDark, build .105 after the design canvas): blocks are pure black, so a black well
+   vanishes and Dark's faint tints barely show: wells, bands, lines and tracks are a step stronger light tints, and the
+   blue-greys turn neutral greys to match the theme's colourless black. Status inks stay as in Dark. */
+body.darkMode.superDark {
+  --wf-band: rgba(255,255,255,0.055); --wf-tile: rgba(255,255,255,0.04); --wf-well: rgba(255,255,255,0.06);
+  --wf-line: rgba(255,255,255,0.14); --wf-row-line: rgba(255,255,255,0.07); --wf-track: rgba(255,255,255,0.1);
+  --wf-subtle: #b0b0b0; --wf-head: #9e9e9e; --wf-grip: #6a6a6a; --wf-idle: #a8a8a8;
+  --wf-dis-text: #8a8a8a; --wf-dis-line: #4a4a4a;
+}
+/* The game's progress tracks on our bands (build .107): Dark's track #2d3542 is the band's own tone, so
+   the card's mastery and HP tracks vanished; inside a band they take our track tint, which lands within a shade of
+   the game's track in Light and Super Dark. The game sets .progress with !important per theme (body.darkMode and
+   body.darkMode.superDark selectors), so ours carries the same theme class and comes later. */
+.wf-band .progress, body.darkMode .wf-band .progress { background-color: var(--wf-track) !important; }
+/* Gear slots: the empty-slot pictures are dark line art that vanish on black; the game's own Equipment grid gives its
+   slots this fill in Super Dark (.combat-equip-img), so ours match it (build .106). */
+body.darkMode.superDark .wf-slot:not(:hover):not(:active) { background-color: #242424; }
+/* Light theme: the game's header text is dark there, so the header red is lighter (the game's own skill headers are mid
+   tones too); and the game's light text-* colours are near 2:1 on white, so inside our UI they take the token inks. */
+body:not(.darkMode) .bg-worker-folks { background-color: #d9706b !important; }
+body:not(.darkMode) .wf-ui .text-warning { color: var(--wf-debt) !important; }
+body:not(.darkMode) .wf-ui .text-success { color: var(--wf-working) !important; }
+body:not(.darkMode) .wf-ui .text-danger { color: var(--wf-strike) !important; }
+body:not(.darkMode) .wf-ui .text-info { color: var(--wf-cooldown) !important; }
 /* Text scale: everything the mod draws (Hiring page, Worker box, its modals) is one step
    bigger than the game's 14 px default: body 16 px, small text 14.5 px, headings 20 px. */
 .wf-ui { font-size: 1rem; }
@@ -9,7 +54,7 @@
 /* 1rem inputs: iOS Safari zooms the page into a smaller one on focus. */
 .wf-ui input.form-control { font-size: 1rem; }
 /* Only disabled buttons are grey. */
-.wf-ui .btn:disabled, .wf-ui .btn.disabled { color: #8a949e; border-color: #5c6873; background-color: transparent; opacity: 1; }
+.wf-ui .btn:disabled, .wf-ui .btn.disabled { color: var(--wf-dis-text); border-color: var(--wf-dis-line); background-color: transparent; opacity: 1; }
 .wf-line-icon { width: 18px; height: 18px; object-fit: contain; vertical-align: -4px; margin-right: 5px; }
 .bg-worker-folks { background-color: #7e2828 !important; }
 .border-worker-folks { border-color: #329389 !important; }
@@ -19,24 +64,24 @@
 #worker-folks-folks { align-items: flex-start; }
 .wf-card { min-height: 160px; display: flex; flex-direction: column; }
 .wf-card-body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; }
-.wf-band { background: rgba(255,255,255,0.045); border-radius: 6px; padding: 12px; } /* 12px on the page (build .87); 20px in popups */
+.wf-band { background: var(--wf-band); border-radius: 6px; padding: 12px; } /* 12px on the page (build .87); 20px in popups */
 .wf-band-actions { margin-top: auto; }
 .wf-band-strike { box-shadow: inset 3px 0 0 #bf1f1f; }
 .wf-band-strike.wf-debt-block { box-shadow: inset 3px 0 0 #c98a16; }
 /* On Thieving without food: the card's top border turns amber (the food line says why). */
-.wf-card-alert { border-color: #f0b84a !important; }
+.wf-card-alert { border-color: var(--wf-alert) !important; }
 .wf-card-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .wf-gap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 /* Secondary text that must stay readable: lighter than body text, brighter than the game's text-muted. */
-.wf-subtle { color: #b5bec7; }
+.wf-subtle { color: var(--wf-subtle); }
 /* "?" buttons: explanations live behind them; a 32px target. */
 .wf-help { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; min-height: 32px; padding: 0 .35rem; margin-left: .2rem;
-  color: #8fa3b8; background: none; border: 0; font-size: 1.1rem; line-height: 1; vertical-align: middle; } /* the shared "?" look */
-.wf-help:focus { color: #fff; box-shadow: none; }
-@media (hover: hover) { .wf-help:hover { color: #fff; } }
+  color: var(--wf-help); background: none; border: 0; font-size: 1.1rem; line-height: 1; vertical-align: middle; } /* the shared "?" look */
+.wf-help:focus { color: var(--wf-hover); box-shadow: none; }
+@media (hover: hover) { .wf-help:hover { color: var(--wf-hover); } }
 /* Help popups: a grey band per idea, a heading, one sentence a line. */
 .wf-help-body .wf-band + .wf-band { margin-top: 8px; }
-.wf-help-body .wf-help-head { color: #a0a8b4; font-weight: 600; margin-bottom: 4px; }
+.wf-help-body .wf-help-head { color: var(--wf-head); font-weight: 600; margin-bottom: 4px; }
 .wf-help-body .wf-help-p { margin: 0; }
 .wf-help-body .wf-help-p + .wf-help-p { margin-top: 6px; }
 .wf-card-portrait { width: 64px; height: 64px; border-radius: 6px; object-fit: contain; }
@@ -52,13 +97,13 @@
 .wf-badge-cooldown { background-color: #1f6fbf; color: #fff; }
 /* Amber with dark text: white on amber was hard to read (build .55). Overtime is a choice, not a fault: amber outline. */
 .wf-badge-debt { background-color: #f0b84a; color: #1b1f24; }
-.wf-badge-overtime { background-color: transparent; color: #f0b84a; border: 1px solid #f0b84a; }
-.wf-text-working { color: #5ccf6b; }
-.wf-text-idle { color: #aab4be; }
-.wf-text-strike { color: #ff6b6b; }
-.wf-text-cooldown { color: #6fb3ff; }
-.wf-text-debt { color: #f0b84a; }
-.wf-text-overtime { color: #f0b84a; }
+.wf-badge-overtime { background-color: transparent; color: var(--wf-debt); border: 1px solid var(--wf-debt); }
+.wf-text-working { color: var(--wf-working); }
+.wf-text-idle { color: var(--wf-idle); }
+.wf-text-strike { color: var(--wf-strike); }
+.wf-text-cooldown { color: var(--wf-cooldown); }
+.wf-text-debt { color: var(--wf-debt); }
+.wf-text-overtime { color: var(--wf-debt); }
 .wf-card-skill { font-size: 1.05em; }
 /* Worker box: a button that opens the worker modal. */
 .wf-skill-control .wf-ctrl-button { white-space: normal; text-align: left; max-width: 100%; }
@@ -75,7 +120,7 @@
 .wf-worker-grid { display: grid; grid-template-columns: repeat(var(--wf-cols3, 3), 19.5rem); gap: 8px; justify-content: center; text-align: left; }
 @media (max-width: 1099.98px) { .wf-worker-grid { grid-template-columns: repeat(var(--wf-cols2, 2), 19.5rem); } }
 @media (max-width: 767.98px) { .wf-worker-popup { width: 96vw !important; } .wf-worker-grid { grid-template-columns: 1fr; } }
-.wf-worker-tile { display: flex; align-items: flex-start; gap: 8px; padding: 8px; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; background: rgba(255,255,255,0.03); color: inherit; text-align: left; font-size: 1rem; }
+.wf-worker-tile { display: flex; align-items: flex-start; gap: 8px; padding: 8px; border: 1px solid var(--wf-line); border-radius: 6px; background: var(--wf-tile); color: inherit; text-align: left; font-size: 1rem; }
 @media (hover: hover) { .wf-worker-tile:hover:not(:disabled) { border-color: #329389; background: rgba(50,147,137,0.12); } }
 .wf-worker-tile:disabled { opacity: 0.5; cursor: not-allowed; }
 .wf-worker-tile-active { border-color: #329389; box-shadow: inset 0 0 0 1px #329389; background: rgba(50,147,137,0.08); }
@@ -89,14 +134,14 @@
 .wf-effect { min-width: 0; }
 .wf-worker-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 /* Worn gear on a Worker popup tile (build .54): 20px icons; amber ring when a charge item ran out. */
-.wf-worker-none { display: flex; align-items: center; justify-content: center; text-align: center; padding: 8px; border-radius: 6px; background: rgba(255,255,255,0.05); font-size: 1rem; line-height: 1.3; }
+.wf-worker-none { display: flex; align-items: center; justify-content: center; text-align: center; padding: 8px; border-radius: 6px; background: var(--wf-well); font-size: 1rem; line-height: 1.3; }
 /* Reserve (build .76): one block per currency like the bank's Sell block: name left and amount right, a fill bar,
    the 40px field (7 digits wide) with its presets on one row (presets drop under it when it can't fit), a thin rule,
    Deposit the full width of the block (the user's call, build .78). */
 .wf-reserve-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.wf-reserve-bar { height: 6px; margin-top: 10px !important; background: rgba(255,255,255,0.08); }
+.wf-reserve-bar { height: 6px; margin-top: 10px !important; background: var(--wf-track); }
 .wf-reserve-covers { margin-top: 8px; }
-.wf-reserve-rule { margin: 14px 0; border-top: 1px solid rgba(255,255,255,0.1); }
+.wf-reserve-rule { margin: 14px 0; border-top: 1px solid var(--wf-line-soft); }
 .wf-reserve-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .wf-reserve-input { min-height: 40px; flex: 1 1 8rem; min-width: 8rem; width: auto; }
 .wf-reserve-presets { display: flex; gap: 6px; flex: 0 0 auto; }
@@ -128,7 +173,7 @@
 .wf-picker-foot.wf-picker-foot-solo .wf-picker-equip { grid-column: 2; grid-row: 1; justify-self: stretch; width: auto; }
 .wf-picker-foot.wf-picker-foot-solo .wf-picker-back { grid-row: 1; }
 .wf-mastery { display: block; }
-.wf-details { border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.5rem; }
+.wf-details { border-top: 1px solid var(--wf-line-soft); padding-top: 0.5rem; }
 /* Card layout: full-width sections under the portrait row, a button row with even gaps. */
 .wf-min0 { min-width: 0; }
 .wf-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -142,14 +187,14 @@
 .wf-slot-grid { display: grid; grid-template-columns: repeat(3, 52px); grid-auto-rows: 52px; gap: 10px 14px; justify-content: center; margin: 0 auto; }
 .wf-slot { position: relative; width: 52px; height: 52px; padding: 0; display: flex; align-items: center; justify-content: center; line-height: 1; }
 .wf-slot img { width: 36px; height: 36px; object-fit: contain; display: block; }
-.wf-slot-qty { position: absolute; right: 2px; bottom: 0; font-size: 0.8rem !important; line-height: 1; background: rgba(0,0,0,0.6); border-radius: 3px; padding: 1px 2px; }
+.wf-slot-qty { position: absolute; right: 2px; bottom: 0; font-size: 0.8rem !important; line-height: 1; background: rgba(0,0,0,0.6); color: #fff; border-radius: 3px; padding: 1px 2px; }
 /* Item grid: 52px rows (48px tile + 6px gap); at least 4 rows are always visible, it scrolls past 6. */
 .wf-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, 52px); grid-auto-rows: 52px; align-content: start; gap: 6px; min-height: 226px; max-height: 342px; overflow-y: auto; min-width: min(86vw, 26rem); max-width: 100%; padding: 2px;
-  scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.25) transparent; } /* .99: the shared rule 4a.16, never the browser's bar */
+  scrollbar-width: thin; scrollbar-color: var(--wf-thumb) transparent; } /* .99: the shared rule 4a.16, never the browser's bar */
 .wf-picker-none { grid-column: 1 / -1; }
 .wf-picker-item { position: relative; width: 52px; height: 52px; padding: 0; display: flex; align-items: center; justify-content: center; line-height: 1; }
 .wf-picker-item img { width: 40px; height: 40px; object-fit: contain; display: block; }
-.wf-picker-item small { position: absolute; right: 2px; bottom: 0; font-size: 0.8rem !important; line-height: 1; background: rgba(0,0,0,0.6); border-radius: 3px; padding: 1px 2px; }
+.wf-picker-item small { position: absolute; right: 2px; bottom: 0; font-size: 0.8rem !important; line-height: 1; background: rgba(0,0,0,0.6); color: #fff; border-radius: 3px; padding: 1px 2px; }
 .wf-picker-item.wf-picker-locked img { opacity: 0.4; filter: grayscale(0.8); }
 .wf-picker-qty-row { gap: 8px; }
 .wf-picker-qty { width: 7rem; min-height: 40px; }
@@ -218,7 +263,7 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-skill-name-icon { width: 1.15em; height: 1.15em; margin-right: .25em; vertical-align: -0.2em; }
 .wf-skill-name b { font-weight: 600; }
 /* Gear picker grid on a grey band (build .62); with nothing to show, the reason sits in its middle. */
-.wf-picker-grid { background: rgba(255,255,255,0.045); border-radius: 6px; padding: 12px; }
+.wf-picker-grid { background: var(--wf-band); border-radius: 6px; padding: 12px; }
 .wf-picker-grid.wf-picker-grid-empty { display: flex; align-items: center; justify-content: center; }
 .wf-picker-none { text-align: center; padding: 0 12px; max-width: 26rem; }
 /* A block that d-none can still hide (Bootstrap's d-block is !important and outranks d-none, build .63). */
@@ -227,15 +272,15 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-title-slot { white-space: nowrap; }
 .wf-title-slot img { width: 1em; height: 1em; margin-right: .3em; vertical-align: -0.12em; }
 /* A slot this tier hasn't opened: grey, as disabled, its reason on tap and in the tooltip. */
-.wf-slot.wf-slot-locked { border: 2px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.03); cursor: not-allowed; }
+.wf-slot.wf-slot-locked { border: 2px solid var(--wf-locked-line); background: var(--wf-tile); cursor: not-allowed; }
 .wf-slot.wf-slot-locked img { opacity: 0.35; filter: grayscale(1); }
 .wf-slot-locked-line { text-align: center; margin-top: 8px; }
 /* Gear bonuses folded at the bottom: a caret toggle like the game's, the list on a grey band when open. */
-.wf-stats-toggle { display: block; min-height: 32px; margin: 12px auto 0; padding: 4px 8px; background: none; border: 0; color: #a0a8b4; font-weight: 600; }
-.wf-stats-toggle:focus { color: #fff; box-shadow: none; }
-@media (hover: hover) { .wf-stats-toggle:hover { color: #fff; } }
+.wf-stats-toggle { display: block; min-height: 32px; margin: 12px auto 0; padding: 4px 8px; background: none; border: 0; color: var(--wf-head); font-weight: 600; }
+.wf-stats-toggle:focus { color: var(--wf-hover); box-shadow: none; }
+@media (hover: hover) { .wf-stats-toggle:hover { color: var(--wf-hover); } }
 @media (pointer: coarse) { .wf-stats-toggle { min-height: 40px; } }
-.wf-gear .wf-gear-summary { margin-top: 8px; padding: 20px; border-radius: 6px; background: rgba(255,255,255,0.045); line-height: 1.5; }
+.wf-gear .wf-gear-summary { margin-top: 8px; padding: 20px; border-radius: 6px; background: var(--wf-band); line-height: 1.5; }
 
 /* Tooltips (src/tips.mjs, the user 17 Oct 2026; build .91): the text centred, an item's icon
    before its name. The tippy box is appended to <body>, so sizes are in em of the tooltip's own text. */
@@ -248,10 +293,10 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-layout-block.wf-folded .wf-layout-head ~ * { display: none !important; }
 .wf-layout-block.wf-folded .wf-layout-head { margin-bottom: 0 !important; }
 .wf-fold { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; min-height: 32px; padding: 0; margin: 0 .25rem 0 -.5rem;
-  color: #a0a8b4; background: none; border: 0; font-size: 1.25rem; line-height: 1; }
-.wf-fold:focus { color: #fff; box-shadow: none; }
-@media (hover: hover) { .wf-fold:hover { color: #fff; } }
-.wf-grip { margin-left: auto; padding-left: 8px; color: #6c7a89; font-size: 1rem; line-height: 1; display: none; }
+  color: var(--wf-head); background: none; border: 0; font-size: 1.25rem; line-height: 1; }
+.wf-fold:focus { color: var(--wf-hover); box-shadow: none; }
+@media (hover: hover) { .wf-fold:hover { color: var(--wf-hover); } }
+.wf-grip { margin-left: auto; padding-left: 8px; color: var(--wf-grip); font-size: 1rem; line-height: 1; display: none; }
 .wf-layout-movable .wf-grip { display: inline-block; }
 .wf-layout-head > .ml-auto:not(.d-none) ~ .wf-grip { margin-left: 0; }
 /* A Folk card moves by its top band (the grip after its status badge); it doesn't fold. */
@@ -277,28 +322,28 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
    folded, the Payroll mini bar. */
 #worker-folks-overview > .wf-dash-content { padding: 16px !important; }
 .wf-dash-right { gap: 12px; min-width: 0; }
-.wf-dash-pill { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.12); font-size: 0.85rem; white-space: nowrap; }
-.wf-dash-pill .wf-dash-bar, .wf-dash-paymini .wf-dash-bar { width: 72px; height: 6px; margin: 0; background: rgba(255,255,255,0.08); }
+.wf-dash-pill { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--wf-line); font-size: 0.85rem; white-space: nowrap; }
+.wf-dash-pill .wf-dash-bar, .wf-dash-paymini .wf-dash-bar { width: 72px; height: 6px; margin: 0; background: var(--wf-track); }
 .wf-dash-paymini { display: none; align-items: center; gap: 8px; font-size: 0.85rem; white-space: nowrap; }
 .wf-dash-paymini-cur .wf-line-icon { margin-right: 0; }
 #worker-folks-overview.wf-folded .wf-dash-paymini { display: flex; }
 .wf-dash-grid { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1.6fr); gap: 12px; height: 21rem; }
 .wf-dash-band { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
-.wf-dash-pay { overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.25) transparent; }
-.wf-dash-head { color: #a0a8b4; font-weight: 600; margin-bottom: 8px; gap: 6px; flex: 0 0 auto; }
+.wf-dash-pay { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--wf-thumb) transparent; }
+.wf-dash-head { color: var(--wf-head); font-weight: 600; margin-bottom: 8px; gap: 6px; flex: 0 0 auto; }
 .wf-dash-head .wf-help { margin: -4px 0; }
-.wf-dash-scroll { flex: 1 1 0; min-height: 0; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.25) transparent; }
+.wf-dash-scroll { flex: 1 1 0; min-height: 0; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; scrollbar-color: var(--wf-thumb) transparent; }
 .wf-dash-line { margin-top: 4px; }
 .wf-dash-sub { margin: 2px 0 6px; }
 /* At work: one line a Folk, trouble first; the full skill, action and status in the row's tooltip */
 .wf-dash-row { display: flex; align-items: center; gap: 6px; padding: 4px 0; white-space: nowrap; }
-.wf-dash-row + .wf-dash-row { border-top: 1px solid rgba(255,255,255,0.06); }
+.wf-dash-row + .wf-dash-row { border-top: 1px solid var(--wf-row-line); }
 .wf-dash-row-name { font-weight: 600; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .wf-dash-row-skill { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .wf-dash-row-blank { display: inline-block; flex: none; }
 .wf-dash-row-status { width: 16px; height: 16px; flex: none; margin-left: auto; }
 /* Payroll: one compact block per currency (the reserve's own field, presets and Deposit) */
-.wf-pay-cur + .wf-pay-cur { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); }
+.wf-pay-cur + .wf-pay-cur { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--wf-line-soft); }
 .wf-pay-covers { margin-top: 6px; }
 .wf-pay-why { margin-top: 8px; }
 .wf-dash-pay .wf-reserve-bar { margin-top: 8px !important; }
@@ -308,10 +353,10 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 @media (pointer: coarse) { .wf-dash-pay .wf-reserve-deposit { min-height: 40px; } } /* never under 40px on touch (.100) */
 /* Made: XP as skill chips, then the item chips in their own scroll box, so many kinds never grow the block */
 .wf-dash-xp { display: flex; flex-wrap: wrap; gap: 6px; flex: 0 0 auto; }
-.wf-dash-xp-chip { display: inline-flex; align-items: center; gap: 2px; padding: 2px 8px; border-radius: 6px; background: rgba(0,0,0,0.2); font-size: 0.85rem; }
+.wf-dash-xp-chip { display: inline-flex; align-items: center; gap: 2px; padding: 2px 8px; border-radius: 6px; background: var(--wf-well); font-size: 0.85rem; }
 /* An even grid: equal cells that stretch to fill each row, so no ragged gap at the right (the user, build .98). */
 .wf-dash-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); grid-auto-rows: min-content; align-content: start; gap: 8px; margin-top: 10px; min-height: 76px; padding-right: 4px; }
-.wf-dash-item { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; padding: 8px 4px 6px; border-radius: 8px; background: rgba(0,0,0,0.2); }
+.wf-dash-item { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; padding: 8px 4px 6px; border-radius: 8px; background: var(--wf-well); }
 .wf-dash-item-icon { width: 32px; height: 32px; object-fit: contain; }
 .wf-dash-item-count { font-size: 0.8rem; font-weight: 600; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wf-dash-more { grid-column: 1 / -1; }

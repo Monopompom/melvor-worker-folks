@@ -501,7 +501,9 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
               : '';
           return {
             reason,
-            owedText: templateLangString('MOD_WF_STRIKE_OWED', { amount: fmt({ [plain.debtCurrency]: plain.debt }), severance: numberWithCommas(plain.severance) }),
+            owedText: templateLangString('MOD_WF_STRIKE_OWED', { amount: fmt({ [plain.debtCurrency]: plain.debt }) }),
+            // its own line (the user, build .108): a long amount never wraps the severance; none when it is free
+            severanceText: plain.severance > 0 ? templateLangString('MOD_WF_STRIKE_SEVERANCE', { severance: numberWithCommas(plain.severance) }) : '',
             settleText: templateLangString('MOD_WF_BUTTON_SETTLE', { amount: fmt(plain.parts) }),
             apologyText: this.levels !== undefined && !this.levels.apologyUnlocked()
               ? `${templateLangString('MOD_WF_BUTTON_APOLOGY', { amount: fmt(apology.parts) })} (${this.levels.lockText(this.levels.apologyLevel)})`

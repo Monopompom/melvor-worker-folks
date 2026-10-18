@@ -21,8 +21,11 @@ while you fight, raid or train something else.
    going until you start an action on that page yourself. Picking a Folk that is busy on
    another skill does not interrupt it either: it moves over when you start the new skill.
    Skills added by other mods get a Worker box too, as long as they have a skill page.
-4. The **Hiring** page (sidebar, under the passive skills) is the crew overview: every Folk
-   with its status, the skill it holds, what it is working on, and a Stop button. The usual
+4. The **Hiring** page (sidebar, under the passive skills) is the crew overview. Its
+   **Overview** block shows who is at work (trouble first), what your Folks made this session,
+   the Payroll Reserve once unlocked, and your next Hiring unlock. Below it, a card per Folk
+   with its status, the skill it holds, what it is working on, and a Stop button. Fold a block
+   to its title or drag blocks and cards into your own order; Reset layout puts it back. The usual
    skill minibar floats at its side (mastery, milestones, the pet once found, quick-equip of
    Hiring gear, and the relics button in Ancient Relics).
 5. **Shift Slots** limit how many Folks work at the same time. Buy more in the Shop; your
