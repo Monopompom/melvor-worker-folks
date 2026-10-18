@@ -217,19 +217,8 @@ function fillCard(col, folk, view) {
   set('gear', (el) => {
     const gear = view.gear(folk);
     setText(el, gear.text);
-    // Melvor's tooltip, plain text, one line per slot (build .89).
-    if (el.dataset.wfTip !== gear.title) {
-      el.dataset.wfTip = gear.title;
-      if (typeof tippy !== 'function') el.title = gear.title;
-      else if (gear.title === '') el._tippy?.destroy();
-      else {
-        const box = document.createElement('div');
-        box.style.whiteSpace = 'pre-line';
-        box.textContent = gear.title;
-        if (el._tippy !== undefined) el._tippy.setContent(box);
-        else tippy(el, { content: box, placement: 'top', interactive: false, animation: false, touch: 'hold' });
-      }
-    }
+    // Melvor's tooltip, one line per worn item with its icon (src/tips.mjs; build .91).
+    view.tip(el, gear.tip);
     // Amber when a worn item ran out (needs attention); blue outline otherwise, like Details.
     const className = `btn btn-sm ${gear.out ? 'btn-outline-warning' : 'btn-outline-info'}`;
     if (el.className !== className) el.className = className;

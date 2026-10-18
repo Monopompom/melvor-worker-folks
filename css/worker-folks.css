@@ -93,9 +93,6 @@
 /* Reserve (build .76): one block per currency like the bank's Sell block: name left and amount right, a fill bar,
    the 40px field (7 digits wide) with its presets on one row (presets drop under it when it can't fit), a thin rule,
    Deposit the full width of the block (the user's call, build .78). */
-#worker-folks-reserve > .block-content { padding: 16px !important; }
-#worker-folks-reserve [data-wf="reserve-capacity"] { margin-bottom: 16px !important; }
-#worker-folks-reserve [data-wf="reserve-rows"] .row { row-gap: 12px; }
 .wf-reserve-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .wf-reserve-bar { height: 6px; margin-top: 10px !important; background: rgba(255,255,255,0.08); }
 .wf-reserve-covers { margin-top: 8px; }
@@ -105,19 +102,12 @@
 .wf-reserve-presets { display: flex; gap: 6px; flex: 0 0 auto; }
 .wf-reserve-presets .btn { min-height: 32px; min-width: 40px; }
 .wf-reserve-deposit { width: 100%; min-height: 40px; margin-top: 14px !important; }
-/* Top row (build .79): reserve and Tips one height (row-deck); Tips is a grid of bands, as many side by side as fit
-   at 15rem each, two rows a page; the pager buttons are 32px squares. */
-.wf-top-row > [class*="col"] > .block { margin-bottom: 12px; }
+/* Top row (build .79): the reserve and the Overview one height (row-deck). */
 /* Build .88 (the user): block content 16px in, blocks 12px apart both ways (the game's .block keeps 30px
    under it and rows a 28px gutter). */
-#worker-folks-container > .row { margin-left: -6px; margin-right: -6px; }
-#worker-folks-container > .row > [class*="col"] { padding-left: 6px; padding-right: 6px; }
-#worker-folks-container > .row .block { margin-bottom: 12px; }
-#worker-folks-tips > .wf-tips-content { padding: 16px !important; display: flex; flex-direction: column; }
-.wf-tips-icon { font-size: 1.25rem; width: 24px; text-align: center; }
-.wf-tips-pager .btn { min-width: 32px; min-height: 32px; }
-.wf-tips-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 12px; flex: 1 1 auto; align-content: start; }
-.wf-tip-body { margin-top: 4px; line-height: 1.4; }
+#worker-folks-folks { margin-left: -6px; margin-right: -6px; }
+#worker-folks-folks > [class*="col"] { padding-left: 6px; padding-right: 6px; }
+#worker-folks-folks .block, .wf-layout-wide > .block { margin-bottom: 12px; }
 /* Gear picker (build .62): Equip and Back stacked, one width, centred. */
 /* One line (build .71): Back left, Equip centred, Show all with its "?" right in a frame that only lines it up
    with the buttons (no hover, no pointer of its own). Columns are fixed, so a hidden Equip leaves its gap. */
@@ -242,3 +232,90 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 @media (hover: hover) { .wf-stats-toggle:hover { color: #fff; } }
 @media (pointer: coarse) { .wf-stats-toggle { min-height: 40px; } }
 .wf-gear .wf-gear-summary { margin-top: 8px; padding: 20px; border-radius: 6px; background: rgba(255,255,255,0.045); line-height: 1.5; }
+
+/* Tooltips (src/tips.mjs, the user 17 Oct 2026; build .91): the text centred, an item's icon
+   before its name. The tippy box is appended to <body>, so sizes are in em of the tooltip's own text. */
+.wf-tip { text-align: center; }
+.wf-tip-line { white-space: pre-line; }
+.wf-tip-icon { width: 1.25em; height: 1.25em; object-fit: contain; vertical-align: middle; margin: -0.15em 0.3em 0 0; }
+
+/* Page layout (src/layout.mjs, build .93, the user 18 Oct 2026): blocks fold to their title row (caret left) and move
+   by it (grip right), kept per browser. One column since build .98: the Overview above or below the cards. */
+.wf-layout-block.wf-folded .wf-layout-head ~ * { display: none !important; }
+.wf-layout-block.wf-folded .wf-layout-head { margin-bottom: 0 !important; }
+.wf-fold { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; min-height: 32px; padding: 0; margin: 0 .25rem 0 -.5rem;
+  color: #a0a8b4; background: none; border: 0; font-size: 1.25rem; line-height: 1; }
+.wf-fold:focus { color: #fff; box-shadow: none; }
+@media (hover: hover) { .wf-fold:hover { color: #fff; } }
+.wf-grip { margin-left: auto; padding-left: 8px; color: #6c7a89; font-size: 1rem; line-height: 1; display: none; }
+.wf-layout-movable .wf-grip { display: inline-block; }
+.wf-layout-head > .ml-auto:not(.d-none) ~ .wf-grip { margin-left: 0; }
+/* A Folk card moves by its top band (the grip after its status badge); it doesn't fold. */
+.wf-card-end { display: flex; align-items: center; margin-left: auto; padding-left: 12px; flex-shrink: 0; }
+.wf-card-end .wf-card-status { margin-left: 0; }
+.wf-card-end .wf-grip { margin-left: 8px; padding-left: 0; }
+.wf-layout-movable .wf-card-head { cursor: grab; }
+.wf-layout-movable .wf-card-head button { cursor: pointer; }
+.wf-card-col.sortable-ghost { opacity: 0.4; }
+.wf-layout-movable .wf-layout-head { cursor: grab; }
+.wf-layout-movable .wf-layout-head button { cursor: pointer; }
+.wf-layout-dragging .wf-layout-head { cursor: grabbing; }
+.wf-layout-block.sortable-ghost { opacity: 0.4; }
+.wf-layout-foot { display: flex; justify-content: center; margin: 4px 0 12px; }
+.wf-layout-foot .btn { min-height: 32px; }
+@media (pointer: coarse) {
+  .wf-fold { min-width: 40px; min-height: 40px; }
+}
+
+/* Overview (src/dashboard.mjs, build .95; merged with the Payroll Reserve in .98, the user 18 Oct 2026). One fixed
+   height that holds a full crew: three bands side by side (At work, Payroll, Made this session), each scrolling inside.
+   On a phone they stack, Payroll first, each with its own cap. The title row carries the Next unlock pill and, while
+   folded, the Payroll mini bar. */
+#worker-folks-overview > .wf-dash-content { padding: 16px !important; }
+.wf-dash-right { gap: 12px; min-width: 0; }
+.wf-dash-pill { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.12); font-size: 0.85rem; white-space: nowrap; }
+.wf-dash-pill .wf-dash-bar, .wf-dash-paymini .wf-dash-bar { width: 72px; height: 6px; margin: 0; background: rgba(255,255,255,0.08); }
+.wf-dash-paymini { display: none; align-items: center; gap: 8px; font-size: 0.85rem; white-space: nowrap; }
+.wf-dash-paymini-cur .wf-line-icon { margin-right: 0; }
+#worker-folks-overview.wf-folded .wf-dash-paymini { display: flex; }
+.wf-dash-grid { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1.6fr); gap: 12px; height: 21rem; }
+.wf-dash-band { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.wf-dash-pay { overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.25) transparent; }
+.wf-dash-head { color: #a0a8b4; font-weight: 600; margin-bottom: 8px; gap: 6px; flex: 0 0 auto; }
+.wf-dash-head .wf-help { margin: -4px 0; }
+.wf-dash-scroll { flex: 1 1 0; min-height: 0; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.25) transparent; }
+.wf-dash-line { margin-top: 4px; }
+.wf-dash-sub { margin: 2px 0 6px; }
+/* At work: one line a Folk, trouble first; the full skill, action and status in the row's tooltip */
+.wf-dash-row { display: flex; align-items: center; gap: 6px; padding: 4px 0; white-space: nowrap; }
+.wf-dash-row + .wf-dash-row { border-top: 1px solid rgba(255,255,255,0.06); }
+.wf-dash-row-name { font-weight: 600; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.wf-dash-row-skill { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.wf-dash-row-blank { display: inline-block; flex: none; }
+.wf-dash-row-status { width: 16px; height: 16px; flex: none; margin-left: auto; }
+/* Payroll: one compact block per currency (the reserve's own field, presets and Deposit) */
+.wf-pay-cur + .wf-pay-cur { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); }
+.wf-pay-covers { margin-top: 6px; }
+.wf-pay-why { margin-top: 8px; }
+.wf-dash-pay .wf-reserve-bar { margin-top: 8px !important; }
+.wf-dash-pay .wf-reserve-controls { margin-top: 10px; gap: 6px; }
+.wf-dash-pay .wf-reserve-input { min-height: 36px; flex-basis: 6rem; min-width: 6rem; }
+.wf-dash-pay .wf-reserve-deposit { min-height: 36px; margin-top: 10px !important; }
+/* Made: XP as skill chips, then the item chips in their own scroll box, so many kinds never grow the block */
+.wf-dash-xp { display: flex; flex-wrap: wrap; gap: 6px; flex: 0 0 auto; }
+.wf-dash-xp-chip { display: inline-flex; align-items: center; gap: 2px; padding: 2px 8px; border-radius: 6px; background: rgba(0,0,0,0.2); font-size: 0.85rem; }
+/* An even grid: equal cells that stretch to fill each row, so no ragged gap at the right (the user, build .98). */
+.wf-dash-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); grid-auto-rows: min-content; align-content: start; gap: 8px; margin-top: 10px; min-height: 76px; padding-right: 4px; }
+.wf-dash-item { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; padding: 8px 4px 6px; border-radius: 8px; background: rgba(0,0,0,0.2); }
+.wf-dash-item-icon { width: 32px; height: 32px; object-fit: contain; }
+.wf-dash-item-count { font-size: 0.8rem; font-weight: 600; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wf-dash-more { grid-column: 1 / -1; }
+@media (max-width: 767.98px) {
+  .wf-dash-grid { grid-template-columns: minmax(0, 1fr); height: auto; }
+  .wf-dash-pay { order: -1; overflow: visible; }
+  .wf-dash-scroll { flex: 0 1 auto; }
+  .wf-dash-roster { max-height: 14rem; }
+  .wf-dash-items { max-height: 12rem; }
+  .wf-dash-title .wf-dash-right { order: 10; flex-basis: 100%; margin: 8px 0 0 !important; flex-wrap: wrap; }
+  .wf-dash-title .wf-grip { margin-left: auto !important; }
+}

@@ -168,7 +168,9 @@ Mod Settings → Worker Folks: wage difficulty, a preset from **No sweat** (free
 strikes; a strike or unpaid wages from before are only on hold and come back if you switch to a paid
 difficulty) through Easy (¼), Relaxed (½), **Standard** (full wages, the default), Tense (×1.5),
 Hard (×2), Brutal (×3) to **Evil hardcore** (×5); Abyssal
-Pieces wages on/off, Hiring XP share of Folk skill XP (default 5%).
+Pieces wages on/off, Hiring XP share of Folk skill XP (default 5%), and **Hide Folks' gain popups**
+(off by default: when on, the XP, item, currency and mastery popups from your Folks' work stay hidden;
+level-ups, warnings and your own popups still show).
 
 ## Languages
 

@@ -23,7 +23,7 @@
       {
         "id": "Bruno",
         "name": "Bruno",
-        "media": "img/pet.png",
+        "media": "img/pet.webp",
         "hint": "Hint: Hiring",
         "ignoreCompletion": false,
         "activeInRaid": false,
@@ -42,7 +42,7 @@
         "name": "Overseers Hat",
         "category": "Hiring",
         "type": "Equipment",
-        "media": "img/town_helmet.png",
+        "media": "img/town_helmet.webp",
         "ignoreCompletion": false,
         "obtainFromItemLog": false,
         "golbinRaidExclusive": false,
@@ -70,7 +70,7 @@
         "name": "Overseers Body",
         "category": "Hiring",
         "type": "Equipment",
-        "media": "img/town_body.png",
+        "media": "img/town_body.webp",
         "ignoreCompletion": false,
         "obtainFromItemLog": false,
         "golbinRaidExclusive": false,
@@ -98,7 +98,7 @@
         "name": "Overseers Leggings",
         "category": "Hiring",
         "type": "Equipment",
-        "media": "img/town_legs.png",
+        "media": "img/town_legs.webp",
         "ignoreCompletion": false,
         "obtainFromItemLog": false,
         "golbinRaidExclusive": false,
@@ -126,7 +126,7 @@
         "name": "Overseers Boots",
         "category": "Hiring",
         "type": "Equipment",
-        "media": "img/town_boots.png",
+        "media": "img/town_boots.webp",
         "ignoreCompletion": false,
         "obtainFromItemLog": false,
         "golbinRaidExclusive": false,
@@ -154,7 +154,7 @@
         "name": "Hiring Skillcape",
         "category": "Combat",
         "type": "Armour",
-        "media": "img/skillcape.png",
+        "media": "img/skillcape.webp",
         "ignoreCompletion": false,
         "obtainFromItemLog": false,
         "golbinRaidExclusive": false,
@@ -295,7 +295,7 @@
     "shopPurchases": [
       {
         "id": "Overseers_Hat",
-        "media": "img/town_helmet.png",
+        "media": "img/town_helmet.webp",
         "category": "melvorF:Township",
         "contains": {
           "items": [
@@ -334,7 +334,7 @@
       },
       {
         "id": "Overseers_Body",
-        "media": "img/town_body.png",
+        "media": "img/town_body.webp",
         "category": "melvorF:Township",
         "contains": {
           "items": [
@@ -373,7 +373,7 @@
       },
       {
         "id": "Overseers_Leggings",
-        "media": "img/town_legs.png",
+        "media": "img/town_legs.webp",
         "category": "melvorF:Township",
         "contains": {
           "items": [
@@ -412,7 +412,7 @@
       },
       {
         "id": "Overseers_Boots",
-        "media": "img/town_boots.png",
+        "media": "img/town_boots.webp",
         "category": "melvorF:Township",
         "contains": {
           "items": [
@@ -451,7 +451,7 @@
       },
       {
         "id": "Hiring_Skillcape",
-        "media": "img/skillcape.png",
+        "media": "img/skillcape.webp",
         "category": "melvorD:Skillcapes",
         "contains": {
           "items": [

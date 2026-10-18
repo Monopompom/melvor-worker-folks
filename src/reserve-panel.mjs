@@ -1,223 +1,228 @@
-// Payroll Reserve panel and the Tips block beside it on the Hiring page. Game-facing (DOM only).
+// The Payroll band in the Overview block (build .98, the user, 18 Oct 2026: the Payroll Reserve merged into the
+// Overview, with the Wages band folded in). Game-facing (DOM only); the Overview (dashboard.mjs) owns the band's box,
+// this fills it.
+//
+// What it shows: nothing but "Wages are off" on No sweat; before the reserve unlocks (Hiring 5) the crew's cost an
+// hour per currency and "Paid from your bank"; after, one compact block per currency (amount / capacity, a fill bar,
+// "Covers N h at …/h", the amount field with its presets, Deposit). Owed wages go last, in amber.
+//
+// The page redraws about once a second while the bank changes. Rebuilding the band each time would blur the amount
+// field under the player's cursor, so the band is rebuilt only when its shape changes (which currencies, locked or
+// open, a currency that can't take a deposit, owed lines) and otherwise updates its numbers in place.
 
-export const PANEL_ID = 'worker-folks-reserve';
-export const TIPS_ID = 'worker-folks-tips';
-/** Tips are MOD_WF_TIP_<n>_HEAD and MOD_WF_TIP_<n> in the language file, n = 1..TIP_COUNT. */
-export const TIP_COUNT = 12;
-/** Tips about wages, the reserve and strikes: left out while wages are off (No sweat). */
-const WAGE_TIPS = new Set([1, 2, 5, 6, 9, 11, 12]);
-let tipList = [];
+export const BAND_SELECTOR = '#worker-folks-overview [data-wf="payroll"]';
+export const MINI_SELECTOR = '#worker-folks-overview [data-wf="paymini"]';
 
 /**
- * `model`: { enabled, lockedText?, capacityText, media, currencies: [{ id, name, media, amount, perHour, hours, low, capacity, room, bank }], onDeposit(id, amount) }
+ * The folded Overview's Payroll mini bar in its title row (CSS shows it only while folded): per currency an icon, a
+ * fill bar and the hours covered (the amount while nobody is paid from it), toned like the band; before the reserve
+ * unlocks, the cost an hour. Updated in place.
+ */
+function renderMini(model, shown, hoursText) {
+  const mini = document.querySelector(MINI_SELECTOR);
+  if (mini === null) return;
+  const key = JSON.stringify([model.off, model.locked, shown.map((c) => c.id)]);
+  if (mini.dataset.wfKey !== key) {
+    mini.dataset.wfKey = key;
+    mini.replaceChildren(...(model.off ? [] : shown.map((c) => {
+      const part = document.createElement('span');
+      part.className = 'wf-dash-pill wf-dash-paymini-cur'; // styled as the Next unlock pill beside it (the user, build .98)
+      part.dataset.wfCurrency = c.id;
+      const img = document.createElement('img');
+      img.className = 'wf-line-icon';
+      img.src = c.media;
+      img.alt = c.name;
+      part.append(img);
+      if (!model.locked && c.capacity !== undefined && c.capacity !== Infinity && c.capacity > 0) {
+        const bar = document.createElement('div');
+        bar.className = 'progress wf-dash-bar';
+        const fill = document.createElement('div');
+        fill.className = 'progress-bar';
+        bar.append(fill);
+        part.append(bar);
+      }
+      part.append(document.createElement('span'));
+      return part;
+    })));
+  }
+  for (const c of shown) {
+    const part = mini.querySelector(`[data-wf-currency="${c.id}"]`);
+    if (part === null) continue;
+    const fill = part.querySelector('.progress-bar');
+    if (fill !== null) {
+      fill.style.width = `${Math.max(0, Math.min(100, (c.amount / c.capacity) * 100))}%`;
+      fill.className = `progress-bar ${c.amount <= 0 ? 'bg-danger' : c.low ? 'bg-warning' : 'bg-success'}`;
+    }
+    const text = part.lastElementChild;
+    if (model.locked) {
+      text.className = 'font-w600';
+      text.textContent = `${formatNumber(Math.floor(c.perHour))}/h`;
+    } else {
+      text.className = c.amount <= 0 && c.perHour > 0 ? 'text-danger font-w600' : c.low ? 'text-warning font-w600' : 'font-w600';
+      // Nobody paid from it right now: the amount in it, not an empty hours count.
+      text.textContent = c.hours === Infinity ? formatNumber(Math.floor(c.amount)) : `${hoursText(c.hours)} h`;
+    }
+  }
+}
+
+/**
+ * `model`: { off, locked, currencies: [{ id, name, media, amount, perHour, hours, low, capacity, room, bank }],
+ *   owed: [{ name, amount }], helpMedia?, onDeposit(id, amount) }
  * onDeposit reports its own outcome (notifications) and returns true when something went in.
- * The deposit input keeps its value across re-renders.
  */
 export function renderReservePanel(model) {
-  const panel = document.getElementById(PANEL_ID);
-  if (panel === null) return false;
-  panel.classList.toggle('d-none', !model.enabled);
-  const column = panel.closest('[data-wf="reserve-col"]');
-  column?.classList.toggle('d-none', !model.enabled);
-  if (!model.enabled) {
-    renderTips('col-12', false);
-    return true;
-  }
-  const icon = panel.querySelector('[data-wf="reserve-icon"]');
-  if (icon !== null) icon.src = model.media;
-  const rows = panel.querySelector('[data-wf="reserve-rows"]');
-  if (rows === null) return false;
-  const drafts = new Map();
-  rows.querySelectorAll('[data-wf-currency]').forEach((row) => {
-    const input = row.querySelector('input');
-    if (input !== null) drafts.set(row.dataset.wfCurrency, input.value);
+  const band = document.querySelector(BAND_SELECTOR);
+  if (band === null) return false;
+  const state = band.wfPayroll ?? (band.wfPayroll = { key: '', refs: new Map(), latest: new Map(), owed: null });
+  model.currencies.forEach((c) => state.latest.set(c.id, c));
+  const n = (v) => numberWithCommas(Math.floor(v));
+  const hoursText = (h) => (h >= 100 ? `${Math.floor(h)}` : h.toFixed(1));
+  const roomOf = (c) => (c.room === undefined ? Infinity : c.room);
+  const mostOf = (c) => Math.max(0, Math.floor(Math.min(c.bank, roomOf(c))));
+  const whyOf = (c) => (roomOf(c) <= 0 ? 'full' : !(c.bank >= 1) ? 'nothing' : '');
+  const shown = model.locked ? model.currencies.filter((c) => c.perHour > 0) : model.currencies;
+  const key = JSON.stringify({
+    off: model.off,
+    locked: model.locked,
+    cur: shown.map((c) => [c.id, model.locked ? 0 : whyOf(c), c.perHour > 0, c.capacity !== undefined && c.capacity !== Infinity && c.capacity > 0]),
+    owed: model.owed.length,
   });
-  rows.replaceChildren();
-  const capacityLine = panel.querySelector('[data-wf="reserve-capacity"]');
-  if (capacityLine !== null) {
-    capacityLine.textContent = model.lockedText === undefined ? model.capacityText ?? '' : '';
-    capacityLine.classList.toggle('d-none', !capacityLine.textContent);
+
+  const el = (tag, cls, text) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  };
+
+  if (key !== state.key) {
+    state.key = key;
+    state.refs.clear();
+    const head = el('div', 'wf-dash-head d-flex align-items-center');
+    head.append(el('span', '', getLangString('MOD_WF_DASH_PAYROLL')));
+    if (!model.off && !model.locked) {
+      // The reserve's help ("?"): the page's help listener opens it (hiring-skill.mjs wireHelp, topic "reserve").
+      const help = el('button', 'btn btn-sm wf-help');
+      help.type = 'button';
+      help.dataset.wfHelp = 'reserve';
+      help.setAttribute('aria-label', getLangString('MOD_WF_HELP_BUTTON'));
+      const q = el('i', 'fa fa-question-circle');
+      q.setAttribute('aria-hidden', 'true');
+      help.append(q);
+      head.append(help);
+    }
+    const body = [head];
+    if (model.off) body.push(el('div', 'wf-subtle', getLangString('MOD_WF_DASH_WAGES_OFF')));
+    else if (model.locked) {
+      if (shown.length === 0) body.push(el('div', 'wf-subtle', getLangString('MOD_WF_DASH_UNPAID')));
+      for (const c of shown) {
+        const line = el('div', 'wf-dash-line font-w600');
+        const img = el('img', 'wf-line-icon');
+        img.src = c.media;
+        img.alt = '';
+        const text = el('span');
+        line.append(img, text);
+        body.push(line, el('div', 'wf-subtle wf-dash-sub', getLangString('MOD_WF_DASH_FROM_BANK')));
+        state.refs.set(c.id, { perHourText: text });
+      }
+    } else {
+      for (const c of shown) body.push(currencyBlock(c));
+    }
+    const owed = el('div', 'text-warning font-w600 wf-dash-line');
+    state.owed = owed;
+    if (model.owed.length > 0) body.push(owed);
+    band.replaceChildren(...body);
   }
-  // The panel is one card column wide, two when a second currency shows; the Tips block takes the rest of the row.
-  const two = model.lockedText === undefined && model.currencies.length > 1;
-  if (column !== null) column.className = two ? 'col-12 col-xl-8' : 'col-12 col-md-6 col-xl-4';
-  renderTips(two ? 'col-12 col-xl-4' : 'col-12 col-md-6 col-xl-8', true);
-  if (model.lockedText !== undefined) {
-    const locked = document.createElement('div');
-    locked.className = 'text-warning';
-    locked.textContent = model.lockedText;
-    rows.append(locked);
-    return true;
+
+  // Numbers, in place.
+  for (const c of shown) {
+    const r = state.refs.get(c.id);
+    if (r === undefined) continue;
+    if (r.perHourText) r.perHourText.textContent = templateLangString('MOD_WF_DASH_PER_HOUR', { amount: n(c.perHour), currency: c.name });
+    if (r.amount) r.amount.textContent = n(c.amount);
+    if (r.capacity) r.capacity.textContent = ` / ${n(c.capacity)}`;
+    if (r.fill) {
+      r.fill.style.width = `${Math.max(0, Math.min(100, (c.amount / c.capacity) * 100))}%`;
+      r.fill.className = `progress-bar ${c.amount <= 0 ? 'bg-danger' : c.low ? 'bg-warning' : 'bg-success'}`;
+    }
+    if (r.covers) {
+      r.covers.className = `wf-pay-covers ${c.amount <= 0 && c.perHour > 0 ? 'text-danger font-w600' : c.low ? 'text-warning font-w600' : 'wf-subtle'}`;
+      r.covers.textContent = c.hours === Infinity ? getLangString('MOD_WF_RESERVE_IDLE')
+        : templateLangString('MOD_WF_RESERVE_COVERS', { hours: hoursText(c.hours), perHour: n(c.perHour) });
+    }
+    if (r.why) {
+      r.why.textContent = whyOf(c) === 'full' ? templateLangString('MOD_WF_RESERVE_FULL', { capacity: n(c.capacity ?? 0), currency: c.name })
+        : templateLangString('MOD_WF_RESERVE_NOTHING', { currency: c.name });
+    }
   }
-  // One action block per currency, laid out like the bank's Sell block: a header with the
-  // amount on the right and a fill bar, the field with its presets on one row, a rule, one green Deposit centred.
-  // When nothing can go in, one amber line says why in place of the controls (build .76).
-  const grid = document.createElement('div');
-  grid.className = 'row';
-  for (const c of model.currencies) {
-    const col = document.createElement('div');
-    col.className = two ? 'col-12 col-md-6' : 'col-12';
-    const block = document.createElement('div');
-    block.className = 'wf-band wf-reserve-block';
+  renderMini(model, shown, hoursText);
+  if (state.owed !== null) state.owed.textContent = model.owed.map((o) => templateLangString('MOD_WF_DASH_OWED', { amount: `${n(o.amount)} ${o.name}` })).join(' · ');
+  return true;
+
+  /** One currency: name and amount / capacity, bar, Covers, then the field, presets and Deposit (or why not). */
+  function currencyBlock(c) {
+    const refs = {};
+    const block = el('div', 'wf-pay-cur');
     block.dataset.wfCurrency = c.id;
-    col.append(block);
-
-    const room = c.room === undefined ? Infinity : c.room;
+    const head = el('div', 'wf-reserve-head');
+    const name = el('span', 'font-w600');
+    const img = el('img', 'skill-icon-xs mr-1');
+    img.src = c.media;
+    img.alt = '';
+    name.append(img, document.createTextNode(c.name));
+    const amounts = el('span');
+    refs.amount = el('span', 'font-w600');
+    amounts.append(refs.amount);
     const bounded = c.capacity !== undefined && c.capacity !== Infinity && c.capacity > 0;
-    const head = document.createElement('div');
-    head.className = 'wf-reserve-head';
-    head.innerHTML = `<span class="font-w600"><img class="skill-icon-xs mr-1" src="${c.media}" alt="">${c.name}</span>`
-      + `<span><span class="font-w600">${numberWithCommas(c.amount)}</span>${bounded ? `<span class="wf-subtle"> / ${numberWithCommas(c.capacity)}</span>` : ''}</span>`;
-    block.append(head);
-
     if (bounded) {
-      const fill = Math.max(0, Math.min(100, (c.amount / c.capacity) * 100));
-      const bar = document.createElement('div');
-      bar.className = 'progress wf-reserve-bar';
-      bar.innerHTML = `<div class="progress-bar ${c.amount <= 0 ? 'bg-danger' : c.low ? 'bg-warning' : 'bg-success'}" role="progressbar" style="width: ${fill}%"></div>`;
+      refs.capacity = el('span', 'wf-subtle');
+      amounts.append(refs.capacity);
+    }
+    head.append(name, amounts);
+    block.append(head);
+    if (bounded) {
+      const bar = el('div', 'progress wf-reserve-bar');
+      refs.fill = el('div', 'progress-bar');
+      refs.fill.setAttribute('role', 'progressbar');
+      bar.append(refs.fill);
       block.append(bar);
     }
-    const hours = document.createElement('div');
-    hours.className = `wf-reserve-covers ${c.amount <= 0 && c.perHour > 0 ? 'text-danger font-w600' : c.low ? 'text-warning font-w600' : 'wf-subtle'}`;
-    hours.textContent = c.hours === Infinity ? getLangString('MOD_WF_RESERVE_IDLE') : templateLangString('MOD_WF_RESERVE_COVERS', { hours: c.hours >= 100 ? `${Math.floor(c.hours)}` : c.hours.toFixed(1), perHour: numberWithCommas(c.perHour) });
-    block.append(hours);
-
-    const rule = document.createElement('hr');
-    rule.className = 'wf-reserve-rule';
-    block.append(rule);
-
-    const most = Math.max(0, Math.floor(Math.min(c.bank, room)));
-    const why = room <= 0 ? templateLangString('MOD_WF_RESERVE_FULL', { capacity: numberWithCommas(c.capacity ?? 0), currency: c.name })
-      : !(c.bank >= 1) ? templateLangString('MOD_WF_RESERVE_NOTHING', { currency: c.name })
-        : '';
-    if (why !== '') {
-      const line = document.createElement('div');
-      line.className = 'text-warning text-center';
-      line.textContent = why;
-      block.append(line);
-      grid.append(col);
-      continue;
+    refs.covers = el('div', 'wf-pay-covers');
+    block.append(refs.covers);
+    if (whyOf(c) !== '') {
+      refs.why = el('div', 'text-warning wf-pay-why');
+      block.append(refs.why);
+      state.refs.set(c.id, refs);
+      return block;
     }
-
-    const controls = document.createElement('div');
-    controls.className = 'wf-reserve-controls';
-    const input = document.createElement('input');
+    const controls = el('div', 'wf-reserve-controls');
+    const input = el('input', 'form-control wf-reserve-input');
     input.type = 'number';
     input.min = '0';
     input.inputMode = 'numeric';
-    input.className = 'form-control wf-reserve-input';
     input.placeholder = getLangString('MOD_WF_RESERVE_AMOUNT');
     input.setAttribute('aria-label', `${getLangString('MOD_WF_RESERVE_AMOUNT')} (${c.name})`);
-    input.value = drafts.get(c.id) ?? '';
-    const presets = document.createElement('div');
-    presets.className = 'wf-reserve-presets';
-    // Presets fill the field (the bank's All / All but 1 do the same); Deposit commits.
+    const presets = el('div', 'wf-reserve-presets');
+    // Presets fill the field (the bank's All / All but 1 do the same); Deposit commits. They read the latest numbers.
+    const now = () => state.latest.get(c.id) ?? c;
+    const current = () => Math.max(0, Math.floor(Number(input.value) || 0));
     const addPreset = (label, value) => {
-      const b = document.createElement('button');
+      const b = el('button', 'btn btn-sm btn-info', label);
       b.type = 'button';
-      b.className = 'btn btn-sm btn-info';
-      b.textContent = label;
       b.onclick = () => { input.value = `${value()}`; };
       presets.append(b);
     };
-    const current = () => Math.max(0, Math.floor(Number(input.value) || 0));
     if (c.perHour > 0) {
-      addPreset(templateLangString('MOD_WF_RESERVE_QUICK_HOURS', { hours: '1' }), () => Math.min(most, current() + Math.ceil(c.perHour)));
-      addPreset(templateLangString('MOD_WF_RESERVE_QUICK_HOURS', { hours: '10' }), () => Math.min(most, current() + Math.ceil(c.perHour * 10)));
+      addPreset(templateLangString('MOD_WF_RESERVE_QUICK_HOURS', { hours: '1' }), () => Math.min(mostOf(now()), current() + Math.ceil(now().perHour)));
+      addPreset(templateLangString('MOD_WF_RESERVE_QUICK_HOURS', { hours: '10' }), () => Math.min(mostOf(now()), current() + Math.ceil(now().perHour * 10)));
     }
-    addPreset(getLangString('MOD_WF_RESERVE_QUICK_ALL'), () => most);
+    addPreset(getLangString('MOD_WF_RESERVE_QUICK_ALL'), () => mostOf(now()));
     controls.append(input, presets);
-    block.append(controls);
-
-    const deposit = document.createElement('button');
+    const deposit = el('button', 'btn btn-success btn-sm d-block wf-reserve-deposit', getLangString('MOD_WF_BUTTON_DEPOSIT'));
     deposit.type = 'button';
-    deposit.className = 'btn btn-success d-block wf-reserve-deposit';
-    deposit.textContent = getLangString('MOD_WF_BUTTON_DEPOSIT');
     deposit.onclick = () => { if (model.onDeposit(c.id, input.value)) input.value = ''; };
-    block.append(deposit);
-    grid.append(col);
+    block.append(controls, deposit);
+    state.refs.set(c.id, refs);
+    return block;
   }
-  rows.append(grid);
-  return true;
-}
-
-// Tips (build .79): short facts from the player README, a page at a time with ‹ › to leaf through. The block is
-// built once and only re-laid out afterwards (the reserve re-renders on every payroll change), so hovering a pager
-// button never flickers. A page is two rows of as many tips as fit side by side (re-measured when the grid
-// changes size); the first page is a random one.
-let tipStart = -1;
-let tipsWired = false;
-
-function renderTips(columnClass, wagesOn) {
-  const block = document.getElementById(TIPS_ID);
-  if (block === null) return;
-  const list = Array.from({ length: TIP_COUNT }, (_, i) => i + 1).filter((n) => wagesOn || !WAGE_TIPS.has(n));
-  if (list.length !== tipList.length) tipStart = -1;
-  tipList = list;
-  const column = block.closest('[data-wf="tips-col"]');
-  if (column !== null && column.className !== columnClass) column.className = columnClass;
-  if (!tipsWired) {
-    tipsWired = true;
-    const prev = block.querySelector('[data-wf="tips-prev"]');
-    const next = block.querySelector('[data-wf="tips-next"]');
-    prev?.setAttribute('aria-label', getLangString('MOD_WF_TIPS_PREV'));
-    next?.setAttribute('aria-label', getLangString('MOD_WF_TIPS_NEXT'));
-    prev?.addEventListener('click', () => leaf(-1));
-    next?.addEventListener('click', () => leaf(1));
-    // The grid's own size, not the window's: the page is built hidden (width 0), and the game menu changes the width too.
-    const grid = block.querySelector('[data-wf="tips-grid"]');
-    if (grid !== null && typeof ResizeObserver === 'function') new ResizeObserver(() => layoutTips()).observe(grid);
-  }
-  layoutTips();
-}
-
-function tipsPerPage(grid) {
-  const width = grid.clientWidth;
-  if (width === 0) return 0;
-  const min = 15 * (parseFloat(getComputedStyle(grid).fontSize) || 14);
-  const columns = Math.max(1, Math.floor((width + 12) / (min + 12)));
-  return Math.min(tipList.length, columns * 2);
-}
-
-function layoutTips() {
-  const block = document.getElementById(TIPS_ID);
-  const grid = block?.querySelector('[data-wf="tips-grid"]');
-  if (grid === null || grid === undefined) return;
-  const per = tipsPerPage(grid);
-  if (per === 0) return; // hidden: laid out when the grid gets a size
-  const pages = Math.ceil(tipList.length / per);
-  if (tipStart < 0) tipStart = Math.floor(Math.random() * pages) * per;
-  const page = Math.min(pages - 1, Math.floor(tipStart / per));
-  const shown = [];
-  for (let i = page * per; i < Math.min(tipList.length, (page + 1) * per); i += 1) shown.push(tipList[i]);
-  const key = shown.join(',');
-  if (grid.dataset.shown !== key) {
-    grid.dataset.shown = key;
-    grid.replaceChildren(...shown.map((n) => {
-      const tip = document.createElement('div');
-      tip.className = 'wf-band wf-tip';
-      const head = document.createElement('div');
-      head.className = 'font-w600';
-      head.textContent = getLangString(`MOD_WF_TIP_${n}_HEAD`);
-      const body = document.createElement('div');
-      body.className = 'wf-subtle wf-tip-body';
-      body.textContent = getLangString(`MOD_WF_TIP_${n}`);
-      tip.append(head, body);
-      return tip;
-    }));
-  }
-  const count = block.querySelector('[data-wf="tips-page"]');
-  if (count !== null) count.textContent = `${page + 1} / ${pages}`;
-  block.querySelector('[data-wf="tips-pager"]')?.classList.toggle('d-none', pages < 2);
-}
-
-function leaf(step) {
-  const grid = document.getElementById(TIPS_ID)?.querySelector('[data-wf="tips-grid"]');
-  if (grid === null || grid === undefined) return;
-  const per = tipsPerPage(grid);
-  if (per === 0) return;
-  const pages = Math.ceil(tipList.length / per);
-  const page = (Math.floor(Math.max(0, tipStart) / per) + step + pages) % pages;
-  tipStart = page * per;
-  layoutTips();
 }

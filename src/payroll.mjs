@@ -253,7 +253,7 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     game.notifications.createInfoNotification(
       'worker_folks:reserve-low',
       templateLangString('MOD_WF_RESERVE_LOW', { hours: (Math.floor(hours * 10) / 10).toFixed(1), amount: numberWithCommas(reserve), currency: cur?.name ?? id }),
-      hiring.getMediaURL('img/payroll_reserve.png'),
+      hiring.getMediaURL('img/payroll_reserve.webp'),
     );
   };
 
@@ -315,7 +315,7 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
         );
       });
     } else if (parkedCount() > 0 && game._isInOnlineLoop) {
-      game.notifications.createInfoNotification('worker_folks:parked', getLangString('MOD_WF_NO_SWEAT_PARKED'), hiring.getMediaURL('img/payroll_reserve.png'));
+      game.notifications.createInfoNotification('worker_folks:parked', getLangString('MOD_WF_NO_SWEAT_PARKED'), hiring.getMediaURL('img/payroll_reserve.webp'));
     }
     hiring.crew.touch();
   };

@@ -20,7 +20,7 @@ const swalClass = (extra = {}) => {
   return typeof createSwalCustomClass === 'function' ? createSwalCustomClass(cls) : cls;
 };
 
-export function createHiringClass({ popupDidRender, selectDelegable, log, createCrew, createEventBus, folkModel, pickName, renderFolkCards, renderReservePanel, produceRate, rules, perks, promotion, pricing }) {
+export function createHiringClass({ popupDidRender, selectDelegable, log, createCrew, createEventBus, folkModel, pickName, renderFolkCards, renderReservePanel, produceRate, rules, perks, promotion, pricing, tips, layout, dashboard }) {
   class FolkSlotAction extends MasteryAction {
     constructor(namespace, data, game, skill) {
       super(namespace, data, game);
@@ -39,7 +39,7 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
     constructor(namespace, game) {
       super(namespace, 'Hiring', game, 'FolkSlot');
       // The gold-ringed icon, as Voyage's in the sidebar (the user, build .90).
-      this._media = 'img/icon.png';
+      this._media = 'img/icon.webp';
       this.renderQueue = new MasterySkillRenderQueue();
       /** Active actions a Folk may hold, computed on character load. */
       this.delegableSkills = [];
@@ -121,7 +121,7 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
     }
 
     portrait(tier) {
-      return this.getMediaURL(`img/worker_folk_${tier.toLowerCase()}.png`);
+      return this.getMediaURL(`img/worker_folk_${tier.toLowerCase()}.webp`);
     }
 
     /**
@@ -229,7 +229,7 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
       const status = this.statusOf(folk);
       const skill = this.skillOf(folk);
       const cls = `wf-text-${status} font-w700`;
-      lines.push({ icon: this.getMediaURL(`img/status_${status}.png`), text: getLangString(`MOD_WF_STATUS_${status}`), cls });
+      lines.push({ icon: this.getMediaURL(`img/status_${status}.webp`), text: getLangString(`MOD_WF_STATUS_${status}`), cls });
       // A Folk that can't be picked says how to get it back (build .55).
       if (status === 'strike') lines.push({ text: getLangString('MOD_WF_TILE_FIX_strike'), cls: 'text-warning' });
       if (status === 'cooldown') lines.push({ text: templateLangString('MOD_WF_TILE_FIX_cooldown', { time: formatAsShorthandTimePeriod(folk.cooldownTicks * TICK_INTERVAL, true) }), cls: 'text-warning' });
@@ -374,11 +374,17 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
       const payroll = this.payroll;
       if (payroll === undefined) return;
       const capacityHours = payroll.capacityHours();
+      // Owed wages per currency (a Folk in debt, not on strike), for the band's amber line.
+      const owed = new Map();
+      this.crew.all.forEach((f) => {
+        if (!this.owing(f)) return;
+        const id = f.debtCurrency ?? 'melvorD:GP';
+        owed.set(id, (owed.get(id) ?? 0) + f.debt);
+      });
       renderReservePanel({
-        enabled: payroll.enabled,
-        lockedText: this.levels !== undefined && capacityHours === 0 ? templateLangString('MOD_WF_RESERVE_LOCKED', { level: `${this.levels.reserveLevel}` }) : undefined,
-        capacityText: capacityHours > 0 ? templateLangString('MOD_WF_RESERVE_CAPACITY', { hours: `${capacityHours}` }) : '',
-        media: this.getMediaURL('img/payroll_reserve.png'),
+        off: !payroll.enabled,
+        locked: capacityHours === 0,
+        owed: [...owed].map(([id, amount]) => ({ amount, name: this.game.currencies.getObjectByID(id)?.name ?? id })),
         currencies: ['melvorD:GP', 'melvorItA:AbyssalPieces']
           .map((id) => ({ id, currency: this.game.currencies.getObjectByID(id) }))
           .filter(({ id, currency }) => currency !== undefined && (id === 'melvorD:GP' || this.crew.reserveOf(id) > 0 || (payroll.crewPerHour()[id] ?? 0) > 0))
@@ -407,7 +413,7 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
           if (!payroll.deposit(id, plan.deposit)) return false;
           this.game.notifications.createSuccessNotification('worker_folks:reserve',
             templateLangString(plan.outcome === 'cut' ? 'MOD_WF_RESERVE_CUT' : 'MOD_WF_RESERVE_DONE', { amount: n(plan.deposit), currency: name }),
-            this.getMediaURL('img/payroll_reserve.png'));
+            this.getMediaURL('img/payroll_reserve.webp'));
           return true;
         },
       });
@@ -416,8 +422,13 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
     renderFolks() {
       if (!this.renderQueue.folks) return;
       this.wireHelp();
+      dashboard?.wire(); // before the layout: it finds the Overview block by id
+      layout?.wire({ rerender: () => { this.renderQueue.folks = true; } });
       this.renderReserve();
-      const done = renderFolkCards(this.crew.all, {
+      layout?.refresh();
+      dashboard?.markDirty();
+      const done = renderFolkCards(layout?.orderFolks(this.crew.all) ?? this.crew.all, {
+        tip: (el, content) => tips?.set(el, content),
         roleName: (tier) => this.roleName(tier),
         portrait: (tier) => this.portrait(tier),
         slotText: (folk) => templateLangString('MOD_WF_CARD_SLOT', { slot: `${folk.slot + 1}` }),
@@ -440,7 +451,7 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
           } catch (err) { log('menu close failed', err); }
         },
         status: (folk) => this.statusOf(folk),
-        statusIcon: (status) => this.getMediaURL(`img/status_${status}.png`),
+        statusIcon: (status) => this.getMediaURL(`img/status_${status}.webp`),
         statusText: (status) => getLangString(`MOD_WF_STATUS_${status}`),
         assignmentText: (folk) => this.assignmentText(folk),
         // The assignment line says it on its own; the line under it says how (build .61, user layout).
@@ -529,11 +540,19 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
         /** The card's Gear button: "Gear 3/9", worn items in the tooltip, amber when something ran out (build .54). */
         gear: (folk) => {
           const s = this.loadout?.summary(folk);
-          if (s === undefined) return { text: getLangString('MOD_WF_BUTTON_GEAR'), title: '', out: false };
-          const line = (t) => `${t.name}${t.qty > 0 ? ` ×${numberWithCommas(t.qty)}` : ''}${t.charges !== undefined ? ` (${templateLangString('MOD_WF_GEAR_TIP_CHARGES', { count: numberWithCommas(t.charges) })})` : ''}`;
-          const lines = s.filled === 0 ? [getLangString('MOD_WF_GEAR_TIP_EMPTY')] : s.worn.map(line);
-          if (s.out.length > 0) lines.push(templateLangString('MOD_WF_GEAR_TIP_OUT', { items: s.out.map((t) => t.name).join(', ') }));
-          return { text: templateLangString('MOD_WF_BUTTON_GEAR_COUNT', { filled: `${s.filled}`, open: `${s.open}` }), title: lines.join('\n'), out: s.out.length > 0 };
+          if (s === undefined) return { text: getLangString('MOD_WF_BUTTON_GEAR'), tip: [], out: false };
+          // One line per worn item, its icon before its name (src/tips.mjs, build .91); a run-out line names each item
+          // with its icon too.
+          const line = (t) => ({ media: t.media, text: `${t.name}${t.qty > 0 ? ` ×${numberWithCommas(t.qty)}` : ''}${t.charges !== undefined ? ` (${templateLangString('MOD_WF_GEAR_TIP_CHARGES', { count: numberWithCommas(t.charges) })})` : ''}` });
+          const tip = s.filled === 0 ? [getLangString('MOD_WF_GEAR_TIP_EMPTY')] : s.worn.map(line);
+          if (s.out.length > 0) {
+            const [before, after = ''] = templateLangString('MOD_WF_GEAR_TIP_OUT', { items: '\u0000' }).split('\u0000');
+            const parts = [{ text: before }];
+            s.out.forEach((t, i) => { if (i > 0) parts.push({ text: ', ' }); parts.push({ media: t.media, text: t.name }); });
+            parts.push({ text: after });
+            tip.push({ parts });
+          }
+          return { text: templateLangString('MOD_WF_BUTTON_GEAR_COUNT', { filled: `${s.filled}`, open: `${s.open}` }), tip, out: s.out.length > 0 };
         },
         onGear: (folk) => this.loadout?.openLoadout(folk),
         hp: (folk) => this.health?.hpView(folk),
@@ -542,12 +561,14 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
         frozenReason: () => this.health?.freezeReason() ?? '',
         cooldownText: (folk) => (folk.cooldownTicks > 0 ? templateLangString('MOD_WF_CARD_COOLDOWN', { time: formatAsShorthandTimePeriod(folk.cooldownTicks * TICK_INTERVAL, true) }) : ''),
       });
+      layout?.dressCards();
       if (done) this.renderQueue.folks = false;
     }
 
     render() {
       super.render();
       this.renderFolks();
+      dashboard?.render();
     }
 
     /** Cards show live skill state: refresh whenever this page opens. */

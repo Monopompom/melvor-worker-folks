@@ -5,7 +5,7 @@
     "pages": [
       {
         "id": "Hiring",
-        "media": "img/icon.png",
+        "media": "img/icon.webp",
         "containerID": "worker-folks-container",
         "headerBgClass": "bg-worker-folks",
         "hasGameGuide": false,
@@ -207,7 +207,7 @@
       {
         "id": "WorkerFolks",
         "name": "Worker Folks",
-        "media": "img/icon.png"
+        "media": "img/icon.webp"
       }
     ],
     "shopCategoryOrder": [
@@ -288,7 +288,7 @@
         "name": "Mastery Token (Hiring)",
         "category": "Mastery",
         "type": "Token",
-        "media": "img/mastery_token.png",
+        "media": "img/mastery_token.webp",
         "ignoreCompletion": false,
         "obtainFromItemLog": false,
         "golbinRaidExclusive": false,

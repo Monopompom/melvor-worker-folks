@@ -147,6 +147,7 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
   ctx.patch(Game, 'tick').after(function () {
     if (hiring === undefined || this.isGolbinRaid || this._isPaused || hiring.delegated.size === 0) return;
     ticking = true;
+    hiring.folkTurn = true; // quiet-popups.mjs: what these ticks queue comes from the Folks
     try {
       for (const skill of Array.from(hiring.delegated)) {
         if (!skill.isActive) {
@@ -161,6 +162,7 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
       }
     } finally {
       ticking = false;
+      hiring.folkTurn = false;
     }
   });
 

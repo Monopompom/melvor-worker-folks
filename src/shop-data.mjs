@@ -90,7 +90,7 @@ export function licencePurchase(tier, expansions, t = fallbackText) {
   return {
     ...base,
     id: `Licence_${tier}`,
-    media: `img/licence_${tier.toLowerCase()}.png`,
+    media: `img/licence_${tier.toLowerCase()}.webp`,
     cost: { currencies: GP(LICENCE_GP[tier]), items: licenceItems(tier, expansions) },
     unlockRequirements: [],
     purchaseRequirements,
@@ -105,7 +105,7 @@ export function hirePurchase(tier, t = fallbackText) {
   return {
     ...base,
     id: `Hire_${tier}`,
-    media: `img/worker_folk_${tier.toLowerCase()}.png`,
+    media: `img/worker_folk_${tier.toLowerCase()}.webp`,
     cost: { currencies: GP(HIRE_BASE[tier]), items: [] },
     unlockRequirements: [],
     purchaseRequirements: [{ type: 'ShopPurchase', purchaseID: `worker_folks:Licence_${tier}`, count: 1 }],
@@ -119,7 +119,7 @@ export function shiftSlotPurchase(t = fallbackText) {
   return {
     ...base,
     id: 'Shift_Slot',
-    media: 'img/shift_slot.png',
+    media: 'img/shift_slot.webp',
     cost: { currencies: GP(3000000), items: [] },
     unlockRequirements: [],
     purchaseRequirements: [{ type: 'ShopPurchase', purchaseID: 'worker_folks:Licence_Newbie', count: 1 }],

@@ -14,7 +14,7 @@ const AOD_INHERIT = {
   'melvorAoD:Cartography': ['melvorAoD:Cartography_Skillcape', 'melvorAoD:Superior_Cartography_Skillcape'],
 };
 
-export function install(ctx, { getHiring, rules, consumptionRules, popupDidRender, log }) {
+export function install(ctx, { getHiring, rules, consumptionRules, popupDidRender, tips, log }) {
   let hiring;
   const expansions = () => ({
     hasAoD: game.registeredNamespaces.hasNamespace('melvorAoD'),
@@ -242,10 +242,11 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
       const skill = hiring.skillOf(folk);
       // Tooltips of buttons this modal replaces: a shown tooltip never gets its mouseleave once its button is gone,
       // so it stayed on screen after a view change (user report, build .51). Destroyed before every redraw and on close.
-      const tips = [];
-      // touch: 'hold' on a phone a tap selects or opens; holding shows the item tooltip.
-      const tip = (el, opts) => { if (typeof tippy !== 'function') return false; tips.push(tippy(el, { touch: 'hold', ...opts })); return true; };
-      const clearTips = () => { tips.splice(0).forEach((t) => { try { t.destroy(); } catch {} }); };
+      // Every tooltip through src/tips.mjs (build .91): centred, an item's icon before its name; on a phone a tap
+      // selects or opens, holding shows the tooltip.
+      const tipped = [];
+      const tip = (el, content) => { tips?.set(el, content); tipped.push(el); };
+      const clearTips = () => { tipped.splice(0).forEach((el) => tips?.clear(el)); };
 
       // The views redraw inside the open popup, so the skill-name pass (didRender) runs again after each one.
       const names = () => { try { if (Swal.isVisible()) popupDidRender?.(Swal.getPopup()); } catch {} };
@@ -292,7 +293,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
             b.setAttribute('aria-disabled', 'true');
             b.setAttribute('aria-label', reason);
             img.src = l.slot.emptyMedia;
-            if (!tip(b, { content: reason, placement: 'top', interactive: false })) b.title = reason;
+            tip(b, reason);
             b.onclick = () => { lockedLine.textContent = reason; lockedLine.classList.remove('d-none'); };
             grid.append(b);
             continue;
@@ -313,7 +314,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
             b.append(q);
           }
           const e = api.entry(folk, slot.id);
-          if (!tip(b, { content: e === undefined ? slot.name : e.item.name, placement: 'top', interactive: false })) b.title = slot.name;
+          tip(b, [e === undefined ? slot.name : { item: e.item }]);
           b.onclick = () => showPicker(slot.id);
           grid.append(b);
         }
@@ -501,7 +502,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
             b.innerHTML = `<img src="${item.media}" alt=""><small>${count}</small>`;
             b.setAttribute('aria-label', `${item.name} ×${count}`);
             b.setAttribute('aria-pressed', 'false');
-            tip(b, { content: item.name, placement: 'top', interactive: false });
+            tip(b, [{ item }]);
             b.onclick = () => select(item, b);
             grid.append(b);
           });

@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-10-17.90';
+export const BUILD = '2026-10-18.98';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -68,10 +68,24 @@ export async function setup(ctx) {
   const promotion = await ctx.loadModule('src/promotion.mjs');
   const loadoutRules = await ctx.loadModule('src/loadout-rules.mjs');
   const loadout = await ctx.loadModule('src/loadout.mjs');
+  // Every tooltip in the mod goes through one module (build .91, the user: the same look as Voyage's).
+  const tips = (await ctx.loadModule('src/tips.mjs')).install(ctx, { log });
+  const layoutModel = await ctx.loadModule('src/layout-model.mjs');
+  const layout = (await ctx.loadModule('src/layout.mjs')).install(ctx, { log, tips, model: layoutModel });
+  const dashboard = (await ctx.loadModule('src/dashboard.mjs')).install(ctx, {
+    getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+    model: await ctx.loadModule('src/dashboard-model.mjs'),
+    milestones: await ctx.loadModule('src/milestones.mjs'),
+    tips,
+    popupDidRender,
+    log,
+  });
   const consumptionRules = await ctx.loadModule('src/consumption-rules.mjs');
   const consumption = await ctx.loadModule('src/consumption.mjs');
   const milestones = await ctx.loadModule('src/milestones.mjs');
   const levels = await ctx.loadModule('src/levels.mjs');
+  const quietPopups = await ctx.loadModule('src/quiet-popups.mjs');
+  const popupRules = await ctx.loadModule('src/popup-rules.mjs');
   const healthRules = await ctx.loadModule('src/health-rules.mjs');
   const health = await ctx.loadModule('src/health.mjs');
   const resume = await ctx.loadModule('src/resume.mjs');
@@ -105,6 +119,9 @@ export async function setup(ctx) {
     perks,
     promotion,
     pricing,
+    tips,
+    layout,
+    dashboard,
   });
   ctx.gameData.buildPackage((pkg) => {
     pkg.skills.add(Hiring);
@@ -189,6 +206,7 @@ export async function setup(ctx) {
     rules: loadoutRules,
     consumptionRules,
     popupDidRender,
+    tips,
     log,
   });
 
@@ -213,6 +231,13 @@ export async function setup(ctx) {
   levels.install(ctx, {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     rules: milestones,
+    log,
+  });
+
+  // 5d2. "Hide Folks' gain popups" (setting in the Hiring section, after the XP share).
+  quietPopups.install(ctx, {
+    getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+    rules: popupRules,
     log,
   });
 

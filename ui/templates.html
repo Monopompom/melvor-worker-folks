@@ -3,37 +3,9 @@
     <div class="skill-info">
       <skill-header data-skill-id="worker_folks:Hiring"></skill-header>
     </div>
-    <div class="row row-deck wf-top-row">
-      <div class="col-12 col-md-6 col-xl-4" data-wf="reserve-col">
-        <div class="block block-rounded border-top border-worker-folks border-4x" id="worker-folks-reserve">
-          <div class="block-content p-3">
-            <div class="d-flex align-items-center mb-2">
-              <img class="skill-icon-sm mr-2" data-wf="reserve-icon" alt="" />
-              <h5 class="font-w600 mb-0"><lang-string lang-id="MOD_WF_RESERVE_TITLE"></lang-string></h5>
-              <button type="button" class="btn btn-sm wf-help" data-wf-help="reserve"><i class="fa fa-question-circle"></i></button>
-            </div>
-            <div class="wf-subtle mb-2" data-wf="reserve-capacity"></div>
-            <div data-wf="reserve-rows"></div>
-          </div>
-        </div>
-      </div>
-      <div class="col-12 col-md-6 col-xl-8" data-wf="tips-col">
-        <div class="block block-rounded border-top border-worker-folks border-4x" id="worker-folks-tips">
-          <div class="block-content wf-tips-content">
-            <div class="d-flex align-items-center mb-3">
-              <i class="fa fa-lightbulb text-warning wf-tips-icon mr-2"></i>
-              <h5 class="font-w600 mb-0"><lang-string lang-id="MOD_WF_TIPS_TITLE"></lang-string></h5>
-              <div class="ml-auto d-flex align-items-center wf-tips-pager" data-wf="tips-pager">
-                <button type="button" class="btn btn-sm btn-outline-info" data-wf="tips-prev"><i class="fa fa-chevron-left"></i></button>
-                <span class="wf-subtle mx-2" data-wf="tips-page"></span>
-                <button type="button" class="btn btn-sm btn-outline-info" data-wf="tips-next"><i class="fa fa-chevron-right"></i></button>
-              </div>
-            </div>
-            <div class="wf-tips-grid" data-wf="tips-grid"></div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- One column of blocks (build .98): the Overview, with the Payroll Reserve in it, is built here in JS
+         (src/dashboard.mjs); layout.mjs moves the cards' grid in beside it so either can go first. -->
+    <div data-wf="blocks"></div>
     <div class="row row-deck" id="worker-folks-folks">
       <div class="col-12" id="worker-folks-empty">
         <div class="block block-rounded border-top border-worker-folks border-4x text-center p-3">
