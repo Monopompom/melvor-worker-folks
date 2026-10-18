@@ -141,7 +141,8 @@
 .wf-slot img { width: 36px; height: 36px; object-fit: contain; display: block; }
 .wf-slot-qty { position: absolute; right: 2px; bottom: 0; font-size: 0.8rem !important; line-height: 1; background: rgba(0,0,0,0.6); border-radius: 3px; padding: 1px 2px; }
 /* Item grid: 52px rows (48px tile + 6px gap); at least 4 rows are always visible, it scrolls past 6. */
-.wf-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, 52px); grid-auto-rows: 52px; align-content: start; gap: 6px; min-height: 226px; max-height: 342px; overflow-y: auto; min-width: min(86vw, 26rem); max-width: 100%; padding: 2px; }
+.wf-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, 52px); grid-auto-rows: 52px; align-content: start; gap: 6px; min-height: 226px; max-height: 342px; overflow-y: auto; min-width: min(86vw, 26rem); max-width: 100%; padding: 2px;
+  scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.25) transparent; } /* .99: the shared rule 4a.16, never the browser's bar */
 .wf-picker-none { grid-column: 1 / -1; }
 .wf-picker-item { position: relative; width: 52px; height: 52px; padding: 0; display: flex; align-items: center; justify-content: center; line-height: 1; }
 .wf-picker-item img { width: 40px; height: 40px; object-fit: contain; display: block; }
