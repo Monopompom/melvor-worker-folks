@@ -10,6 +10,8 @@
   --wf-subtle: #5f6b77; --wf-head: #56616d; --wf-hover: #1b1f24; --wf-help: #4f6b88; --wf-grip: #9aa5b1;
   --wf-working: #1e7b2e; --wf-idle: #5c6873; --wf-strike: #b42318; --wf-cooldown: #1d5fa8; --wf-debt: #8a5a00; --wf-alert: #d99a1e;
   --wf-dis-text: #6c757d; --wf-dis-line: #b6bec7;
+  /* build .112 (scan A-36, B-18): band edges and dimmed icons are tokens too; a dimmed icon keeps more ink on white */
+  --wf-edge-strike: #bf1f1f; --wf-edge-debt: #d99a1e; --wf-dim: .65;
 }
 body.darkMode {
   --wf-band: rgba(255,255,255,0.045); --wf-tile: rgba(255,255,255,0.03); --wf-well: rgba(0,0,0,0.2);
@@ -18,6 +20,7 @@ body.darkMode {
   --wf-subtle: #b5bec7; --wf-head: #a0a8b4; --wf-hover: #fff; --wf-help: #8fa3b8; --wf-grip: #6c7a89;
   --wf-working: #5ccf6b; --wf-idle: #aab4be; --wf-strike: #ff6b6b; --wf-cooldown: #6fb3ff; --wf-debt: #f0b84a; --wf-alert: #f0b84a;
   --wf-dis-text: #8a949e; --wf-dis-line: #5c6873;
+  --wf-edge-strike: #bf1f1f; --wf-edge-debt: #c98a16; --wf-dim: .4;
 }
 /* Super Dark (body.darkMode.superDark, build .105 after the design canvas): blocks are pure black, so a black well
    vanishes and Dark's faint tints barely show: wells, bands, lines and tracks are a step stronger light tints, and the
@@ -35,22 +38,60 @@ body.darkMode.superDark {
 .wf-band .progress, body.darkMode .wf-band .progress { background-color: var(--wf-track) !important; }
 /* Gear slots: the empty-slot pictures are dark line art that vanish on black; the game's own Equipment grid gives its
    slots this fill in Super Dark (.combat-equip-img), so ours match it (build .106). */
-body.darkMode.superDark .wf-slot:not(:hover):not(:active) { background-color: #242424; }
+body.darkMode.superDark .wf-slot:not(.btn-info):not(:hover):not(:active) { background-color: #242424; } /* empty slots only: worn ones keep their blue (B-36, .112) */
 /* Light theme: the game's header text is dark there, so the header red is lighter (the game's own skill headers are mid
-   tones too); and the game's light text-* colours are near 2:1 on white, so inside our UI they take the token inks. */
+   tones too). The game's text-* colours are near 2:1 on white in Light, and its Dark red #e56767 is 3.9:1 on our bands
+   (scan A-09, build .112), so inside our UI every theme takes the token inks: the dark set in Light, the bright set
+   (#5ccf6b, #f0b84a, #ff6b6b, #6fb3ff) in Dark and Super Dark. */
 body:not(.darkMode) .bg-worker-folks { background-color: #d9706b !important; }
-body:not(.darkMode) .wf-ui .text-warning { color: var(--wf-debt) !important; }
-body:not(.darkMode) .wf-ui .text-success { color: var(--wf-working) !important; }
-body:not(.darkMode) .wf-ui .text-danger { color: var(--wf-strike) !important; }
-body:not(.darkMode) .wf-ui .text-info { color: var(--wf-cooldown) !important; }
+.wf-ui .text-warning { color: var(--wf-debt) !important; }
+.wf-ui .text-success { color: var(--wf-working) !important; }
+.wf-ui .text-danger { color: var(--wf-strike) !important; }
+.wf-ui .text-info { color: var(--wf-cooldown) !important; }
+/* Light: the game's buttons and badges inside our UI take the same dark inks (the user's decision D-1 on the scan
+   board, build .113). On white and on our bands the game's outline labels read 2.0-3.8 : 1 and its
+   filled info, success and danger buttons and info and warning badges carry white text at 2-3 : 1. Outline buttons
+   take the ink for label and border and fill with it on hover; filled ones take it as their fill. Disabled buttons
+   keep the shared grey. Dark and Super Dark keep the game's own buttons. */
+body:not(.darkMode) .wf-ui { --wf-ink-info: #1d5fa8; --wf-ink-info-hover: #174d89; --wf-ink-ok: #1e7b2e; --wf-ink-ok-hover: #186425;
+  --wf-ink-bad: #b42318; --wf-ink-bad-hover: #941c13; --wf-ink-warn: #8a5a00; --wf-ink-warn-hover: #704900; }
+body:not(.darkMode) .wf-ui .btn-outline-info:not(:disabled):not(.disabled),
+body:not(.darkMode) .wf-ui .btn-outline-primary:not(:disabled):not(.disabled) { color: var(--wf-ink-info); border-color: var(--wf-ink-info); }
+body:not(.darkMode) .wf-ui .btn-outline-success:not(:disabled):not(.disabled) { color: var(--wf-ink-ok); border-color: var(--wf-ink-ok); }
+body:not(.darkMode) .wf-ui .btn-outline-danger:not(:disabled):not(.disabled) { color: var(--wf-ink-bad); border-color: var(--wf-ink-bad); }
+body:not(.darkMode) .wf-ui .btn-outline-warning:not(:disabled):not(.disabled) { color: var(--wf-ink-warn); border-color: var(--wf-ink-warn); }
+body:not(.darkMode) .wf-ui .btn-outline-info:not(:disabled):not(.disabled):is(:hover, :active, .active),
+body:not(.darkMode) .wf-ui .btn-outline-primary:not(:disabled):not(.disabled):is(:hover, :active, .active) { color: #fff; background-color: var(--wf-ink-info); }
+body:not(.darkMode) .wf-ui .btn-outline-success:not(:disabled):not(.disabled):is(:hover, :active, .active) { color: #fff; background-color: var(--wf-ink-ok); }
+body:not(.darkMode) .wf-ui .btn-outline-danger:not(:disabled):not(.disabled):is(:hover, :active, .active) { color: #fff; background-color: var(--wf-ink-bad); }
+body:not(.darkMode) .wf-ui .btn-outline-warning:not(:disabled):not(.disabled):is(:hover, :active, .active) { color: #fff; background-color: var(--wf-ink-warn); }
+body:not(.darkMode) .wf-ui .btn-info:not(:disabled):not(.disabled) { color: #fff; background-color: var(--wf-ink-info); border-color: var(--wf-ink-info); }
+body:not(.darkMode) .wf-ui .btn-success:not(:disabled):not(.disabled) { color: #fff; background-color: var(--wf-ink-ok); border-color: var(--wf-ink-ok); }
+body:not(.darkMode) .wf-ui .btn-danger:not(:disabled):not(.disabled) { color: #fff; background-color: var(--wf-ink-bad); border-color: var(--wf-ink-bad); }
+body:not(.darkMode) .wf-ui .btn-info:not(:disabled):not(.disabled):hover { background-color: var(--wf-ink-info-hover); border-color: var(--wf-ink-info-hover); }
+body:not(.darkMode) .wf-ui .btn-success:not(:disabled):not(.disabled):hover { background-color: var(--wf-ink-ok-hover); border-color: var(--wf-ink-ok-hover); }
+body:not(.darkMode) .wf-ui .btn-danger:not(:disabled):not(.disabled):hover { background-color: var(--wf-ink-bad-hover); border-color: var(--wf-ink-bad-hover); }
+body:not(.darkMode) .wf-ui .badge-info { color: #fff; background-color: var(--wf-ink-info); }
+body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(--wf-ink-warn); }
 /* Text scale: everything the mod draws (Hiring page, Worker box, its modals) is one step
-   bigger than the game's 14 px default: body 16 px, small text 14.5 px, headings 20 px. */
+   bigger than the game's 14 px default: body 16 px, small text 14.5 px, block and card titles the game's 18 px h5
+   (20 px until build .112, scan A-02). */
 .wf-ui { font-size: 1rem; }
 .wf-ui small, .wf-ui .small, .wf-ui .font-size-sm { font-size: 0.9rem !important; }
-.wf-ui h5 { font-size: 1.25rem; }
+.wf-ui h5 { font-size: 1.125rem; }
 .wf-ui .btn-sm { font-size: 0.9rem; padding: 0.3rem 0.65rem; }
+.wf-ui .btn-sm.wf-help { font-size: 1.1rem; } /* the "?" stays 1.1rem: .btn-sm above outranked .wf-help (scan A-01, build .112) */
 .wf-ui .badge { font-size: 0.9rem; }
 .wf-ui .swal2-html-container { font-size: 1rem; }
+/* A long popup scrolls inside its body, the title, the ✕ and the buttons stay on screen; at its end the wheel goes on
+   to the modal (as Voyage's; scan B-06, B-32, C-06, C-25, build .112). A popup with a
+   picture on top (wf-pic) leaves room for it. */
+.wf-ui .swal2-html-container { max-height: calc(100vh - 14rem); overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--wf-thumb) transparent; }
+.wf-ui.wf-pic .swal2-html-container { max-height: calc(100vh - 20rem); }
+/* Tool windows with a ✕ (Worker, Gear): the title keeps clear of it on both sides, so it stays centred (scan B-05). */
+.wf-ui.wf-tool .swal2-title { padding-left: 3rem; padding-right: 3rem; }
+/* A long popup title wraps onto balanced lines, never cut (build .109); skill-names.mjs ties where it may break. */
+.wf-ui .swal2-title { text-wrap: balance; }
 /* 1rem inputs: iOS Safari zooms the page into a smaller one on focus. */
 .wf-ui input.form-control { font-size: 1rem; }
 /* Only disabled buttons are grey. */
@@ -66,8 +107,8 @@ body:not(.darkMode) .wf-ui .text-info { color: var(--wf-cooldown) !important; }
 .wf-card-body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; }
 .wf-band { background: var(--wf-band); border-radius: 6px; padding: 12px; } /* 12px on the page (build .87); 20px in popups */
 .wf-band-actions { margin-top: auto; }
-.wf-band-strike { box-shadow: inset 3px 0 0 #bf1f1f; }
-.wf-band-strike.wf-debt-block { box-shadow: inset 3px 0 0 #c98a16; }
+.wf-band-strike { box-shadow: inset 3px 0 0 var(--wf-edge-strike); }
+.wf-band-strike.wf-debt-block { box-shadow: inset 3px 0 0 var(--wf-edge-debt); }
 /* On Thieving without food: the card's top border turns amber (the food line says why). */
 .wf-card-alert { border-color: var(--wf-alert) !important; }
 .wf-card-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
@@ -84,34 +125,57 @@ body:not(.darkMode) .wf-ui .text-info { color: var(--wf-cooldown) !important; }
 .wf-help-body .wf-help-head { color: var(--wf-head); font-weight: 600; margin-bottom: 4px; }
 .wf-help-body .wf-help-p { margin: 0; }
 .wf-help-body .wf-help-p + .wf-help-p { margin-top: 6px; }
+/* Numbers in a small table, not in a sentence (TIP_12, build .112). */
+.wf-help-table { margin: 8px 0 0; border-collapse: collapse; }
+.wf-help-table th, .wf-help-table td { padding: 3px 16px 3px 0; text-align: left; }
+.wf-help-table th { color: var(--wf-head); font-weight: 600; }
+.wf-help-table tr + tr td { border-top: 1px solid var(--wf-row-line); }
+/* An amount column lines up on its right edge, its head too (the user, build .112). */
+.wf-help-table th.wf-num, .wf-help-table td.wf-num { text-align: right; padding-right: 0; }
+/* A band's own heading (Mastery perks), as the Overview's and the help popups' (scan A-31). */
+.wf-band-head { color: var(--wf-head); font-weight: 600; }
 .wf-card-portrait { width: 64px; height: 64px; border-radius: 6px; object-fit: contain; }
-.wf-status-strike { border-color: #bf1f1f !important; }
+.wf-status-strike { border-color: var(--wf-edge-strike) !important; }
 .wf-status { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-size: 0.9em; }
 .wf-status-icon { width: 18px; height: 18px; }
 /* A long name truncates with room to spare: the badge never shrinks and keeps 12px from it (build .83). */
 .wf-card-status { margin-left: 12px; flex-shrink: 0; }
 /* Status colours: the card badge (wf-badge-*) and the dropdown status line (wf-text-*). */
-.wf-badge-working { background-color: #2f8a3c; color: #fff; }
+.wf-badge-working { background-color: #2b7f37; color: #fff; } /* 4.9:1 with white (A-22, .112) */
 .wf-badge-idle { background-color: #5c6873; color: #fff; }
 .wf-badge-strike { background-color: #bf1f1f; color: #fff; }
 .wf-badge-cooldown { background-color: #1f6fbf; color: #fff; }
-/* Amber with dark text: white on amber was hard to read (build .55). Overtime is a choice, not a fault: amber outline. */
+/* Amber with dark text: white on amber was hard to read (build .55). Overtime is an active state worth noticing, filled
+   blue like Cooling down (blue = overtime on; an amber outline until build .112, scan A-30); its toggle
+   button keeps the decided amber. */
 .wf-badge-debt { background-color: #f0b84a; color: #1b1f24; }
-.wf-badge-overtime { background-color: transparent; color: var(--wf-debt); border: 1px solid var(--wf-debt); }
+.wf-badge-overtime { background-color: #1f6fbf; color: #fff; }
 .wf-text-working { color: var(--wf-working); }
 .wf-text-idle { color: var(--wf-idle); }
 .wf-text-strike { color: var(--wf-strike); }
 .wf-text-cooldown { color: var(--wf-cooldown); }
 .wf-text-debt { color: var(--wf-debt); }
-.wf-text-overtime { color: var(--wf-debt); }
+.wf-text-overtime { color: var(--wf-cooldown); }
 .wf-card-skill { font-size: 1.05em; }
-/* Worker box: a button that opens the worker modal. */
-.wf-skill-control .wf-ctrl-button { white-space: normal; text-align: left; max-width: 100%; }
+/* A long name wraps onto balanced lines, never cut: the whole name on the card on every device (scan A-06, C-12). */
+.wf-card-name { text-wrap: balance; overflow-wrap: anywhere; }
+/* Worker box: a button that opens the worker modal. The status line takes the rest of the row and Stop sits at its
+   end; once the row wraps, Stop fills its own line instead of hanging at the right (scan B-01, build
+   .112): the status grows 999 times faster, so on a shared line Stop keeps its own width. Worker and Stop are one
+   height (B-33). */
+.wf-skill-control .wf-ctrl-button { white-space: normal; text-align: left; max-width: 100%; min-height: 36px; }
+.wf-skill-control [data-wf="status"] { flex: 999 1 auto; min-width: 0; }
+.wf-skill-control [data-wf="stop"], .wf-skill-control [data-wf="goto"] { flex: 1 0 auto; min-height: 36px; }
+.wf-ctrl-slots { white-space: nowrap; }
 @media (max-width: 575.98px) {
   .wf-skill-control .block-content { padding: 0.5rem !important; }
 }
 .wf-ctrl-portrait { width: 24px; height: 24px; border-radius: 4px; object-fit: contain; vertical-align: middle; }
 .wf-skill-control .block-content { min-height: 0; }
+/* The gutter wrapper on a page without the game's `.content` padding (Cartography's map, scan B-10, build .112): the
+   game's side padding, a small gap above and below instead of the page's 30px / 160px. */
+.content.wf-ctrl-gutter { padding-top: 0.5rem !important; padding-bottom: 0 !important; }
+.wf-ctrl-gutter > .wf-skill-control { margin-bottom: 0.5rem !important; }
 /* Worker modal: fixed-width tiles in a wrapping row, so the popup hugs one or two tiles and caps at three
    per row (max width as before). One column on phones. */
 .wf-worker-popup { width: auto !important; max-width: 96vw !important; }
@@ -122,12 +186,16 @@ body:not(.darkMode) .wf-ui .text-info { color: var(--wf-cooldown) !important; }
 @media (max-width: 1199.98px) { .wf-worker-grid { grid-template-columns: repeat(var(--wf-cols2, 2), 19.5rem); } }
 @media (max-width: 767.98px) { .wf-worker-popup { width: 96vw !important; } .wf-worker-grid { grid-template-columns: 1fr; } }
 .wf-worker-tile { display: flex; align-items: flex-start; gap: 8px; padding: 8px; border: 1px solid var(--wf-line); border-radius: 6px; background: var(--wf-tile); color: inherit; text-align: left; font-size: 1rem; }
-@media (hover: hover) { .wf-worker-tile:hover:not(:disabled) { border-color: #329389; background: rgba(50,147,137,0.12); } }
-.wf-worker-tile:disabled { opacity: 0.5; cursor: not-allowed; }
+@media (hover: hover) { .wf-worker-tile:hover:not([aria-disabled="true"]) { border-color: #329389; background: rgba(50,147,137,0.12); } }
+/* An unavailable Folk (strike, cooldown): focusable with aria-disabled so its reason is reachable; only the portrait,
+   badges and effects fade, its status and how-to-fix lines keep full ink (scan B-03, C-34, build .112). */
+.wf-worker-tile[aria-disabled="true"] { cursor: not-allowed; }
+.wf-worker-tile[aria-disabled="true"] > .wf-worker-portrait, .wf-worker-tile[aria-disabled="true"] .wf-worker-badges,
+.wf-worker-tile[aria-disabled="true"] .wf-effects { opacity: var(--wf-dim); }
 .wf-worker-tile-active { border-color: #329389; box-shadow: inset 0 0 0 1px #329389; background: rgba(50,147,137,0.08); }
 .wf-worker-portrait { width: 48px; height: 48px; border-radius: 6px; object-fit: contain; flex: 0 0 auto; }
 .wf-worker-text { min-width: 0; line-height: 1.3; overflow-wrap: anywhere; }
-.wf-worker-text small { font-size: 0.9rem !important; opacity: 0.9; }
+.wf-worker-text small { font-size: 0.9rem !important; } /* no opacity: it pulled Light's inks under 4.5:1 (B-04) */
 .wf-worker-line { margin-top: 2px; }
 /* A tier's effects (build .73): each piece is a flex item, so a piece that doesn't fit moves to the next line whole,
    and only one longer than the line wraps inside itself; the value is in its tone's colour. */
@@ -135,7 +203,7 @@ body:not(.darkMode) .wf-ui .text-info { color: var(--wf-cooldown) !important; }
 .wf-effect { min-width: 0; }
 .wf-worker-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 /* Worn gear on a Worker popup tile (build .54): 20px icons; amber ring when a charge item ran out. */
-.wf-worker-none { display: flex; align-items: center; justify-content: center; text-align: center; padding: 8px; border-radius: 6px; background: var(--wf-well); font-size: 1rem; line-height: 1.3; }
+.wf-worker-none { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 8px; border-radius: 6px; background: var(--wf-well); font-size: 1rem; line-height: 1.3; }
 /* Reserve (build .76): one block per currency like the bank's Sell block: name left and amount right, a fill bar,
    the 40px field (7 digits wide) with its presets on one row (presets drop under it when it can't fit), a thin rule,
    Deposit the full width of the block (the user's call, build .78). */
@@ -146,7 +214,7 @@ body:not(.darkMode) .wf-ui .text-info { color: var(--wf-cooldown) !important; }
 .wf-reserve-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .wf-reserve-input { min-height: 40px; flex: 1 1 8rem; min-width: 8rem; width: auto; }
 .wf-reserve-presets { display: flex; gap: 6px; flex: 0 0 auto; }
-.wf-reserve-presets .btn { min-height: 32px; min-width: 40px; }
+.wf-reserve-presets .btn { min-height: 40px; min-width: 40px; } /* one height with the field (scan A-05, .112) */
 .wf-reserve-deposit { width: 100%; min-height: 40px; margin-top: 14px !important; }
 /* Top row (build .79): the reserve and the Overview one height (row-deck). */
 /* Build .88 (the user): block content 16px in, blocks 12px apart both ways (the game's .block keeps 30px
@@ -160,7 +228,7 @@ body:not(.darkMode) .wf-ui .text-info { color: var(--wf-cooldown) !important; }
 .wf-picker-foot { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
 .wf-picker-back { grid-column: 1; justify-self: start; min-height: 40px; }
 .wf-picker-equip { grid-column: 2; min-width: 8rem; min-height: 40px; }
-.wf-picker-showall { grid-column: 3; justify-self: end; display: flex; align-items: center; min-height: 40px; padding: 0 4px 0 10px; border: 1px solid rgba(160,168,180,0.35); border-radius: 0.25rem; }
+.wf-picker-showall { grid-column: 3; justify-self: end; display: flex; align-items: center; min-height: 40px; padding: 0 4px 0 10px; border: 1px solid var(--wf-line); border-radius: 0.25rem; }
 .wf-picker-showall .custom-control { margin: 0; }
 .wf-picker-showall .custom-control-label { margin: 0; }
 @media (max-width: 575.98px) {
@@ -189,6 +257,7 @@ body:not(.darkMode) .wf-ui .text-info { color: var(--wf-cooldown) !important; }
 .wf-slot { position: relative; width: 52px; height: 52px; padding: 0; display: flex; align-items: center; justify-content: center; line-height: 1; }
 .wf-slot img { width: 36px; height: 36px; object-fit: contain; display: block; }
 .wf-slot-qty { position: absolute; right: 2px; bottom: 0; font-size: 0.8rem !important; line-height: 1; background: rgba(0,0,0,0.6); color: #fff; border-radius: 3px; padding: 1px 2px; }
+.wf-ui .wf-slot-qty.text-danger { color: #ff6b6b !important; } /* on the dark chip the bright red in every theme (B-15) */
 /* Item grid: 52px rows (48px tile + 6px gap); at least 4 rows are always visible, it scrolls past 6. */
 .wf-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, 52px); grid-auto-rows: 52px; align-content: start; gap: 6px; min-height: 226px; max-height: 342px; overflow-y: auto; min-width: min(86vw, 26rem); max-width: 100%; padding: 2px;
   scrollbar-width: thin; scrollbar-color: var(--wf-thumb) transparent; } /* .99: the shared rule 4a.16, never the browser's bar */
@@ -196,8 +265,9 @@ body:not(.darkMode) .wf-ui .text-info { color: var(--wf-cooldown) !important; }
 .wf-picker-item { position: relative; width: 52px; height: 52px; padding: 0; display: flex; align-items: center; justify-content: center; line-height: 1; }
 .wf-picker-item img { width: 40px; height: 40px; object-fit: contain; display: block; }
 .wf-picker-item small { position: absolute; right: 2px; bottom: 0; font-size: 0.8rem !important; line-height: 1; background: rgba(0,0,0,0.6); color: #fff; border-radius: 3px; padding: 1px 2px; }
-.wf-picker-item.wf-picker-locked img { opacity: 0.4; filter: grayscale(0.8); }
+.wf-picker-item.wf-picker-locked img { opacity: var(--wf-dim); filter: grayscale(0.8); }
 .wf-picker-qty-row { gap: 8px; }
+.wf-picker-qty-row .btn { min-height: 40px; } /* All as tall as its field (B-34) */
 .wf-picker-qty { width: 7rem; min-height: 40px; }
 .wf-picker-controls { margin-top: 0.75rem; }
 /* Custom checkbox: the box is positioned for the game's 14 px text; centre it on our bigger label. */
@@ -269,12 +339,13 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-picker-none { text-align: center; padding: 0 12px; max-width: 26rem; }
 /* A block that d-none can still hide (Bootstrap's d-block is !important and outranks d-none, build .63). */
 .wf-picker-desc, .wf-block { display: block; }
+.wf-picker-desc { text-align: center; } /* as the rest of the foot (B-35) */
 /* Gear popup title while picking: "Jel's gear – [icon] Feet" (build .64). */
 .wf-title-slot { white-space: nowrap; }
 .wf-title-slot img { width: 1em; height: 1em; margin-right: .3em; vertical-align: -0.12em; }
 /* A slot this tier hasn't opened: grey, as disabled, its reason on tap and in the tooltip. */
 .wf-slot.wf-slot-locked { border: 2px solid var(--wf-locked-line); background: var(--wf-tile); cursor: not-allowed; }
-.wf-slot.wf-slot-locked img { opacity: 0.35; filter: grayscale(1); }
+.wf-slot.wf-slot-locked img { opacity: var(--wf-dim); filter: grayscale(1); }
 .wf-slot-locked-line { text-align: center; margin-top: 8px; }
 /* Gear bonuses folded at the bottom: a caret toggle like the game's, the list on a grey band when open. */
 .wf-stats-toggle { display: block; min-height: 32px; margin: 12px auto 0; padding: 4px 8px; background: none; border: 0; color: var(--wf-head); font-weight: 600; }
@@ -323,9 +394,15 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
    folded, the Payroll mini bar. */
 #worker-folks-overview > .wf-dash-content { padding: 16px !important; }
 .wf-dash-right { gap: 12px; min-width: 0; }
-.wf-dash-pill { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--wf-line); font-size: 0.85rem; white-space: nowrap; }
+.wf-dash-pill { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--wf-line); font-size: 0.9rem; white-space: nowrap; }
+/* Beside the title the pill stays one row: a long text wraps inside its span, the bar and percentage stay on its
+   right. A wrapping flex box is sized short of its content in Chrome (415px for ~487px), which put "0%" on a line of
+   its own (live check, .118); only the full-width row below wraps. */
+.wf-dash-next { white-space: normal; flex-wrap: nowrap; max-width: 32rem; }
+.wf-dash-next .wf-dash-next-text { min-width: 0; }
+.wf-dash-next .wf-dash-bar, .wf-dash-next > .font-w600 { flex: none; }
 .wf-dash-pill .wf-dash-bar, .wf-dash-paymini .wf-dash-bar { width: 72px; height: 6px; margin: 0; background: var(--wf-track); }
-.wf-dash-paymini { display: none; align-items: center; gap: 8px; font-size: 0.85rem; white-space: nowrap; }
+.wf-dash-paymini { display: none; align-items: center; gap: 8px; font-size: 0.9rem; white-space: nowrap; }
 .wf-dash-paymini-cur .wf-line-icon { margin-right: 0; }
 #worker-folks-overview.wf-folded .wf-dash-paymini { display: flex; }
 .wf-dash-grid { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1.6fr); gap: 12px; height: 21rem; }
@@ -336,37 +413,68 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-dash-scroll { flex: 1 1 0; min-height: 0; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; scrollbar-color: var(--wf-thumb) transparent; }
 .wf-dash-line { margin-top: 4px; }
 .wf-dash-sub { margin: 2px 0 6px; }
-/* At work: one line a Folk, trouble first; the full skill, action and status in the row's tooltip */
+/* At work: one line a Folk, trouble first: the skill icon, the first name, the skill, then the status icon and word in
+   its colour (never an icon alone; scan A-07, build .112). The full name, skill and action in the row's
+   tooltip; the skill gives way first. */
 .wf-dash-row { display: flex; align-items: center; gap: 6px; padding: 4px 0; white-space: nowrap; }
 .wf-dash-row + .wf-dash-row { border-top: 1px solid var(--wf-row-line); }
-.wf-dash-row-name { font-weight: 600; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.wf-dash-row-name { font-weight: 600; flex: 0 1 auto; min-width: 2.5rem; overflow: hidden; text-overflow: ellipsis; }
 .wf-dash-row-skill { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .wf-dash-row-blank { display: inline-block; flex: none; }
-.wf-dash-row-status { width: 16px; height: 16px; flex: none; margin-left: auto; }
+.wf-dash-row-status { display: inline-flex; align-items: center; gap: 4px; flex: none; margin-left: auto; font-weight: 600; font-size: 0.9rem; }
+.wf-dash-row-status img { width: 18px; height: 18px; }
 /* Payroll: one compact block per currency (the reserve's own field, presets and Deposit) */
 .wf-pay-cur + .wf-pay-cur { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--wf-line-soft); }
 .wf-pay-covers { margin-top: 6px; }
 .wf-pay-why { margin-top: 8px; }
 .wf-dash-pay .wf-reserve-bar { margin-top: 8px !important; }
 .wf-dash-pay .wf-reserve-controls { margin-top: 10px; gap: 6px; }
-.wf-dash-pay .wf-reserve-input { min-height: 36px; flex-basis: 6rem; min-width: 6rem; }
-.wf-dash-pay .wf-reserve-deposit { min-height: 36px; margin-top: 10px !important; }
-@media (pointer: coarse) { .wf-dash-pay .wf-reserve-deposit { min-height: 40px; } } /* never under 40px on touch (.100) */
+.wf-dash-pay .wf-reserve-input { min-height: 40px; flex-basis: 6rem; min-width: 6rem; }
+.wf-dash-pay .wf-reserve-deposit { min-height: 40px; margin-top: 10px !important; } /* 40px field and a normal Deposit (scan A-05, .112) */
 /* Made: XP as skill chips, then the item chips in their own scroll box, so many kinds never grow the block */
 .wf-dash-xp { display: flex; flex-wrap: wrap; gap: 6px; flex: 0 0 auto; }
-.wf-dash-xp-chip { display: inline-flex; align-items: center; gap: 2px; padding: 2px 8px; border-radius: 6px; background: var(--wf-well); font-size: 0.85rem; }
+.wf-dash-xp-chip { display: inline-flex; align-items: center; gap: 2px; padding: 2px 8px; border-radius: 6px; background: var(--wf-well); font-size: 0.9rem; }
 /* An even grid: equal cells that stretch to fill each row, so no ragged gap at the right (the user, build .98). */
 .wf-dash-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); grid-auto-rows: min-content; align-content: start; gap: 8px; margin-top: 10px; min-height: 76px; padding-right: 4px; }
 .wf-dash-item { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; padding: 8px 4px 6px; border-radius: 8px; background: var(--wf-well); }
 .wf-dash-item-icon { width: 32px; height: 32px; object-fit: contain; }
 .wf-dash-item-count { font-size: 0.8rem; font-weight: 600; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wf-dash-more { grid-column: 1 / -1; }
-@media (max-width: 767.98px) {
-  .wf-dash-grid { grid-template-columns: minmax(0, 1fr); height: auto; }
+/* The bands follow the Overview's own width, not the window's (scan A-10, build .112): three across from
+   900px of block; under it At work and Payroll side by side with Made this session under them; under 600px one
+   column, Payroll first. */
+#worker-folks-overview { container-type: inline-size; container-name: wf-overview; }
+@container wf-overview (max-width: 899.98px) {
+  .wf-dash-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); height: auto; }
+  .wf-dash-work, .wf-dash-pay { height: 21rem; }
+  .wf-dash-made { grid-column: 1 / -1; }
+  .wf-dash-made .wf-dash-scroll { flex: 0 1 auto; }
+  .wf-dash-items { max-height: 12rem; }
+}
+@container wf-overview (max-width: 599.98px) {
+  .wf-dash-grid { grid-template-columns: minmax(0, 1fr); }
+  .wf-dash-work, .wf-dash-pay { height: auto; }
   .wf-dash-pay { order: -1; overflow: visible; }
   .wf-dash-scroll { flex: 0 1 auto; }
   .wf-dash-roster { max-height: 14rem; }
-  .wf-dash-items { max-height: 12rem; }
+}
+/* An Overview too narrow for the title and the whole pill side by side puts the Next pill on its own full-width row
+   under the title, and the grip stays at the end of the title row: by the block's width, not the window's, like the
+   bands (build .112). 820px = the title (~200px) + the pill at its 32rem cap + the grip and padding; at 600px the
+   pill wrapped half-width onto a second line between the two (the user, .118). */
+@container wf-overview (max-width: 819.98px) {
   .wf-dash-title .wf-dash-right { order: 10; flex-basis: 100%; margin: 8px 0 0 !important; flex-wrap: wrap; }
   .wf-dash-title .wf-grip { margin-left: auto !important; }
+  /* On its own row the pill is the row's width: the text on its line, the bar fills the line under it (the user). */
+  .wf-dash-title .wf-dash-next { flex: 1 1 100%; max-width: none; flex-wrap: wrap; }
+  .wf-dash-title .wf-dash-next .wf-dash-next-text { flex: 1 1 100%; }
+  .wf-dash-title .wf-dash-next .wf-dash-bar { flex: 1 1 auto; width: auto; }
 }
+/* Folk cards by the grid's own width (A-10, A-11): three from 1140px, two from 720px, else one. */
+#worker-folks-folks { container-type: inline-size; container-name: wf-crew; }
+#worker-folks-folks > .wf-card-col, #worker-folks-folks > [data-wf-folk] { flex: 0 0 100%; max-width: 100%; }
+@container wf-crew (min-width: 720px) { #worker-folks-folks > [data-wf-folk] { flex: 0 0 50%; max-width: 50%; } }
+@container wf-crew (min-width: 1140px) { #worker-folks-folks > [data-wf-folk] { flex: 0 0 33.3333%; max-width: 33.3333%; } }
+/* While nobody is hired the empty card comes first: the one thing to do is on the first screen (A-23, .112). */
+.wf-layout-wide { display: flex; flex-direction: column; }
+.wf-layout-wide > .wf-crew-empty { order: -1; }

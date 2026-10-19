@@ -14,7 +14,7 @@ const AOD_INHERIT = {
   'melvorAoD:Cartography': ['melvorAoD:Cartography_Skillcape', 'melvorAoD:Superior_Cartography_Skillcape'],
 };
 
-export function install(ctx, { getHiring, rules, consumptionRules, popupDidRender, tips, log }) {
+export function install(ctx, { getHiring, rules, consumptionRules, popupDidRender, titleName, tips, log }) {
   let hiring;
   const expansions = () => ({
     hasAoD: game.registeredNamespaces.hasNamespace('melvorAoD'),
@@ -238,7 +238,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
      */
     openLoadout(folk, initialSlotId) {
       const root = document.createElement('div');
-      root.className = 'text-left font-size-sm wf-gear';
+      root.className = 'text-left wf-gear'; // body size, as every popup (scan B-19, build .112)
       const skill = hiring.skillOf(folk);
       // Tooltips of buttons this modal replaces: a shown tooltip never gets its mouseleave once its button is gone,
       // so it stayed on screen after a view change (user report, build .51). Destroyed before every redraw and on close.
@@ -252,7 +252,8 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
       const names = () => { try { if (Swal.isVisible()) popupDidRender?.(Swal.getPopup()); } catch {} };
       // The title names the slot while picking (build .64, user layout): "Jel's gear – [icon] Feet".
       const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-      const baseTitle = esc(templateLangString('MOD_WF_GEAR_TITLE', { name: folk.name }));
+      // The Folk's name is marked so the title pass keeps it whole with its "'s" when it fits.
+      const baseTitle = esc(templateLangString('MOD_WF_GEAR_TITLE', { name: '\u0000' })).replace('\u0000', titleName ? titleName(folk.name) : esc(folk.name));
       let title = baseTitle;
       const setTitle = (html) => {
         title = html;
@@ -301,7 +302,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
           const slot = tiles.get(l.id);
           b.className = `btn btn-sm wf-slot${slot.empty ? ' btn-outline-info' : ' btn-info'}`;
           img.src = slot.media;
-          b.setAttribute('aria-label', slot.empty ? slot.name : `${slot.name}${slot.qty > 0 ? ` ×${slot.qty}` : ''}`);
+          b.setAttribute('aria-label', slot.empty ? templateLangString('MOD_WF_SLOT_EMPTY', { slot: slot.name }) : `${slot.name}${slot.qty > 0 ? ` ×${slot.qty}` : ''}`); // "Consumable: empty" (C-34)
           if (slot.charges !== undefined) {
             const q = document.createElement('span');
             q.className = `wf-slot-qty${slot.charges === 0 ? ' text-danger' : ''}`;
@@ -341,7 +342,11 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
         summary.id = `wf-gear-stats-${String(folk.id).replace(/[^A-Za-z0-9_-]/g, '_')}`;
         toggle.setAttribute('aria-controls', summary.id);
         const drawToggle = () => {
-          toggle.textContent = `${statsOpen ? '▾' : '▸'} ${templateLangString('MOD_WF_GEAR_STATS', { count: `${lines.length}` })}`;
+          // The caret hidden from screen readers; aria-expanded says it (scan C-33).
+          const glyph = document.createElement('span');
+          glyph.setAttribute('aria-hidden', 'true');
+          glyph.textContent = statsOpen ? '▾ ' : '▸ ';
+          toggle.replaceChildren(glyph, document.createTextNode(templateLangString('MOD_WF_GEAR_STATS', { count: `${lines.length}` })));
           toggle.setAttribute('aria-expanded', statsOpen ? 'true' : 'false');
           summary.classList.toggle('d-none', !statsOpen);
         };
@@ -460,7 +465,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
           if (game.checkRequirements(item.equipRequirements, false)) return null;
           const levels = (item.equipRequirements ?? [])
             .filter((r) => r.type === 'SkillLevel' && r.skill !== undefined && r.skill.level < r.level)
-            .map((r) => `${hiring.skillName(r.skill)} ${r.level}`);
+            .map((r) => `${r.skill.name} ${r.level}`); // the game's skill name: an equip level is the player's Magic, not "Alt. Magic" (B-16)
           return levels.length > 0 ? levels.join(', ') : getLangString('MOD_WF_PICKER_LOCKED_OTHER');
         };
         const refreshPicked = () => {
@@ -502,7 +507,9 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
             b.innerHTML = `<img src="${item.media}" alt=""><small>${count}</small>`;
             b.setAttribute('aria-label', `${item.name} ×${count}`);
             b.setAttribute('aria-pressed', 'false');
-            tip(b, [{ item }]);
+            // A greyed item says why in its tooltip, as a locked slot does (scan B-17, build .112).
+            const missing = needs(item);
+            tip(b, missing === null ? [{ item }] : [{ item }, { text: templateLangString('MOD_WF_PICKER_LOCKED', { item: item.name, needs: missing }), cls: 'text-warning' }]);
             b.onclick = () => select(item, b);
             grid.append(b);
           });
@@ -540,8 +547,8 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
           const help = document.createElement('button');
           help.type = 'button';
           help.className = 'btn btn-sm wf-help ml-2';
-          help.innerHTML = '<i class="fa fa-question-circle"></i>';
-          help.setAttribute('aria-label', getLangString('MOD_WF_HELP_BUTTON'));
+          help.innerHTML = '<i class="fa fa-question-circle" aria-hidden="true"></i>';
+          help.setAttribute('aria-label', getLangString('MOD_WF_HELP_LABEL_showall'));
           help.setAttribute('aria-expanded', 'false');
           help.setAttribute('aria-controls', desc.id);
           help.onclick = () => {
@@ -561,13 +568,15 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
         didRender: popupDidRender,
         title,
         html: root,
+        // 64px like Fire, Promote and the offline popup (scan B-31, C-24, build .112).
         imageUrl: hiring.portrait(folk.tier),
-        imageWidth: 48,
-        imageHeight: 48,
+        imageWidth: 64,
+        imageHeight: 64,
+        imageAlt: folk.name,
         showConfirmButton: false,
         showCloseButton: true,
         willClose: clearTips,
-        customClass: (typeof createSwalCustomClass === 'function' ? createSwalCustomClass({ popup: 'wf-ui' }) : { popup: 'wf-ui' }),
+        customClass: (typeof createSwalCustomClass === 'function' ? createSwalCustomClass({ popup: 'wf-ui wf-tool wf-pic' }) : { popup: 'wf-ui wf-tool wf-pic' }),
       });
     },
     /** Kept for callers that open one slot directly. */

@@ -50,6 +50,14 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
       root.dataset.wfSkill = skill.id;
       if (point.after !== null) point.after.after(root);
       else point.parent.prepend(root);
+      // A page without the game's padded `.content` (Cartography's map) put the box edge to edge: a `.content`
+      // wrapper gives it the same responsive gutter as the other skill pages (scan B-10, build .112).
+      if (root.closest('.content') === null) {
+        const gutter = document.createElement('div');
+        gutter.className = 'content wf-ctrl-gutter';
+        root.before(gutter);
+        gutter.append(root);
+      }
       controls.set(skill, root);
       mounted += 1;
     }
@@ -67,7 +75,10 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
       const b = document.createElement('button');
       b.type = 'button';
       b.className = `wf-worker-tile${active ? ' wf-worker-tile-active' : ''}`;
-      b.disabled = disabled;
+      // Unavailable stays focusable (aria-disabled, not disabled), so the keyboard reaches its reason; the chosen tile
+      // says so beyond its colour (scan C-34, build .112).
+      if (disabled) b.setAttribute('aria-disabled', 'true');
+      if (active) b.setAttribute('aria-current', 'true');
       const img = document.createElement('img');
       img.className = 'wf-worker-portrait';
       img.src = media;
@@ -131,7 +142,7 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
         text.append(s);
       }
       b.append(text);
-      if (!disabled) b.onclick = () => { onClick(); Swal.close(); };
+      b.onclick = () => { if (disabled) return; onClick(); Swal.close(); };
       root.append(b);
     };
     tile({
@@ -152,10 +163,17 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
       onClick: () => hiring.setWorker(skill, opt.id),
     }));
     if (options.length === 0) {
-      // No Folk hired yet: a tile-shaped hint beside "You" until the first hire.
+      // No Folk hired yet: a tile-shaped hint beside "You" until the first hire, with the way to the Shop (scan B-07, C-05, build .112).
       const none = document.createElement('div');
       none.className = 'wf-worker-none';
-      none.textContent = getLangString('MOD_WF_CTRL_NO_FOLKS');
+      const line = document.createElement('div');
+      line.textContent = getLangString('MOD_WF_CTRL_NO_FOLKS');
+      const shop = document.createElement('button');
+      shop.type = 'button';
+      shop.className = 'btn btn-outline-info';
+      shop.textContent = getLangString('MOD_WF_BUTTON_OPEN_SHOP');
+      shop.onclick = () => { Swal.close(); hiring.openShop(); };
+      none.append(line, shop);
       root.append(none);
     }
     // Columns: up to three, never more than there are tiles, so the popup hugs the grid (build .52, user report:
@@ -169,7 +187,7 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
       html: root,
       showConfirmButton: false,
       showCloseButton: true,
-      customClass: (typeof createSwalCustomClass === 'function' ? createSwalCustomClass({ popup: 'wf-worker-popup wf-ui' }) : { popup: 'wf-worker-popup wf-ui' }),
+      customClass: (typeof createSwalCustomClass === 'function' ? createSwalCustomClass({ popup: 'wf-worker-popup wf-ui wf-tool' }) : { popup: 'wf-worker-popup wf-ui wf-tool' }),
     });
   };
 
@@ -179,62 +197,102 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
     const pending = hiring.pendingFor(skill); // Folk | null (you, at next start) | undefined
     const shown = pending === undefined ? holder : pending ?? undefined;
     const working = holder !== undefined && hiring.delegated.has(skill);
-    q('icon').src = hiring.media;
+    const icon = q('icon');
+    if (icon.getAttribute('src') !== hiring.media) icon.src = hiring.media;
 
     const button = q('folk-button');
-    button.replaceChildren();
-    if (shown !== undefined) {
-      const img = document.createElement('img');
-      img.className = 'wf-ctrl-portrait mr-1';
-      img.alt = '';
-      img.src = hiring.portrait(shown.tier);
-      button.append(img);
+    const who = shown === undefined ? getLangString('MOD_WF_CTRL_YOU') : `${shown.name} (${hiring.roleName(shown.tier)})`;
+    const buttonKey = `${who}|${shown?.tier ?? ''}`;
+    if (button.dataset.wfKey !== buttonKey) {
+      button.dataset.wfKey = buttonKey;
+      button.replaceChildren();
+      if (shown !== undefined) {
+        const img = document.createElement('img');
+        img.className = 'wf-ctrl-portrait mr-1';
+        img.alt = '';
+        img.src = hiring.portrait(shown.tier);
+        button.append(img);
+      }
+      button.append(document.createTextNode(who));
+      // The caret is decoration; the label says what the button does and that it opens a picker (scan C-33, C-34).
+      const caret = document.createElement('span');
+      caret.setAttribute('aria-hidden', 'true');
+      caret.textContent = ' ▾';
+      button.append(caret);
+      button.setAttribute('aria-label', templateLangString('MOD_WF_CTRL_BUTTON_LABEL', { name: who }));
+      button.setAttribute('aria-haspopup', 'dialog');
     }
-    button.append(document.createTextNode(shown === undefined ? getLangString('MOD_WF_CTRL_YOU') : `${shown.name} (${hiring.roleName(shown.tier)})`));
-    button.append(document.createTextNode(' ▾'));
     button.onclick = () => openWorkerModal(skill);
 
+    // "N of M Shift Slots in use", its own piece that never splits and never takes the status colour (scan B-09, B-22).
     const slots = templateLangString('MOD_WF_CTRL_SLOTS', { used: `${hiring.delegated.size}`, slots: `${hiring.shiftSlots}` });
     let status;
     let tone = 'text-muted';
-    if (pending === null) {
-      status = `${templateLangString('MOD_WF_CTRL_PENDING_YOU', { name: holder?.name ?? '?' })} · ${slots}`;
+    let showSlots = true;
+    let goto = false;
+    if (holder === undefined && pending === undefined && hiring.highestLicence === null) {
+      // Before the first licence: what the box is for and where to start, no "Shift Slots 0/0" (scan C-04, build .112).
+      status = getLangString('MOD_WF_CTRL_NO_LICENCE');
+      showSlots = false;
+      goto = true;
+    } else if (pending === null) {
+      status = templateLangString('MOD_WF_CTRL_PENDING_YOU', { name: holder?.name ?? '?' });
       tone = 'text-warning font-w600';
     } else if (pending !== undefined) {
       const from = pending.skillId === null ? '' : hiring.skillName(pending.skillId);
-      status = `${templateLangString('MOD_WF_CTRL_PENDING', { name: pending.name, skill: from })} · ${slots}`;
+      status = templateLangString('MOD_WF_CTRL_PENDING', { name: pending.name, skill: from });
       tone = 'text-warning font-w600';
-    } else if (holder === undefined) status = slots;
+    } else if (holder === undefined) status = '';
     else if (!working && hiring.struck(holder)) {
       // A striking or resting Folk isn't ready to work (build .81: the box said "ready" through the whole strike).
-      status = `${templateLangString('MOD_WF_CTRL_STRIKE', { name: holder.name })} · ${slots}`;
+      status = templateLangString('MOD_WF_CTRL_STRIKE', { name: holder.name });
       tone = 'text-danger font-w600';
+      goto = true; // the line sends the player to the Hiring page: a link there (scan B-37)
     } else if (!working && holder.cooldownTicks > 0) {
-      status = `${templateLangString('MOD_WF_CTRL_RESTING', { name: holder.name })} · ${slots}`;
-      tone = 'text-warning font-w600';
+      // "Cooling down" in blue with the time left, as the card and the popup tile (scan B-02, C-17, build .112).
+      status = templateLangString('MOD_WF_CTRL_RESTING', { name: holder.name, time: hiring.cooldownLeft(holder) });
+      tone = 'wf-text-cooldown font-w600';
     } else if (!working) {
-      // Ready to work is news, not a footnote: normal text, not muted (build .55).
-      status = `${templateLangString('MOD_WF_CTRL_READY', { name: holder.name })} · ${slots}`;
+      // Ready to work is news, not a footnote: normal text, not muted (build .55); "idle" like the card (B-38).
+      status = templateLangString('MOD_WF_CTRL_READY', { name: holder.name });
       tone = 'font-w600';
     }
     else if (hiring.debtText(holder) !== null) {
       const d = hiring.debtText(holder);
-      status = `${templateLangString('MOD_WF_CTRL_DEBT', { name: holder.name, amount: d.amount, minutes: d.minutes })} · ${slots}`;
+      status = templateLangString('MOD_WF_CTRL_DEBT', { name: holder.name, amount: d.amount, minutes: d.minutes });
       tone = 'text-warning font-w600';
     } else {
       const action = hiring.currentActionName(skill);
-      status = `${action === null
+      status = action === null
         ? templateLangString('MOD_WF_CTRL_WORKING', { name: holder.name })
-        : templateLangString('MOD_WF_CTRL_WORKING_ON', { name: holder.name, action })} · ${slots}`;
+        : templateLangString('MOD_WF_CTRL_WORKING_ON', { name: holder.name, action });
       tone = 'text-success font-w600';
     }
     const statusEl = q('status');
-    statusEl.textContent = status;
-    statusEl.className = `mr-3 my-1 ${tone}`;
+    const parts = [];
+    if (status !== '') parts.push(document.createTextNode(status));
+    if (showSlots) {
+      const piece = document.createElement('span');
+      piece.className = 'wf-ctrl-slots text-muted font-w400';
+      piece.textContent = status === '' ? slots : ` · ${slots}`;
+      parts.push(piece);
+    }
+    const key = JSON.stringify([status, showSlots ? slots : '', tone]);
+    if (statusEl.dataset.wfKey !== key) {
+      statusEl.dataset.wfKey = key;
+      statusEl.replaceChildren(...parts);
+      statusEl.className = `mr-3 my-1 ${tone}`;
+    }
+    const gotoEl = q('goto');
+    if (gotoEl !== null) {
+      gotoEl.classList.toggle('d-none', !goto);
+      if (gotoEl.textContent !== getLangString('MOD_WF_CTRL_HIRING_PAGE')) gotoEl.textContent = getLangString('MOD_WF_CTRL_HIRING_PAGE');
+      gotoEl.onclick = () => hiring.openPage();
+    }
 
     const stop = q('stop');
     stop.classList.toggle('d-none', !working);
-    stop.textContent = getLangString('MOD_WF_BUTTON_STOP');
+    if (stop.textContent !== getLangString('MOD_WF_BUTTON_STOP')) stop.textContent = getLangString('MOD_WF_BUTTON_STOP');
     stop.onclick = () => { if (holder !== undefined) hiring.stopFolk(holder); };
   };
 
@@ -262,5 +320,16 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
       });
     });
     hiring.events.on('folkStruck', renderAll);
+    // A cooling-down Folk's time left counts down in the box (build .112): its open page redraws once a second, and
+    // only the line that changed is written.
+    setInterval(() => {
+      const open = game.openPage;
+      controls.forEach((root, skill) => {
+        const holder = hiring.crew.bySkill(skill.id);
+        if (holder === undefined || !(holder.cooldownTicks > 0)) return;
+        if (open !== undefined && !(open.action === skill || open.skills?.includes?.(skill))) return;
+        renderOne(skill, root);
+      });
+    }, 1000);
   });
 }

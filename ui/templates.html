@@ -10,7 +10,8 @@
       <div class="col-12" id="worker-folks-empty">
         <div class="block block-rounded border-top border-worker-folks border-4x text-center p-3">
           <h5 class="font-w600 mb-1"><lang-string lang-id="MOD_WF_NO_WORKERS"></lang-string></h5>
-          <div class="mb-2" data-wf="empty-desc"><lang-string lang-id="MOD_WF_NO_WORKERS_DESC"></lang-string></div>
+          <div class="mb-1" data-wf="empty-desc"><lang-string lang-id="MOD_WF_NO_WORKERS_DESC"></lang-string></div>
+          <div class="wf-subtle mb-2" data-wf="empty-note"><lang-string lang-id="MOD_WF_DASH_HIRING_XP"></lang-string></div>
           <button type="button" class="btn btn-outline-info" data-wf="open-shop"><lang-string lang-id="MOD_WF_BUTTON_OPEN_SHOP"></lang-string></button>
         </div>
       </div>
@@ -23,7 +24,7 @@
     <!-- Sections: who, work, health, strike (only on a strike or debt), actions.
          The card is a flex column and the actions band sits at the bottom. Closed cards in a row share one height;
          open Details grow only their own card (equalizeCards in cards.mjs, build .61). -->
-    <div class="block block-rounded border-top border-worker-folks border-4x wf-card">
+    <div class="block block-rounded border-top border-worker-folks border-4x wf-card" role="group">
       <div class="block-content p-3 wf-card-body">
         <div class="wf-band wf-band-who">
           <div class="d-flex align-items-start">
@@ -31,8 +32,9 @@
             <div class="flex-fill wf-min0">
               <div class="d-flex justify-content-between align-items-start">
                 <div class="wf-min0">
-                  <h5 class="font-w600 mb-0 text-truncate" data-wf="name"></h5>
-                  <small class="wf-subtle"><span data-wf="role"></span> &middot; <span data-wf="slot"></span></small>
+                  <!-- The whole name, wrapping onto balanced lines (scan A-06, C-12, build .112); "· Slot N" never splits (A-11). -->
+                  <h5 class="font-w600 mb-0 wf-card-name" data-wf="name"></h5>
+                  <small class="wf-subtle"><span data-wf="role"></span> <span class="text-nowrap">&middot; <span data-wf="slot"></span></span></small>
                 </div>
                 <span class="badge wf-status wf-card-status">
                   <img class="wf-status-icon" data-wf="status-icon" alt="" />
@@ -81,7 +83,7 @@
             <button type="button" class="btn btn-sm btn-outline-danger ml-auto" data-wf="fire"></button>
           </div>
           <div class="wf-details d-none mt-2" data-wf="details">
-            <div class="font-w600 mb-1" data-wf="perks-title"></div>
+            <div class="wf-band-head mb-1" data-wf="perks-title"></div>
             <ul class="pl-3 mb-2" data-wf="perks"></ul>
             <button type="button" class="btn btn-sm btn-outline-warning d-none" data-wf="overtime" aria-pressed="false"></button>
           </div>
@@ -97,7 +99,7 @@
       <div class="block-content p-3 d-flex align-items-center">
         <img class="wf-card-portrait mr-3 wf-frozen-portrait" data-wf="portrait" alt="" />
         <div>
-          <h5 class="font-w600 mb-0" data-wf="title"><span data-wf="title-text"></span><button type="button" class="btn btn-sm wf-help" data-wf-help="frozen"><i class="fa fa-question-circle"></i></button></h5>
+          <h5 class="font-w600 mb-0" data-wf="title"><span data-wf="title-text"></span><button type="button" class="btn btn-sm wf-help" data-wf-help="frozen"><i class="fa fa-question-circle" aria-hidden="true"></i></button></h5>
           <div class="text-warning font-w600" data-wf="text"></div>
         </div>
       </div>
@@ -112,7 +114,9 @@
       <span class="font-w600 mr-2"><lang-string lang-id="MOD_WF_CTRL_LABEL"></lang-string>:</span>
       <button type="button" class="btn btn-sm btn-outline-info wf-ctrl-button mr-3 my-1" data-wf="folk-button"></button>
       <small class="text-muted mr-3 my-1" data-wf="status"></small>
-      <button type="button" class="btn btn-sm btn-danger my-1 ml-auto d-none" data-wf="stop"></button>
+      <!-- Where the line sends the player, a link there (scan B-37, C-04, build .112). -->
+      <button type="button" class="btn btn-sm btn-outline-info my-1 mr-2 d-none" data-wf="goto"></button>
+      <button type="button" class="btn btn-sm btn-danger my-1 d-none" data-wf="stop"></button>
     </div>
   </div>
 </template>

@@ -15,9 +15,11 @@ export function install(ctx, { getHiring, rules, log }) {
     return a !== undefined && a.folk === folk;
   };
   const intervalOf = (e) => (typeof IntervaledGameEvent !== 'undefined' && e instanceof IntervaledGameEvent ? e.interval : 0);
-  // A stack running out is a heads-up, not an error: info (blue). The game has only error, success and info toasts;
-  // build .83 called a createWarningNotification that doesn't exist and threw inside the Folk's tick (fixed .86).
-  const notify = (text) => game.notifications.createInfoNotification('worker_folks:loadout', text);
+  // A worn item running out stops its effect: one kind of toast for every run-out, an error with the fix in one
+  // sentence, as food running out (scan B-11, B-12, B-29, build .112). The game's error toast takes no picture; the info
+  // toast used before drew a broken image and a green "+1" without one. The game has only error, success and info
+  // toasts (build .83 called a createWarningNotification that doesn't exist; fixed .86).
+  const notify = (text) => game.notifications.createErrorNotification('worker_folks:loadout', text);
 
   const clearSlot = (folk, slotId, item) => {
     delete folk.loadout[slotId];
@@ -143,7 +145,12 @@ export function install(ctx, { getHiring, rules, log }) {
     hiring.events.on('folkStarted', ({ folk } = {}) => { if (folk !== undefined) api.sync(folk); });
     // Charge gloves apply only while charges remain: rebuild tables when a worn item crosses zero.
     game.itemCharges.on('chargesChanged', (e) => {
-      const worn = hiring.crew.all.some((folk) => Object.values(folk.loadout).some((entry) => entry.id === e.item.id));
+      const wearers = hiring.crew.all.filter((folk) => Object.values(folk.loadout).some((entry) => entry.id === e.item.id));
+      const worn = wearers.length > 0;
+      // Charges reaching 0 on a worn item get a toast too, as tablets and stacks do (scan B-12, build .112).
+      if (worn && e.oldCharges > 0 && e.newCharges <= 0) {
+        wearers.forEach((folk) => notify(templateLangString('MOD_WF_LOADOUT_CHARGES_OUT', { name: folk.name, item: e.item.name })));
+      }
       if (rules.chargeChangeInvalidates({ oldCharges: e.oldCharges, newCharges: e.newCharges, worn })) {
         hiring.invalidateFolkTables?.();
         hiring.renderQueue.folks = true;

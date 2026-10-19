@@ -53,14 +53,15 @@ export function install(ctx, { log, tips, model }) {
     });
     return b;
   };
-  const grip = () => {
+  /** The ⠿ grip; a block moves by its title, a card by its name band, and each tooltip says which (scan A-15, .112). */
+  const grip = (key = 'MOD_WF_LAYOUT_DRAG') => {
     const g = document.createElement('span');
     g.className = 'wf-grip';
     g.setAttribute('aria-hidden', 'true');
     const i = document.createElement('i');
     i.className = 'fa fa-grip-vertical';
     g.append(i);
-    tips?.set(g, getLangString('MOD_WF_LAYOUT_DRAG'));
+    tips?.set(g, getLangString(key));
     return g;
   };
   const dress = (id, block, head) => {
@@ -218,7 +219,7 @@ export function install(ctx, { log, tips, model }) {
       const end = document.createElement('div');
       end.className = 'wf-card-end';
       badge.before(end);
-      end.append(badge, grip());
+      end.append(badge, grip('MOD_WF_LAYOUT_DRAG_CARD'));
     });
     refresh();
   };

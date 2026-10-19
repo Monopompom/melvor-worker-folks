@@ -2,7 +2,7 @@
 // Folk's own Food slot, regeneration on game ticks, death (crew slot frozen for
 // 24 h) and the card/shop views of it. Game-facing.
 
-export function install(ctx, { getHiring, rules, log }) {
+export function install(ctx, { getHiring, rules, time, log }) {
   let hiring;
   let regenCounter = 0;
 
@@ -65,7 +65,7 @@ export function install(ctx, { getHiring, rules, log }) {
       hiring.events.emit('folkDied', { folk, skill: working, offline });
       game.notifications.createErrorNotification(
         'worker_folks:died',
-        templateLangString('MOD_WF_DIED', { name: folk.name, skill: working?.name ?? '', slot: `${folk.slot + 1}` }),
+        templateLangString('MOD_WF_DIED', { name: folk.name, skill: working === undefined ? '' : hiring.skillName(working), slot: `${folk.slot + 1}` }),
         hiring.portrait(folk.tier),
       );
       log(`${folk.name} died on ${working?.id ?? '-'}; slot ${folk.slot} frozen until ${new Date(until).toISOString()}`);
@@ -107,7 +107,7 @@ export function install(ctx, { getHiring, rules, log }) {
       const now = Date.now();
       const out = [];
       hiring.crew.frozenSlots().forEach((until, slot) => {
-        out.push({ slot, text: templateLangString('MOD_WF_SLOT_FROZEN', { slot: `${slot + 1}`, time: formatAsShorthandTimePeriod(rules.freezeRemaining(until, now), true) }) });
+        out.push({ slot, text: templateLangString('MOD_WF_SLOT_FROZEN', { slot: `${slot + 1}`, time: time.shortTime(rules.freezeRemaining(until, now)) }) }); // never "23h 59m 60s" (scan C-26, .112)
       });
       return out;
     },
@@ -119,7 +119,7 @@ export function install(ctx, { getHiring, rules, log }) {
     thawText() {
       const next = hiring.crew.nextThaw();
       if (next === undefined) return '';
-      return templateLangString('MOD_WF_REQ_SLOT_FROZEN', { time: formatAsShorthandTimePeriod(rules.freezeRemaining(next, Date.now()), true) });
+      return templateLangString('MOD_WF_REQ_SLOT_FROZEN', { time: time.shortTime(rules.freezeRemaining(next, Date.now())) });
     },
   };
 

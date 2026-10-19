@@ -104,6 +104,8 @@ export function install(ctx, { getHiring, rate, log }) {
     ctx.patch(Class, 'action').replace(function (original) {
       if (hiring === undefined || !hiring.delegated.has(this)) return original();
       return runAsFolk(this, () => {
+        // No Folk on a delegated skill (it left between ticks): the action runs as the player's rather than throwing.
+        if (hiring.acting === undefined) return original();
         hiring.acting.outcome = rate.rollOutcome(rate.produceRate(hiring.acting.folk.tier));
         hiring.lastOutcome = hiring.acting.outcome;
         if (rewardsInsideBody && hiring.acting.outcome === 'fail') {

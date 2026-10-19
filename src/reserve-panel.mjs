@@ -28,6 +28,12 @@ function renderMini(model, shown, hoursText) {
       const part = document.createElement('span');
       part.className = 'wf-dash-pill wf-dash-paymini-cur'; // styled as the Next unlock pill beside it (the user, build .98)
       part.dataset.wfCurrency = c.id;
+      // A word, never an icon alone (scan A-27, build .112); the tooltip says what the hours are.
+      if (!model.locked) {
+        const word = document.createElement('span');
+        word.textContent = getLangString('MOD_WF_DASH_MINI_RESERVE');
+        part.append(word);
+      }
       const img = document.createElement('img');
       img.className = 'wf-line-icon';
       img.src = c.media;
@@ -54,20 +60,23 @@ function renderMini(model, shown, hoursText) {
       fill.className = `progress-bar ${c.amount <= 0 ? 'bg-danger' : c.low ? 'bg-warning' : 'bg-success'}`;
     }
     const text = part.lastElementChild;
+    const put = (el, cls, t) => { if (el.className !== cls) el.className = cls; if (el.textContent !== t) el.textContent = t; };
     if (model.locked) {
-      text.className = 'font-w600';
-      text.textContent = `${formatNumber(Math.floor(c.perHour))}/h`;
+      put(text, 'font-w600', `${formatNumber(Math.floor(c.perHour))} ${c.name}/h`);
     } else {
-      text.className = c.amount <= 0 && c.perHour > 0 ? 'text-danger font-w600' : c.low ? 'text-warning font-w600' : 'font-w600';
       // Nobody paid from it right now: the amount in it, not an empty hours count.
-      text.textContent = c.hours === Infinity ? formatNumber(Math.floor(c.amount)) : `${hoursText(c.hours)} h`;
+      put(text, c.amount <= 0 && c.perHour > 0 && c.bank < c.perHour ? 'text-danger font-w600' : c.low ? 'text-warning font-w600' : 'font-w600',
+        c.hours === Infinity ? formatNumber(Math.floor(c.amount)) : `${hoursText(c.hours)}\u00a0h`);
+      model.tip?.(part, c.hours === Infinity
+        ? templateLangString('MOD_WF_DASH_MINI_TIP_IDLE', { amount: numberWithCommas(Math.floor(c.amount)), currency: c.name })
+        : templateLangString('MOD_WF_DASH_MINI_TIP', { amount: numberWithCommas(Math.floor(c.amount)), currency: c.name, hours: hoursText(c.hours) }));
     }
   }
 }
 
 /**
- * `model`: { off, locked, currencies: [{ id, name, media, amount, perHour, hours, low, capacity, room, bank }],
- *   owed: [{ name, amount }], helpMedia?, onDeposit(id, amount) }
+ * `model`: { off, locked, noCrew, currencies: [{ id, name, media, amount, perHour, hours, low, capacity, room, bank }],
+ *   owed: [{ name, amount }], tip?(el, content), onDeposit(id, amount) }
  * onDeposit reports its own outcome (notifications) and returns true when something went in.
  */
 export function renderReservePanel(model) {
@@ -76,10 +85,12 @@ export function renderReservePanel(model) {
   const state = band.wfPayroll ?? (band.wfPayroll = { key: '', refs: new Map(), latest: new Map(), owed: null });
   model.currencies.forEach((c) => state.latest.set(c.id, c));
   const n = (v) => numberWithCommas(Math.floor(v));
-  const hoursText = (h) => (h >= 100 ? `${Math.floor(h)}` : h.toFixed(1));
+  // As src/time-format.mjs hoursText: rounded down, so "Covers 1.0 h" is never 0.96 h.
+  const hoursText = (h) => (h >= 100 ? `${Math.floor(h)}` : (Math.floor(h * 10) / 10).toFixed(1));
   const roomOf = (c) => (c.room === undefined ? Infinity : c.room);
   const mostOf = (c) => Math.max(0, Math.floor(Math.min(c.bank, roomOf(c))));
-  const whyOf = (c) => (roomOf(c) <= 0 ? 'full' : !(c.bank >= 1) ? 'nothing' : '');
+  // No crew: the capacity is 0 because there are no wages to hold, not because it is full (scan A-04, build .112).
+  const whyOf = (c) => (model.noCrew ? 'nocrew' : roomOf(c) <= 0 ? 'full' : !(c.bank >= 1) ? 'nothing' : '');
   const shown = model.locked ? model.currencies.filter((c) => c.perHour > 0) : model.currencies;
   const key = JSON.stringify({
     off: model.off,
@@ -105,7 +116,7 @@ export function renderReservePanel(model) {
       const help = el('button', 'btn btn-sm wf-help');
       help.type = 'button';
       help.dataset.wfHelp = 'reserve';
-      help.setAttribute('aria-label', getLangString('MOD_WF_HELP_BUTTON'));
+      help.setAttribute('aria-label', getLangString('MOD_WF_HELP_LABEL_reserve'));
       const q = el('i', 'fa fa-question-circle');
       q.setAttribute('aria-hidden', 'true');
       help.append(q);
@@ -134,29 +145,42 @@ export function renderReservePanel(model) {
     band.replaceChildren(...body);
   }
 
-  // Numbers, in place.
+  // Numbers, in place, and only when they changed (scan C-36: the band rewrote the same lines every second).
+  const put = (target, text, cls) => {
+    if (cls !== undefined && target.className !== cls) target.className = cls;
+    if (target.textContent !== text) target.textContent = text;
+  };
   for (const c of shown) {
     const r = state.refs.get(c.id);
     if (r === undefined) continue;
-    if (r.perHourText) r.perHourText.textContent = templateLangString('MOD_WF_DASH_PER_HOUR', { amount: n(c.perHour), currency: c.name });
-    if (r.amount) r.amount.textContent = n(c.amount);
-    if (r.capacity) r.capacity.textContent = ` / ${n(c.capacity)}`;
+    if (r.perHourText) put(r.perHourText, templateLangString('MOD_WF_DASH_PER_HOUR', { amount: n(c.perHour), currency: c.name }));
+    if (r.amount) put(r.amount, n(c.amount));
+    if (r.capacity) put(r.capacity, ` / ${n(c.capacity)}`);
     if (r.fill) {
-      r.fill.style.width = `${Math.max(0, Math.min(100, (c.amount / c.capacity) * 100))}%`;
-      r.fill.className = `progress-bar ${c.amount <= 0 ? 'bg-danger' : c.low ? 'bg-warning' : 'bg-success'}`;
+      const width = `${Math.max(0, Math.min(100, (c.amount / c.capacity) * 100))}%`;
+      if (r.fill.style.width !== width) r.fill.style.width = width;
+      const cls = `progress-bar ${c.amount <= 0 ? 'bg-danger' : c.low ? 'bg-warning' : 'bg-success'}`;
+      if (r.fill.className !== cls) r.fill.className = cls;
     }
     if (r.covers) {
-      r.covers.className = `wf-pay-covers ${c.amount <= 0 && c.perHour > 0 ? 'text-danger font-w600' : c.low ? 'text-warning font-w600' : 'wf-subtle'}`;
-      r.covers.textContent = c.hours === Infinity ? getLangString('MOD_WF_RESERVE_IDLE')
-        : templateLangString('MOD_WF_RESERVE_COVERS', { hours: hoursText(c.hours), perHour: n(c.perHour) });
+      // Empty while the bank pays is no fault: grey, and says where wages come from; red only when the bank can't pay
+      // either (scan A-26, C-35, build .112). Rates "GP/h" everywhere (A-17).
+      const vars = { hours: hoursText(c.hours), perHour: n(c.perHour), currency: c.name };
+      if (c.hours === Infinity) put(r.covers, getLangString('MOD_WF_RESERVE_IDLE'), 'wf-pay-covers wf-subtle');
+      else if (c.amount <= 0 && c.perHour > 0) {
+        const broke = c.bank < c.perHour;
+        put(r.covers, templateLangString(broke ? 'MOD_WF_RESERVE_EMPTY_BROKE' : 'MOD_WF_RESERVE_EMPTY', vars), `wf-pay-covers ${broke ? 'text-danger font-w600' : 'wf-subtle'}`);
+      } else put(r.covers, templateLangString('MOD_WF_RESERVE_COVERS', vars), `wf-pay-covers ${c.low ? 'text-warning font-w600' : 'wf-subtle'}`);
     }
     if (r.why) {
-      r.why.textContent = whyOf(c) === 'full' ? templateLangString('MOD_WF_RESERVE_FULL', { capacity: n(c.capacity ?? 0), currency: c.name })
-        : templateLangString('MOD_WF_RESERVE_NOTHING', { currency: c.name });
+      const why = whyOf(c);
+      put(r.why, why === 'nocrew' ? getLangString('MOD_WF_RESERVE_NO_CREW')
+        : why === 'full' ? templateLangString('MOD_WF_RESERVE_FULL', { capacity: n(c.capacity ?? 0), currency: c.name })
+          : templateLangString('MOD_WF_RESERVE_NOTHING', { currency: c.name }), why === 'nocrew' ? 'wf-subtle wf-pay-why' : 'text-warning wf-pay-why');
     }
   }
   renderMini(model, shown, hoursText);
-  if (state.owed !== null) state.owed.textContent = model.owed.map((o) => templateLangString('MOD_WF_DASH_OWED', { amount: `${n(o.amount)} ${o.name}` })).join(' · ');
+  if (state.owed !== null) put(state.owed, model.owed.map((o) => templateLangString('MOD_WF_DASH_OWED', { amount: `${n(o.amount)} ${o.name}` })).join(' · '));
   return true;
 
   /** One currency: name and amount / capacity, bar, Covers, then the field, presets and Deposit (or why not). */
@@ -218,7 +242,7 @@ export function renderReservePanel(model) {
     }
     addPreset(getLangString('MOD_WF_RESERVE_QUICK_ALL'), () => mostOf(now()));
     controls.append(input, presets);
-    const deposit = el('button', 'btn btn-success btn-sm d-block wf-reserve-deposit', getLangString('MOD_WF_BUTTON_DEPOSIT'));
+    const deposit = el('button', 'btn btn-success d-block wf-reserve-deposit', getLangString('MOD_WF_BUTTON_DEPOSIT')); // the block's main action: a normal button (A-05)
     deposit.type = 'button';
     deposit.onclick = () => { if (model.onDeposit(c.id, input.value)) input.value = ''; };
     block.append(controls, deposit);

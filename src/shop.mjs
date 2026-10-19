@@ -73,12 +73,16 @@ export function install(ctx, { getHiring, pricing, licencePurchase, hirePurchase
       'WorkerFolksSlotCap',
       () => hiring.shiftSlots - hiring.extraShiftSlots < shiftSlotCap(hiring.highestLicence, hiring.folkCap),
       () => {
+        // Before any Licence there is nothing to own yet: say what opens the slots, not "0 of 0" (scan B-22, B-25, build .112).
+        if (hiring.highestLicence === null) return getLangString('MOD_WF_REQ_SLOT_NO_LICENCE');
         const cap = shiftSlotCap(hiring.highestLicence, hiring.folkCap);
         const owned = hiring.shiftSlots - hiring.extraShiftSlots;
-        if (hiring.highestLicence === null) return templateLangString('MOD_WF_REQ_SLOT_CAP', { owned: `${owned}`, cap: '0', role: hiring.roleName('Newbie') });
-        return cap >= hiring.folkCap
+        const text = cap >= hiring.folkCap
           ? templateLangString('MOD_WF_REQ_SLOT_CAP_SKILLS', { owned: `${owned}`, cap: `${cap}` })
           : templateLangString('MOD_WF_REQ_SLOT_CAP', { owned: `${owned}`, cap: `${cap}`, role: hiring.roleName(hiring.highestLicence) });
+        // Free slots from Hiring levels count in "owned"; say so, or the count looks higher than what was bought.
+        const free = hiring.levels?.freeShiftSlots() ?? 0;
+        return free > 0 ? text + templateLangString('MOD_WF_REQ_SLOT_FREE', { free: `${free}` }) : text;
       },
     );
     if (shiftSlot !== undefined) shiftSlot._defaultPurchaseRequirements.push(slotCap);
@@ -131,13 +135,20 @@ export function install(ctx, { getHiring, pricing, licencePurchase, hirePurchase
           log(`licence bought: ${licence}; shift slots now ${hiring.shiftSlots}`);
           game.notifications.createSuccessNotification(
             'worker_folks:licence',
-            templateLangString('MOD_WF_LICENCE_BOUGHT', { role: hiring.roleName(licence), slots: `${hiring.shiftSlots}` }),
+            templateLangString('MOD_WF_LICENCE_BOUGHT', {
+              role: hiring.roleName(licence),
+              slots: `${hiring.shiftSlots - hiring.extraShiftSlots}`,
+              cap: `${shiftSlotCap(hiring.highestLicence, hiring.folkCap)}`,
+            }),
             e.purchase.media,
           );
           refreshShop();
         }
       });
       hiring.events.on('crewChanged', refreshShop);
+      // The live requirements were built before the save loaded: refresh them once, or the Shop shows the empty
+      // character's texts until the first purchase (scan C-01, build .112).
+      refreshShop();
     },
   };
 }

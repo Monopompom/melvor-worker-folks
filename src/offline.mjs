@@ -53,6 +53,17 @@ export function install(ctx, { getHiring, log }) {
     if (info.offlineProgress === undefined || (tracker.actions.size === 0 && tracker.released.size === 0 && tracker.died.length === 0 && tracker.debts.length === 0 && tracker.struck.length === 0)) return;
     const container = info.offlineProgress.messageContainer;
     if (container === undefined) return;
+    // Welcome Back lines in the game's own style (scan C-08, C-09, C-10, build .112):
+    // h5 600 like the game's, the skill's icon just before the skill's name (the user, .114: an icon at the front of
+    // a wrapped line sat apart from it), a gain green, what was lost or owed red, and the advice on its own plain line
+    // under it.
+    const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    /** The language line as HTML, the marked values in their colour. */
+    const fill = (key, vars, marks = {}, media) => templateLangString(key, Object.fromEntries(Object.entries(vars)
+      .map(([k, v]) => [k, k === 'skill' && media ? icon(media, v) : marks[k] ? `<span class="${marks[k]}">${esc(v)}</span>` : esc(v)])));
+    /** The skill's name with its icon in front: icon, a plain space, the name, as the game writes "8 [icon] Normal Logs"
+     *  (no margin class), kept together on one line. */
+    const icon = (media, name) => `<span class="text-nowrap"><img class="skill-icon-xs" src="${media}" alt=""> ${esc(name)}</span>`;
     const lines = [];
     const describe = (skillId) => {
       const folk = hiring.crew.bySkill(skillId);
@@ -61,35 +72,38 @@ export function install(ctx, { getHiring, log }) {
     };
     tracker.actions.forEach((count, skillId) => {
       const d = describe(skillId);
-      lines.push({ media: d.media, text: templateLangString(count === 1 ? 'MOD_WF_OFFLINE_LINE_ONE' : 'MOD_WF_OFFLINE_LINE', { name: d.name, skill: d.skill, count: numberWithCommas(count) }) });
+      lines.push({ media: d.media, html: fill(count === 1 ? 'MOD_WF_OFFLINE_LINE_ONE' : 'MOD_WF_OFFLINE_LINE', { name: d.name, skill: d.skill, count: numberWithCommas(count) }, { count: 'text-success' }, d.media) });
     });
+    // A skill a strike or a death released already has its own line: no "stopped: restock" line for it (C-10).
+    const explained = new Set([...tracker.struck.map((t) => t.skillId), ...tracker.died.map((t) => t.skillId)]);
     tracker.released.forEach((skillId) => {
+      if (explained.has(skillId)) return;
       const d = describe(skillId);
-      lines.push({ media: d.media, text: templateLangString('MOD_WF_OFFLINE_STOPPED', { name: d.name, skill: d.skill }), warn: true });
+      lines.push({ media: d.media, html: fill('MOD_WF_OFFLINE_STOPPED', { name: d.name, skill: d.skill, why: getLangString('MOD_WF_OFFLINE_STOPPED_WHY') }, { why: 'text-danger' }, d.media), fix: getLangString('MOD_WF_OFFLINE_STOPPED_FIX') });
     });
     tracker.died.forEach(({ name, skill, media }) => {
-      lines.push({ media, text: templateLangString('MOD_WF_OFFLINE_DIED', { name, skill }), tone: 'text-danger' });
+      lines.push({ media, html: `<span class="text-danger">${fill('MOD_WF_OFFLINE_DIED', { name, skill }, {}, media)}</span>` });
     });
     // Debt and strikes are reported with their state on return (a strike may have settled itself).
     tracker.debts.forEach(({ folk, skill, media }) => {
       const d = hiring.debtText(folk);
-      if (d !== null) lines.push({ media, text: templateLangString('MOD_WF_OFFLINE_DEBT', { name: folk.name, skill, amount: d.amount, minutes: d.minutes }), warn: true });
+      if (d !== null) lines.push({ media, html: fill('MOD_WF_OFFLINE_DEBT', { name: folk.name, skill, amount: d.amount, minutes: d.minutes }, { amount: 'text-danger' }, media) });
     });
     tracker.struck.forEach(({ folk, skill, media }) => {
       const currency = this.currencies.getObjectByID(folk.debtCurrency ?? 'melvorD:GP');
-      const text = folk.onStrike
-        ? templateLangString('MOD_WF_OFFLINE_STRUCK', { name: folk.name, skill, amount: `${numberWithCommas(folk.debt)} ${currency?.name ?? ''}`.trim() })
-        : templateLangString('MOD_WF_OFFLINE_STRUCK_SETTLED', { name: folk.name, skill });
-      // Still on strike: red (work stopped); it settled itself from the reserve: plain, nothing to do (build .55).
-      lines.push({ media, text, tone: folk.onStrike ? 'text-danger' : '' });
+      // Still on strike: the amount red and how to fix it; settled itself from the bank: plain, nothing to do (build .55).
+      if (folk.onStrike) {
+        lines.push({ media, html: fill('MOD_WF_OFFLINE_STRUCK', { name: folk.name, skill, amount: `${numberWithCommas(folk.debt)} ${currency?.name ?? ''}`.trim() }, { amount: 'text-danger' }, media), fix: getLangString('MOD_WF_OFFLINE_STRUCK_FIX') });
+      } else lines.push({ media, html: fill('MOD_WF_OFFLINE_STRUCK_SETTLED', { name: folk.name, skill }, {}, media) });
     });
-    // Icon and text on one centred flex row: an inline icon in a heading hangs below the baseline.
-    const row = (className, media, text) => {
-      const el = createElement('h5', { className: `d-flex align-items-center justify-content-center mb-1 ${className}`, parent: container });
-      el.innerHTML = `${media ? `<img class="skill-icon-xs mr-1" src="${media}" alt="">` : ''}<span>${text}</span>`;
-    };
-    row('font-w600 font-size-sm mt-2 text-info', hiring.media, getLangString('MOD_WF_OFFLINE_HEADER'));
-    lines.forEach((line) => row(`font-w400 font-size-sm ${line.tone ?? (line.warn ? 'text-warning' : '')}`, line.media, line.text));
+    // The header: icon and text on one centred flex row. The lines: plain centred text that wraps, the icon inline.
+    const header = createElement('h5', { className: 'd-flex align-items-center justify-content-center font-w600 mb-1 mt-3', parent: container });
+    header.innerHTML = `<img class="skill-icon-xs mr-1" src="${hiring.media}" alt=""><span>${esc(getLangString('MOD_WF_OFFLINE_HEADER'))}</span>`;
+    const row = (className, html) => { createElement('h5', { className, parent: container }).innerHTML = html; };
+    lines.forEach((line) => {
+      row('font-w600 mb-1', line.html);
+      if (line.fix) row('font-w400 mb-2', esc(line.fix));
+    });
     log(`offline: ${ticks} ticks, ${tracker.actions.size} delegated skill(s) acted`);
   });
 
@@ -104,15 +118,15 @@ export function install(ctx, { getHiring, log }) {
     });
     hiring.events.on('folkDied', ({ folk, skill }) => {
       if (!tracker.active) return;
-      tracker.died.push({ name: folk.name, skill: hiring.skillName(skill), media: hiring.portrait(folk.tier) });
+      tracker.died.push({ name: folk.name, skill: skill === undefined ? '' : hiring.skillName(skill), media: skill?.media, skillId: skill?.id });
     });
     hiring.events.on('folkInDebt', ({ folk, skill }) => {
       if (!tracker.active) return;
-      tracker.debts.push({ folk, skill: hiring.skillName(skill), media: hiring.portrait(folk.tier) });
+      tracker.debts.push({ folk, skill: hiring.skillName(skill), media: skill?.media });
     });
     hiring.events.on('folkStruck', ({ folk, skill }) => {
       if (!tracker.active) return;
-      tracker.struck.push({ folk, skill: hiring.skillName(skill), media: hiring.portrait(folk.tier) });
+      tracker.struck.push({ folk, skill: hiring.skillName(skill), media: skill?.media, skillId: skill?.id });
     });
   });
 }

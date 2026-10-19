@@ -20,7 +20,7 @@ const swalClass = (extra = {}) => {
   return typeof createSwalCustomClass === 'function' ? createSwalCustomClass(cls) : cls;
 };
 
-export function createHiringClass({ popupDidRender, selectDelegable, log, createCrew, createEventBus, folkModel, pickName, renderFolkCards, renderReservePanel, produceRate, rules, perks, promotion, pricing, tips, layout, dashboard }) {
+export function createHiringClass({ popupDidRender, titleName = (s) => s, time, selectDelegable, log, createCrew, createEventBus, folkModel, pickName, renderFolkCards, renderReservePanel, produceRate, rules, perks, promotion, pricing, tips, layout, dashboard }) {
   class FolkSlotAction extends MasteryAction {
     constructor(namespace, data, game, skill) {
       super(namespace, data, game);
@@ -215,9 +215,44 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
       };
     }
 
+    /** A cooldown's time left as the page writes times ("4m 59s", never "0h 4m 60s"; src/time-format.mjs, build .112). */
+    cooldownLeft(folk) {
+      return time.shortTime(folk.cooldownTicks * TICK_INTERVAL);
+    }
+
+    /** Opens the Shop on the Worker Folks tab (the empty card, the Worker popup with nobody hired). */
+    openShop() {
+      // false, false: a page link must not toggle the game menu open on narrow screens (the plain changePage call does that below 992px).
+      const page = this.game.pages.getObjectByID('melvorD:Shop');
+      if (page === undefined) return;
+      changePage(page, -1, undefined, false, false);
+      // The Shop opens on its last tab (General Upgrades on a fresh character); show ours (build .83).
+      try {
+        const category = this.game.shop.categories.getObjectByID('worker_folks:WorkerFolks');
+        if (category !== undefined) shopMenu.showSingleTab(category);
+      } catch (err) { log('shop tab failed', err); }
+      this.closeNarrowMenu();
+    }
+
+    /** Opens the Hiring page from another page (the Worker box's link). */
+    openPage() {
+      const page = this.game.pages.getObjectByID('worker_folks:Hiring');
+      if (page === undefined) return;
+      changePage(page, -1, undefined, false, false);
+      this.closeNarrowMenu();
+    }
+
+    /** Below 992px a page link left the game menu open over the page (Voyage's lesson, build .83). */
+    closeNarrowMenu() {
+      try {
+        const narrow = !window.matchMedia('(min-width: 992px)').matches;
+        if (narrow && document.getElementById('page-container')?.classList.contains('sidebar-o-xs')) One.layout('sidebar_close');
+      } catch (err) { log('menu close failed', err); }
+    }
+
     /**
      * Worker-modal tile lines under "name (role)", styled like the Hiring card:
-     * Produce Rate (blue badge) and wage (yellow badge) on their own lines, the tier effects in italics,
+     * Produce Rate (blue badge) and wage (yellow badge) on their own lines, the tier effects as pieces,
      * then the status in colour with its icon, skill and action ("Idle · Fishing · Raw Shrimp").
      */
     folkLines(folk, pageSkill) {
@@ -232,7 +267,7 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
       lines.push({ icon: this.getMediaURL(`img/status_${status}.webp`), text: getLangString(`MOD_WF_STATUS_${status}`), cls });
       // A Folk that can't be picked says how to get it back (build .55).
       if (status === 'strike') lines.push({ text: getLangString('MOD_WF_TILE_FIX_strike'), cls: 'text-warning' });
-      if (status === 'cooldown') lines.push({ text: templateLangString('MOD_WF_TILE_FIX_cooldown', { time: formatAsShorthandTimePeriod(folk.cooldownTicks * TICK_INTERVAL, true) }), cls: 'text-warning' });
+      if (status === 'cooldown') lines.push({ text: templateLangString('MOD_WF_TILE_FIX_cooldown', { time: this.cooldownLeft(folk) }), cls: 'text-warning' });
       if (folk.skillId !== null) {
         // "⛏ Woodcutting (🌳 Oak Tree)": skill icon + name, then the current action in brackets.
         const segments = [{ icon: this.game.skills.getObjectByID(folk.skillId)?.media, text: this.skillName(folk.skillId) }];
@@ -340,7 +375,8 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
       // matched the page itself and every click on it opened the frozen-slot popup (user report, build .57).
       if (container === null || container.dataset.wfHelpWired === '1') return;
       container.dataset.wfHelpWired = '1';
-      container.querySelectorAll('[data-wf-help]').forEach((b) => b.setAttribute('aria-label', getLangString('MOD_WF_HELP_BUTTON')));
+      // Each "?" is named after its topic, as Voyage's (scan A-29, C-33, build .112).
+      container.querySelectorAll('[data-wf-help]').forEach((b) => b.setAttribute('aria-label', getLangString(`MOD_WF_HELP_LABEL_${b.dataset.wfHelp}`)));
       container.addEventListener('click', (e) => {
         const button = e.target instanceof Element ? e.target.closest('[data-wf-help]') : null;
         if (button === null) return;
@@ -348,15 +384,16 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
         if (topic !== 'reserve' && topic !== 'frozen') return;
         const capacity = this.payroll?.capacityHours?.() ?? 0;
         // Help popup layout: a grey band per idea, a heading, one sentence a line.
+        // Every band with its heading (scan A-28, C-23, build .112).
         const sections = topic === 'reserve'
           ? [
-            { body: [getLangString('MOD_WF_RESERVE_HELP_ORDER'), getLangString('MOD_WF_RESERVE_HELP_STRIKE')] },
+            { head: getLangString('MOD_WF_RESERVE_HELP_ORDER_HEAD'), body: [getLangString('MOD_WF_RESERVE_HELP_ORDER'), getLangString('MOD_WF_RESERVE_HELP_STRIKE')] },
             ...(capacity > 0 && capacity !== Infinity ? [{
               head: getLangString('MOD_WF_RESERVE_HELP_CAP_HEAD'),
-              body: [templateLangString('MOD_WF_RESERVE_HELP_CAP', { hours: `${capacity}` }), getLangString('MOD_WF_RESERVE_HELP_GROWS')],
+              body: [templateLangString('MOD_WF_RESERVE_HELP_CAP', { hours: `${capacity}` }), getLangString('MOD_WF_RESERVE_HELP_COVERS'), getLangString('MOD_WF_RESERVE_HELP_GROWS')],
             }] : []),
           ]
-          : [{ body: (this.health?.freezeReason() ?? '').split(/(?<=[.!?])\s+/) }]; // one sentence a line
+          : [{ head: getLangString('MOD_WF_SLOT_FROZEN_HEAD'), body: (this.health?.freezeReason() ?? '').split(/(?<=[.!?])\s+/) }]; // one sentence a line
         const html = sections.map((sec) => `<div class="wf-band">${sec.head ? `<div class="wf-help-head">${sec.head}</div>` : ''}`
           + `${sec.body.filter(Boolean).map((l) => `<p class="wf-help-p">${l}</p>`).join('')}</div>`).join('');
         SwalLocale.fire({
@@ -374,16 +411,19 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
       const payroll = this.payroll;
       if (payroll === undefined) return;
       const capacityHours = payroll.capacityHours();
-      // Owed wages per currency (a Folk in debt, not on strike), for the band's amber line.
+      // Owed wages per currency (a Folk in debt, not on strike: a strike is settled on its card), for the band's amber
+      // line (scan A-13, build .112: strikes were counted in, against this comment).
       const owed = new Map();
       this.crew.all.forEach((f) => {
-        if (!this.owing(f)) return;
+        if (!this.owing(f) || this.struck(f)) return;
         const id = f.debtCurrency ?? 'melvorD:GP';
         owed.set(id, (owed.get(id) ?? 0) + f.debt);
       });
       renderReservePanel({
         off: !payroll.enabled,
         locked: capacityHours === 0,
+        noCrew: this.crew.size === 0,
+        tip: (el, content) => tips?.set(el, content),
         owed: [...owed].map(([id, amount]) => ({ amount, name: this.game.currencies.getObjectByID(id)?.name ?? id })),
         currencies: ['melvorD:GP', 'melvorItA:AbyssalPieces']
           .map((id) => ({ id, currency: this.game.currencies.getObjectByID(id) }))
@@ -409,10 +449,12 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
           const error = (key, args) => { this.game.notifications.createErrorNotification('worker_folks:reserve', templateLangString(key, { currency: name, ...args })); return false; };
           if (plan.outcome === 'empty') return error('MOD_WF_RESERVE_NO_AMOUNT', {});
           if (plan.outcome === 'full') return error('MOD_WF_RESERVE_FULL', { capacity: n(payroll.capacityOf(id)) });
-          if (plan.outcome === 'short') return error('MOD_WF_RESERVE_SHORT', { amount: n(cur?.amount ?? 0) });
+          if (plan.outcome === 'nothing') return error('MOD_WF_RESERVE_NOTHING', {});
           if (!payroll.deposit(id, plan.deposit)) return false;
+          // More than the room or the bank: what fits goes in, and the toast says so (scan A-25, build .112).
+          const doneKey = { cut: 'MOD_WF_RESERVE_CUT', bank: 'MOD_WF_RESERVE_BANK' }[plan.outcome] ?? 'MOD_WF_RESERVE_DONE';
           this.game.notifications.createSuccessNotification('worker_folks:reserve',
-            templateLangString(plan.outcome === 'cut' ? 'MOD_WF_RESERVE_CUT' : 'MOD_WF_RESERVE_DONE', { amount: n(plan.deposit), currency: name }),
+            templateLangString(doneKey, { amount: n(plan.deposit), currency: name }),
             this.getMediaURL('img/payroll_reserve.webp'));
           return true;
         },
@@ -432,24 +474,9 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
         roleName: (tier) => this.roleName(tier),
         portrait: (tier) => this.portrait(tier),
         slotText: (folk) => templateLangString('MOD_WF_CARD_SLOT', { slot: `${folk.slot + 1}` }),
-        helpLabel: () => getLangString('MOD_WF_HELP_BUTTON'),
+        helpLabel: (topic) => getLangString(`MOD_WF_HELP_LABEL_${topic}`),
         emptyText: () => getLangString(this.hasLicence('Newbie') ? 'MOD_WF_NO_WORKERS_DESC_LICENSED' : 'MOD_WF_NO_WORKERS_DESC'),
-        onOpenShop: () => {
-          // false, false: a page link must not toggle the game menu open on narrow screens (the plain changePage call does that below 992px).
-          const page = this.game.pages.getObjectByID('melvorD:Shop');
-          if (page === undefined) return;
-          changePage(page, -1, undefined, false, false);
-          // The Shop opens on its last tab (General Upgrades on a fresh character); show ours (build .83).
-          try {
-            const category = this.game.shop.categories.getObjectByID('worker_folks:WorkerFolks');
-            if (category !== undefined) shopMenu.showSingleTab(category);
-          } catch (err) { log('shop tab failed', err); }
-          // Below 992px a page link left the game menu open over the page (Voyage's lesson, build .83).
-          try {
-            const narrow = !window.matchMedia('(min-width: 992px)').matches;
-            if (narrow && document.getElementById('page-container')?.classList.contains('sidebar-o-xs')) One.layout('sidebar_close');
-          } catch (err) { log('menu close failed', err); }
-        },
+        onOpenShop: () => this.openShop(),
         status: (folk) => this.statusOf(folk),
         statusIcon: (status) => this.getMediaURL(`img/status_${status}.webp`),
         statusText: (status) => getLangString(`MOD_WF_STATUS_${status}`),
@@ -484,7 +511,16 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
           if (payroll === undefined) return null;
           if (!this.struck(folk)) {
             const d = this.debtText(folk);
-            return d === null ? null : { debtOnly: true, owedText: templateLangString('MOD_WF_DEBT_OWED', { amount: d.amount, minutes: d.minutes }) };
+            if (d === null) return null;
+            // Idle, the grace doesn't run: the debt waits for its next action (scan A-24, build .112).
+            const skill = this.skillOf(folk);
+            const working = skill !== undefined && this.delegated.has(skill);
+            // The amount on one line, what happens next on its own line under it (the user, build .112).
+            return {
+              debtOnly: true,
+              owedText: templateLangString('MOD_WF_DEBT_OWED', { amount: d.amount }),
+              noteText: working ? templateLangString('MOD_WF_DEBT_NOTE_WORKING', { minutes: d.minutes }) : getLangString('MOD_WF_DEBT_NOTE_IDLE'),
+            };
           }
           const fmt = (parts) => Object.entries(parts).map(([id, amount]) => `${numberWithCommas(amount)} ${this.game.currencies.getObjectByID(id)?.name ?? id}`).join(' + ');
           const plain = payroll.settlementOf(folk);
@@ -561,22 +597,33 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
         frozenSlots: () => this.health?.frozenSlotsView() ?? [],
         frozenTitle: () => getLangString('MOD_WF_SLOT_FROZEN_TITLE'),
         frozenReason: () => this.health?.freezeReason() ?? '',
-        cooldownText: (folk) => (folk.cooldownTicks > 0 ? templateLangString('MOD_WF_CARD_COOLDOWN', { time: formatAsShorthandTimePeriod(folk.cooldownTicks * TICK_INTERVAL, true) }) : ''),
+        cooldownText: (folk) => (folk.cooldownTicks > 0 ? templateLangString('MOD_WF_CARD_COOLDOWN', { time: this.cooldownLeft(folk) }) : ''),
       });
       layout?.dressCards();
       if (done) this.renderQueue.folks = false;
     }
 
     render() {
+      this.renderPageOpen();
       super.render();
       this.renderFolks();
       dashboard?.render();
     }
 
-    /** Cards show live skill state: refresh whenever this page opens. */
-    onPageChange() {
-      this.renderQueue.folks = true;
-      super.onPageChange(); // renders right away
+    /**
+     * The page-open work. changePage only calls page.action.onPageChange(), and a page with only `skills` has no
+     * action, so an onPageChange here never ran: it runs from the render loop instead (scan C-02, build .112).
+     */
+    renderPageOpen() {
+      const open = game.openPage?.id === 'worker_folks:Hiring';
+      // Cards show live skill state: refresh whenever this page opens.
+      if (open && !this.pageWasOpen) this.renderQueue.folks = true;
+      this.pageWasOpen = open;
+      if (!open) return;
+      // The game shows "Game Guide" under every skill page's title, but Hiring has no guide page, so the link did
+      // nothing. changePage shows it again on the next skill page.
+      const link = document.getElementById('game-guide-header-link');
+      if (link !== null && !link.classList.contains('d-none')) link.classList.add('d-none');
     }
 
     // Hiring is never an active action itself: no activeTick/passiveTick here,
@@ -814,29 +861,38 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
     promote(folk) {
       const plan = this.promotionPlanFor(folk);
       if (plan.nextTier === null) return;
-      const row = (met, text) => `<div class="${met ? 'text-success' : 'text-danger'} font-size-sm">${met ? '✓' : '✗'} ${text}</div>`;
+      // The requirements on a grey band; the fee after the GP icon in bold amber, red when you can't pay (scan C-22, build .112). Body size throughout.
+      const row = (met, text) => `<div class="${met ? 'text-success' : 'text-danger'}">${met ? '✓' : '✗'} ${text}</div>`;
       const diplomaText = plan.diploma === undefined ? '?' : `<img class="skill-icon-xs mr-1" src="${plan.diploma.media}" alt="">${plan.diploma.name}`;
+      const gpShort = plan.blockers.includes('gp');
+      const fee = `<img class="skill-icon-xs mr-1" src="${this.game.gp.media}" alt="GP"><span class="font-w600 ${gpShort ? 'text-danger' : 'text-warning'}">${numberWithCommas(plan.cost)}</span>`;
+      const feeRow = `<div><span class="${gpShort ? 'text-danger' : 'text-success'}">${gpShort ? '✗' : '✓'}</span> ${templateLangString('MOD_WF_PROMO_COST', { cost: fee, percent: `${Math.round((this.levels?.promotionCostRate() ?? promotion.PROMOTION_COST_RATE) * 100)}` })}</div>`;
       const html = `
         <div class="text-left">
+          <div class="wf-band">
           ${this.levels === undefined ? '' : row(!plan.blockers.includes('level'), templateLangString('MOD_WF_PROMO_LEVEL', { level: `${this.levels.promotionLevel}`, now: `${this.level}` }))}
           ${row(!plan.blockers.includes('licence'), templateLangString('MOD_WF_PROMO_LICENCE', { role: this.roleName(plan.nextTier) }))}
           ${row(!plan.blockers.includes('mastery'), templateLangString('MOD_WF_PROMO_MASTERY', { gate: `${plan.gate}`, level: `${this.masteryLevelOf(folk)}` }))}
           ${row(!plan.blockers.includes('diploma'), templateLangString('MOD_WF_PROMO_DIPLOMA', { item: diplomaText }))}
-          ${row(!plan.blockers.includes('gp'), templateLangString('MOD_WF_PROMO_COST', { cost: numberWithCommas(plan.cost), percent: `${Math.round((this.levels?.promotionCostRate() ?? promotion.PROMOTION_COST_RATE) * 100)}` }))}
-          ${plan.ok ? '' : `<div class="text-warning font-size-sm mt-2">${this.promotionNeedsText(folk, plan)}</div>`}
-          <div class="font-size-sm mt-2">${getLangString('MOD_WF_PROMO_KEEPS')}</div>
+          ${feeRow}
+          </div>
+          ${plan.ok ? '' : `<div class="text-warning mt-2">${this.promotionNeedsText(folk, plan)}</div>`}
+          <div class="mt-2">${getLangString('MOD_WF_PROMO_KEEPS')}</div>
         </div>`;
       SwalLocale.fire({
         didRender: popupDidRender,
-        title: templateLangString('MOD_WF_PROMO_TITLE', { name: folk.name, role: this.roleName(plan.nextTier) }),
+        // The Folk's name kept whole when it fits; the title wraps, never cut (build .109).
+        title: templateLangString('MOD_WF_PROMO_TITLE', { name: titleName(folk.name), role: this.roleName(plan.nextTier) }),
         html,
         imageUrl: this.portrait(plan.nextTier),
         imageWidth: 64,
         imageHeight: 64,
         imageAlt: folk.name,
         // Promote is an upgrade: the game's primary blue, not the green of agreeing (user, build .55).
-        customClass: swalClass({ confirmButton: 'btn btn-primary m-1' }),
+        customClass: swalClass({ popup: 'wf-ui wf-pic', confirmButton: 'btn btn-primary m-1' }),
         showCancelButton: true,
+        // Blocked: focus on Cancel, so a keyboard user lands in the dialog (scan C-32, build .112).
+        focusCancel: !plan.ok,
         confirmButtonText: getLangString('MOD_WF_BUTTON_PROMOTE'),
         // Disabled while a requirement is missing: the red rows and the amber line say which.
         didOpen: () => { if (!plan.ok) { const b = Swal.getConfirmButton(); if (b) b.disabled = true; } },
@@ -881,14 +937,14 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
     fire(folk) {
       SwalLocale.fire({
         didRender: popupDidRender,
-        title: templateLangString('MOD_WF_FIRE_TITLE', { name: folk.name }),
-        html: `<div class="text-warning">${getLangString('MOD_WF_FIRE_TEXT')}</div>`,
+        title: templateLangString('MOD_WF_FIRE_TITLE', { name: titleName(folk.name) }),
+        html: `<div class="text-center text-warning">${getLangString('MOD_WF_FIRE_TEXT')}</div>`,
         imageUrl: this.portrait(folk.tier),
         imageWidth: 64,
         imageHeight: 64,
         imageAlt: folk.name,
         // Firing loses the Folk for good: red confirm, blue-outline cancel; the portrait alone, no second icon.
-        customClass: swalClass({ confirmButton: 'btn btn-danger m-1' }),
+        customClass: swalClass({ popup: 'wf-ui wf-pic', confirmButton: 'btn btn-danger m-1' }),
         showCancelButton: true,
         confirmButtonText: getLangString('MOD_WF_BUTTON_FIRE'),
       }).then((result) => {
@@ -902,11 +958,18 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
     perkLines(folk) {
       const level = this.masteryLevelOf(folk);
       const lines = [];
-      lines.push({ met: true, text: templateLangString('MOD_WF_PERK_WAGE', { value: (this.wageRaise(folk) * 100).toFixed(0) }) });
-      // No cut yet read "−0.0%" (regression pass, build .83).
-      const relief = (this.wageDiscount(folk) * 100).toFixed(1);
-      lines.push({ met: true, text: relief === '0.0' ? getLangString('MOD_WF_PERK_RELIEF_NONE') : templateLangString('MOD_WF_PERK_RELIEF', { value: relief }) });
+      // With wages off (No sweat) the wage and strike lines say nothing true: left out (scan C-31, build .112).
+      const paid = this.payroll?.enabled !== false;
+      if (paid) {
+        // The wage is a fact, not a bonus: body ink; the cut green only once one applies (scan A-16).
+        lines.push({ tone: 'info', text: templateLangString('MOD_WF_PERK_WAGE', { value: (this.wageRaise(folk) * 100).toFixed(0) }) });
+        // No cut yet read "−0.0%" (regression pass, build .83).
+        const relief = (this.wageDiscount(folk) * 100).toFixed(1);
+        lines.push(relief === '0.0' ? { tone: 'info', text: getLangString('MOD_WF_PERK_RELIEF_NONE') } : { met: true, text: templateLangString('MOD_WF_PERK_RELIEF', { value: relief }) });
+      }
+      const wageOnly = new Set(['grace', 'cooldown60', 'cooldown90', 'trusted']);
       perks.LEVEL_MILESTONES.forEach(([at, key]) => {
+        if (!paid && wageOnly.has(key)) return;
         lines.push({ met: level >= at, text: `${at}: ${getLangString(`MOD_WF_PERK_${key}`)}` });
       });
       return lines;
@@ -918,7 +981,7 @@ export function createHiringClass({ popupDidRender, selectDelegable, log, create
      */
     tierEffects(tier) {
       const mods = produceRate.tierModifiers(tier, { preservationDisabled: !!this.game.currentGamemode.disablePreservation });
-      const pct = (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n)}%`;
+      const pct = (n) => `${n > 0 ? '+' : n < 0 ? '-' : ''}${Math.abs(n)}%`;
       const piece = (key, value, tone, extra = {}) => {
         const [before, after = ''] = templateLangString(key, { ...extra, value: '\u0001' }).split('\u0001');
         return { before, value, after, tone };

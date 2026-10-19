@@ -102,7 +102,10 @@ test('depositPlan says what goes in and why', () => {
   assert.deepEqual(depositPlan({ amount: '', bank: 100 }), { deposit: 0, outcome: 'empty' });
   assert.deepEqual(depositPlan({ amount: 0, bank: 100 }), { deposit: 0, outcome: 'empty' });
   assert.deepEqual(depositPlan({ amount: 50, bank: 100, room: 0 }), { deposit: 0, outcome: 'full' });
-  assert.deepEqual(depositPlan({ amount: 500, bank: 100 }), { deposit: 0, outcome: 'short' });
+  assert.deepEqual(depositPlan({ amount: 500, bank: 100 }), { deposit: 100, outcome: 'bank' });
+  assert.deepEqual(depositPlan({ amount: 500, bank: 100.6, room: 300 }), { deposit: 100, outcome: 'bank' });
+  assert.deepEqual(depositPlan({ amount: 500, bank: 400, room: 300 }), { deposit: 300, outcome: 'cut' });
+  assert.deepEqual(depositPlan({ amount: 500, bank: 0 }), { deposit: 0, outcome: 'nothing' });
   assert.deepEqual(depositPlan({ amount: 80, bank: 100, room: 30.7 }), { deposit: 30, outcome: 'cut' });
   assert.deepEqual(depositPlan({ amount: '80.9', bank: 100, room: Infinity }), { deposit: 80, outcome: 'ok' });
 });

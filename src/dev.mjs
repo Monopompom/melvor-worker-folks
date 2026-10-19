@@ -185,10 +185,11 @@ export function install({ hiring, log, tiers }) {
       return rows;
     },
     clear() {
-      // Like firing everyone: the slots' mastery goes back to 1 too (it stayed, regression pass, build .83).
-      const slots = hiring.crew.all.map((folk) => folk.slot);
+      // Fires everyone the way the Fire button does, so their skills are released and the slots' mastery goes back to 1
+      // (build .83). Emptying the crew alone left a delegated skill with no Folk: a tick error on its next action
+      // (live check, build .116). Then the reserve and frozen slots go too.
+      hiring.crew.all.slice().forEach((folk) => hiring.crew.fire(folk.id, { reason: 'dev' }));
       hiring.crew.clear();
-      slots.forEach((slot) => hiring.resetSlotMastery(slot));
     },
     /** The exact JSON that goes into the save. */
     dump() {

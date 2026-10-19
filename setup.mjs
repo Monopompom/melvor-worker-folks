@@ -5,13 +5,13 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-10-19.110';
+export const BUILD = '2026-10-19.118';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
  * the zip). Set to true while developing from the unpacked folder.
  */
-const DEV = false;
+const DEV = true;
 
 export async function setup(ctx) {
   const log = DEV ? (...args) => console.log('[Worker Folks]', ...args) : () => {};
@@ -22,7 +22,7 @@ export async function setup(ctx) {
   const lang = await ctx.loadModule('src/lang.mjs');
   const conflicts = await ctx.loadModule('src/conflicts.mjs');
   // Every popup we open runs this on render: skill names get their icon and bold.
-  const { didRender: popupDidRender } = await ctx.loadModule('src/skill-names.mjs');
+  const { didRender: popupDidRender, titleName } = await ctx.loadModule('src/skill-names.mjs');
 
   // 0. Incompatible mods (Multitasking): both change which skill the game treats as active.
   //    Checked now (mods loaded before us) and again once every mod is in (loaded after us).
@@ -39,8 +39,9 @@ export async function setup(ctx) {
         icon: 'warning',
         title: getLangString('MOD_WF_CONFLICT_TITLE'),
         didRender: popupDidRender,
-        // Several sentences: left-aligned (message popup layout); OK is green like every agree (build .75).
-        html: `<div class="text-left">${templateLangString('MOD_WF_CONFLICT_TEXT', { mod: conflict.title })}</div>`,
+        // Message popup layout: centred however many lines (build .109; left past two lines before), the
+        // mod's name bold each time; OK is green like every agree (build .75).
+        html: `<div class="text-center">${templateLangString('MOD_WF_CONFLICT_TEXT', { mod: conflict.title })}</div>`,
         customClass: (() => { const c = { popup: 'wf-ui', confirmButton: 'btn btn-success m-1' }; return typeof createSwalCustomClass === 'function' ? createSwalCustomClass(c) : c; })(),
       });
     });
@@ -63,6 +64,8 @@ export async function setup(ctx) {
   const { createCrew } = await ctx.loadModule('src/crew.mjs');
   const { renderFolkCards, effectsFragment } = await ctx.loadModule('src/cards.mjs');
   const { renderReservePanel } = await ctx.loadModule('src/reserve-panel.mjs');
+  // One way to write a time left (build .112, scan A-12 / C-26).
+  const time = await ctx.loadModule('src/time-format.mjs');
   const wages = await ctx.loadModule('src/wages.mjs');
   const perks = await ctx.loadModule('src/mastery-perks.mjs');
   const promotion = await ctx.loadModule('src/promotion.mjs');
@@ -113,7 +116,7 @@ export async function setup(ctx) {
 
   // 3. Register the skill class first, then the data package that references it.
   const { Hiring } = createHiringClass({
-    popupDidRender,
+    popupDidRender, titleName, time,
     selectDelegable, log, createCrew, createEventBus, folkModel, pickName, renderFolkCards, renderReservePanel, produceRate,
     rules: delegationRules,
     perks,
@@ -206,6 +209,7 @@ export async function setup(ctx) {
     rules: loadoutRules,
     consumptionRules,
     popupDidRender,
+    titleName,
     tips,
     log,
   });
@@ -245,6 +249,7 @@ export async function setup(ctx) {
   health.install(ctx, {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     rules: healthRules,
+    time,
     log,
   });
 
@@ -282,7 +287,7 @@ export async function setup(ctx) {
       log(`folkHired: ${folk.name} (${folk.tier}) in slot ${folk.slot + 1} via ${source}`);
       game.notifications.createSuccessNotification(
         'worker_folks:hired',
-        templateLangString('MOD_WF_HIRED_NOTIFICATION', { name: folk.name, role: hiring.roleName(folk.tier) }),
+        templateLangString('MOD_WF_HIRED_NOTIFICATION', { name: folk.name, aRole: getLangString(`MOD_WF_A_ROLE_${folk.tier}`) }),
         hiring.portrait(folk.tier),
       );
     });

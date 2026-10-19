@@ -29,7 +29,8 @@ export const WAGE_DISCOUNT_LEVEL = 100;
 export const PROMO_COST_LEVEL = 120;
 export const DEFAULT_XP_SHARE = 5;
 
-const RESERVE_STEPS = [[95, 720], [65, 168], [35, 72], [5, 24]];
+/** Reserve capacity steps, [Hiring level, hours]; the Tips popup draws them as a table (build .112). */
+export const RESERVE_STEPS = [[95, 720], [65, 168], [35, 72], [5, 24]];
 
 /** Milestones the current cap can ever show (99 without Throne of the Herald). */
 export function visibleMilestones(maxLevelCap) {

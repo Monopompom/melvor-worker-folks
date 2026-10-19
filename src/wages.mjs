@@ -123,14 +123,17 @@ export function tickCooldown(cooldownTicks, ticks) {
 
 /**
  * A Payroll Reserve deposit (build .55): what actually goes in and why, so the panel can say so instead of failing
- * silently. `room` is Infinity without a level cap. outcome: 'empty' (no amount), 'full' (no room), 'short' (the bank
- * can't cover the amount), 'cut' (more than the room: the room goes in), 'ok'.
+ * silently. `room` is Infinity without a level cap. outcome: 'empty' (no amount), 'full' (no room), 'nothing' (the bank
+ * is empty), 'cut' (more than the room: the room goes in), 'bank' (more than the bank: all of it goes in), 'ok'.
  */
 export function depositPlan({ amount, bank, room = Infinity }) {
   const want = Math.floor(Number(amount));
   if (!(want > 0)) return { deposit: 0, outcome: 'empty' };
   if (!(room > 0)) return { deposit: 0, outcome: 'full' };
-  if (want > bank) return { deposit: 0, outcome: 'short' };
-  if (want > room) return { deposit: Math.floor(room), outcome: 'cut' };
+  // More than the bank holds: what the bank has goes in, as the room case does (scan A-25, build .112).
+  const most = Math.floor(Math.min(bank, room));
+  if (want > bank && !(most > 0)) return { deposit: 0, outcome: 'nothing' };
+  if (want > room && room <= bank) return { deposit: Math.floor(room), outcome: 'cut' };
+  if (want > bank) return { deposit: most, outcome: 'bank' };
   return { deposit: want, outcome: 'ok' };
 }

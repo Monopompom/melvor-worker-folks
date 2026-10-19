@@ -20,6 +20,8 @@ export function renderFolkCards(folks, view) {
   const template = document.getElementById(CARD_TEMPLATE_ID);
   if (list === null || template === null) return false;
   const empty = document.getElementById(EMPTY_ID);
+  // While nobody is hired the grid (with the empty card) goes above the Overview (scan A-23, build .112).
+  list.classList.toggle('wf-crew-empty', folks.length === 0);
   if (empty !== null) {
     empty.classList.toggle('d-none', folks.length > 0);
     // What to buy next depends on the licence (build .55); the button opens the Shop.
@@ -51,16 +53,18 @@ export function renderFolkCards(folks, view) {
 
   const frozenTemplate = document.getElementById(FROZEN_TEMPLATE_ID);
   if (frozenTemplate !== null && typeof view.frozenSlots === 'function') {
+    // Written only when changed: the countdown redraws every second (scan C-36, build .112).
     view.frozenSlots().forEach((f) => {
       const col = take(`frozen-${f.slot}`, frozenTemplate);
       const portrait = col.querySelector('[data-wf="portrait"]');
-      if (portrait !== null) portrait.src = view.portrait('Newbie');
+      if (portrait !== null && portrait.getAttribute('src') !== view.portrait('Newbie')) portrait.src = view.portrait('Newbie');
       const title = col.querySelector('[data-wf="title-text"]');
-      if (title !== null) title.textContent = view.frozenTitle();
+      if (title !== null && title.textContent !== view.frozenTitle()) title.textContent = view.frozenTitle();
       const help = col.querySelector('[data-wf-help]');
-      if (help !== null) help.setAttribute('aria-label', view.helpLabel?.() ?? '?');
+      const label = view.helpLabel?.('frozen') ?? '?';
+      if (help !== null && help.getAttribute('aria-label') !== label) help.setAttribute('aria-label', label);
       const text = col.querySelector('[data-wf="text"]');
-      if (text !== null) text.textContent = f.text;
+      if (text !== null && text.textContent !== f.text) text.textContent = f.text;
     });
   }
 
@@ -136,8 +140,17 @@ function fillCard(col, folk, view) {
     if (el !== null) fn(el);
   };
   const setText = (el, text) => { if (el.textContent !== text) el.textContent = text; };
-  set('portrait', (el) => { if (el.getAttribute('src') !== view.portrait(folk.tier)) el.src = view.portrait(folk.tier); el.alt = folk.name; });
-  set('name', (el) => setText(el, folk.name));
+  // Attributes too are written only when they change (scan C-36: unchanged values were rewritten every second).
+  const setAttr = (el, name, value) => { if (el.getAttribute(name) !== value) el.setAttribute(name, value); };
+  set('portrait', (el) => { if (el.getAttribute('src') !== view.portrait(folk.tier)) el.src = view.portrait(folk.tier); setAttr(el, 'alt', folk.name); });
+  set('name', (el) => {
+    setText(el, folk.name);
+    // The card is a labelled group, so a screen reader's button list says whose Fire it is (scan C-33).
+    const id = `wf-folk-name-${String(folk.id).replace(/[^A-Za-z0-9_-]/g, '_')}`;
+    setAttr(el, 'id', id);
+    const card = col.querySelector('.wf-card');
+    if (card !== null) setAttr(card, 'aria-labelledby', id);
+  });
   set('role', (el) => setText(el, view.roleName(folk.tier)));
   set('slot', (el) => setText(el, view.slotText(folk)));
   set('rate', (el) => setText(el, view.rateText(folk)));
@@ -209,9 +222,18 @@ function fillCard(col, folk, view) {
     el.updateValues(view.masteryProgress(folk));
   });
   const expanded = view.isExpanded(folk);
+  // ▸ closed, ▾ open, before the word, as the gear bonuses and the game's folds (scan A-32); the glyph
+  // is hidden from screen readers, aria-expanded says it (C-33).
   set('expand', (el) => {
-    setText(el, `${view.detailsText()} ${expanded ? '▴' : '▾'}`);
-    el.setAttribute('aria-expanded', `${expanded}`);
+    const key = `${expanded}|${view.detailsText()}`;
+    if (el.dataset.wfKey !== key) {
+      el.dataset.wfKey = key;
+      const glyph = document.createElement('span');
+      glyph.setAttribute('aria-hidden', 'true');
+      glyph.textContent = expanded ? '▾ ' : '▸ ';
+      el.replaceChildren(glyph, document.createTextNode(view.detailsText()));
+    }
+    setAttr(el, 'aria-expanded', `${expanded}`);
     el.onclick = () => view.onToggleExpand(folk);
   });
   set('gear', (el) => {
@@ -251,7 +273,8 @@ function fillCard(col, folk, view) {
           li = document.createElement('li');
           perks.append(li);
         }
-        const className = line.met ? 'text-success' : 'wf-subtle';
+        // 'info' lines (the wage, a cut that is none yet) in body ink; green only for what applies (scan A-16).
+        const className = line.tone === 'info' ? '' : line.met ? 'text-success' : 'wf-subtle';
         if (li.className !== className) li.className = className;
         setText(li, line.text);
       });
@@ -263,7 +286,7 @@ function fillCard(col, folk, view) {
       const className = `btn btn-sm ${ot.on ? 'btn-warning' : 'btn-outline-warning'} mr-2`;
       if (otButton.className !== className) otButton.className = className;
       otButton.classList.toggle('d-none', !ot.unlocked);
-      otButton.setAttribute('aria-pressed', `${ot.on}`);
+      setAttr(otButton, 'aria-pressed', `${ot.on}`);
       otButton.onclick = () => view.onToggleOvertime(folk);
     }
   });
@@ -284,11 +307,14 @@ function fillCard(col, folk, view) {
       const cls = `d-block font-w600 ${debtOnly ? 'text-warning' : 'text-danger'}`;
       if (owed.className !== cls) owed.className = cls;
     }
+    // The second line: the severance on a strike, what happens next on a debt (amber like the debt).
     const sev = el.querySelector('[data-wf="strike-severance"]');
     if (sev !== null) {
-      const text = debtOnly ? '' : (info.severanceText ?? '');
+      const text = (debtOnly ? info.noteText : info.severanceText) ?? '';
       setText(sev, text);
       sev.classList.toggle('d-none', text === '');
+      sev.classList.toggle('text-danger', !debtOnly);
+      sev.classList.toggle('text-warning', debtOnly);
     }
     const settle = el.querySelector('[data-wf="settle"]');
     if (settle !== null) {

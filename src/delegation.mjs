@@ -77,9 +77,11 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
         return false;
       case 'unavailable': {
         const folk = folkFor(skillFor(action));
+        // The refusal says how to fix it, per status (scan B-14, build .112).
+        const status = folk === undefined ? 'strike' : hiring.statusOf(folk);
         this.notifications.createErrorNotification(
           'worker_folks:unavailable',
-          templateLangString('MOD_WF_FOLK_UNAVAILABLE', { name: folk?.name ?? '?', status: getLangString(`MOD_WF_STATUS_${hiring.statusOf(folk)}`) }),
+          templateLangString(`MOD_WF_FOLK_UNAVAILABLE_${status === 'cooldown' ? 'cooldown' : 'strike'}`, { name: folk?.name ?? '?', time: folk === undefined ? '' : hiring.cooldownLeft(folk) }),
         );
         return true;
       }

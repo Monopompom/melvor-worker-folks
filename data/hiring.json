@@ -167,7 +167,7 @@
             {
               "level": 30,
               "descriptionID": 3,
-              "description": "Overtime: −20% action interval for double wages (toggle on the card)."
+              "description": "Overtime: -20% action interval for double wages (toggle on the card)."
             },
             {
               "level": 40,
@@ -177,7 +177,7 @@
             {
               "level": 60,
               "descriptionID": 5,
-              "description": "Journeyman may be promoted to Master. Strike cooldown −25%."
+              "description": "Journeyman may be promoted to Master. Strike cooldown -25%."
             },
             {
               "level": 75,
@@ -192,12 +192,12 @@
             {
               "level": 90,
               "descriptionID": 8,
-              "description": "Strike cooldown −50% in total."
+              "description": "Strike cooldown -50% in total."
             },
             {
               "level": 99,
               "descriptionID": 9,
-              "description": "Wages −50% in total. Trusted: strikes cost owed wages only, no severance."
+              "description": "Wages -50% in total. Trusted: strikes cost owed wages only, no severance."
             }
           ]
         }
