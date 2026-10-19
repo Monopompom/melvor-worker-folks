@@ -115,10 +115,11 @@ body:not(.darkMode) .wf-ui .text-info { color: var(--wf-cooldown) !important; }
 /* Worker modal: fixed-width tiles in a wrapping row, so the popup hugs one or two tiles and caps at three
    per row (max width as before). One column on phones. */
 .wf-worker-popup { width: auto !important; max-width: 96vw !important; }
-/* Fixed 19.5rem columns, as many as fit (3 / 2 / 1) and never more than there are tiles; the popup's auto width
+/* Fixed 19.5rem columns, as many as fit (3 / 2 / 1) and never more than there are tiles; the steps are the game's widths
+   (1200 and 768; build .110 moved the two-column step from 1100); the popup's auto width
    then hugs the grid, so it is centred with no empty column (build .52). */
 .wf-worker-grid { display: grid; grid-template-columns: repeat(var(--wf-cols3, 3), 19.5rem); gap: 8px; justify-content: center; text-align: left; }
-@media (max-width: 1099.98px) { .wf-worker-grid { grid-template-columns: repeat(var(--wf-cols2, 2), 19.5rem); } }
+@media (max-width: 1199.98px) { .wf-worker-grid { grid-template-columns: repeat(var(--wf-cols2, 2), 19.5rem); } }
 @media (max-width: 767.98px) { .wf-worker-popup { width: 96vw !important; } .wf-worker-grid { grid-template-columns: 1fr; } }
 .wf-worker-tile { display: flex; align-items: flex-start; gap: 8px; padding: 8px; border: 1px solid var(--wf-line); border-radius: 6px; background: var(--wf-tile); color: inherit; text-align: left; font-size: 1rem; }
 @media (hover: hover) { .wf-worker-tile:hover:not(:disabled) { border-color: #329389; background: rgba(50,147,137,0.12); } }
