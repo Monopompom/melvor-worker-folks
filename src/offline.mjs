@@ -59,11 +59,15 @@ export function install(ctx, { getHiring, log }) {
     // under it.
     const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     /** The language line as HTML, the marked values in their colour. */
-    const fill = (key, vars, marks = {}, media) => templateLangString(key, Object.fromEntries(Object.entries(vars)
-      .map(([k, v]) => [k, k === 'skill' && media ? icon(media, v) : marks[k] ? `<span class="${marks[k]}">${esc(v)}</span>` : esc(v)])));
+    const fill = (key, vars, marks = {}, media) => {
+      // In brackets, "(Woodcutting)": the icon's 4 px margin after "(" is matched before ")" (the user, 20 Oct 2026).
+      const boxed = getLangString(key).includes('(${skill})');
+      return templateLangString(key, Object.fromEntries(Object.entries(vars)
+        .map(([k, v]) => [k, k === 'skill' && media ? icon(media, v, boxed) : marks[k] ? `<span class="${marks[k]}">${esc(v)}</span>` : esc(v)])));
+    };
     /** The skill's name with its icon in front: icon, a plain space, the name, as the game writes "8 [icon] Normal Logs"
      *  (no margin class), kept together on one line. */
-    const icon = (media, name) => `<span class="text-nowrap"><img class="skill-icon-xs" src="${media}" alt=""> ${esc(name)}</span>`;
+    const icon = (media, name, boxed = false) => `<span class="text-nowrap${boxed ? ' pr-1' : ''}"><img class="skill-icon-xs" src="${media}" alt=""> ${esc(name)}</span>`;
     const lines = [];
     const describe = (skillId) => {
       const folk = hiring.crew.bySkill(skillId);
