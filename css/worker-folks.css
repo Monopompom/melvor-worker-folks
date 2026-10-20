@@ -126,7 +126,7 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 .wf-help-body .wf-help-p { margin: 0; }
 .wf-help-body .wf-help-p + .wf-help-p { margin-top: 6px; }
 /* Numbers in a small table, not in a sentence (TIP_12, build .112). */
-.wf-help-table { margin: 8px 0 0; border-collapse: collapse; }
+.wf-help-table { margin: 8px auto 0; border-collapse: collapse; } /* centred under the centred lines; its cells keep their columns */
 .wf-help-table th, .wf-help-table td { padding: 3px 16px 3px 0; text-align: left; }
 .wf-help-table th { color: var(--wf-head); font-weight: 600; }
 .wf-help-table tr + tr td { border-top: 1px solid var(--wf-row-line); }

@@ -470,11 +470,12 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
           : [{ head: getLangString('MOD_WF_SLOT_FROZEN_HEAD'), body: (this.health?.freezeReason() ?? '').split(/(?<=[.!?])\s+/) }]; // one sentence a line
         const html = sections.map((sec) => `<div class="wf-band">${sec.head ? `<div class="wf-help-head">${sec.head}</div>` : ''}`
           + `${sec.body.filter(Boolean).map((l) => `<p class="wf-help-p">${l}</p>`).join('')}</div>`).join('');
+        // Centred, as every popup (the user, 20 Oct 2026, of the frozen slot's: "this should be at least centered").
         SwalLocale.fire({
           didRender: popupDidRender,
           title: getLangString(topic === 'reserve' ? 'MOD_WF_RESERVE_TITLE' : 'MOD_WF_SLOT_FROZEN_TITLE'),
           width: '38rem', // a little wider than the game's 32em default
-          html: `<div class="text-left wf-help-body">${html}</div>`,
+          html: `<div class="text-center wf-help-body">${html}</div>`,
           confirmButtonText: getLangString('MOD_WF_BUTTON_GOT_IT'),
           customClass: swalClass(),
         });

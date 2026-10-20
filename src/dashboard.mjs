@@ -84,7 +84,7 @@ export function install(ctx, { getHiring, model, milestones, tips, popupDidRende
 
   /** The tips, one band each, in the shared help-popup layout; "Your first Folk" first while nobody is hired. */
   const openTips = () => {
-    const body = el('div', 'text-left wf-help-body');
+    const body = el('div', 'text-center wf-help-body'); // centred, as every popup (the user, 20 Oct 2026)
     const band = (head, ...parts) => {
       const b = el('div', 'wf-band');
       b.append(el('div', 'wf-help-head', head), ...parts);

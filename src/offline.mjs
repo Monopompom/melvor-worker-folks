@@ -82,6 +82,9 @@ export function install(ctx, { getHiring, log }) {
     const explained = new Set([...tracker.struck.map((t) => t.skillId), ...tracker.died.map((t) => t.skillId)]);
     tracker.released.forEach((skillId) => {
       if (explained.has(skillId)) return;
+      // Delegated again by now: the skill went from one Folk to another (Voyage's walker taking it over), not stopped.
+      const skill = this.skills.getObjectByID(skillId);
+      if (skill !== undefined && hiring.isDelegated(skill)) return;
       const d = describe(skillId);
       lines.push({ media: d.media, html: fill('MOD_WF_OFFLINE_STOPPED', { name: d.name, skill: d.skill, why: getLangString('MOD_WF_OFFLINE_STOPPED_WHY') }, { why: 'text-danger' }, d.media), fix: getLangString('MOD_WF_OFFLINE_STOPPED_FIX') });
     });
