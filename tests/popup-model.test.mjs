@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { FOLK_GAIN_TYPES, dropPopup } from '../src/popup-rules.mjs';
+import { FOLK_GAIN_TYPES, dropPopup } from '../src/popup-model.mjs';
 
 test('gain popups from a Folk turn are dropped only with the setting on', () => {
   for (const type of FOLK_GAIN_TYPES) {

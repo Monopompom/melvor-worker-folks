@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   clampPreservation, tabletPreservation, slotKind, consumeOne, firstThisAction,
   folkEvaluatesCondition, chargeChangeInvalidates,
-} from '../src/consumption-rules.mjs';
+} from '../src/consumption-model.mjs';
 
 test('preservation is clamped to the engine range', () => {
   assert.equal(clampPreservation(-5), 0);

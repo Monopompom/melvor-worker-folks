@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decideStart, rebuildDelegated, workerOptions, moveMode, releaseMode } from '../src/delegation-rules.mjs';
+import { decideStart, rebuildDelegated, workerOptions, moveMode, releaseMode } from '../src/delegation-model.mjs';
 
 test('decideStart: Folk-held skills delegate while a Shift Slot is free', () => {
   assert.equal(decideStart({ hasFolk: false, isDelegated: false, delegatedCount: 0, shiftSlots: 1 }), 'main');

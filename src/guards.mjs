@@ -2,7 +2,7 @@
 // reason on its own buttons. Without a guard every path is as before. Pure: no game globals.
 
 /**
- * staff: { action: 'hire' | 'promote' | 'fire' | 'settle', folk?, tier? }
+ * staff: { action: 'hire' | 'promote' | 'fire' | 'settle' | 'assign', folk?, skillId?, skill? }  (assign: picked for a skill)
  * work:  { folk, skillId, skill }  (may this Folk work this skill where it stands)
  * gear:  { folk }                  (may the player change this Folk's gear now)
  */

@@ -187,6 +187,11 @@ function fillCard(col, folk, view) {
     const cooldown = view.cooldownText(folk);
     setText(el, cooldown !== '' ? cooldown : view.detailText(folk));
   });
+  set('where', (el) => {
+    const text = view.whereText?.(folk) ?? '';
+    setText(el, text);
+    el.classList.toggle('d-none', text === '');
+  });
   // Health is always shown, so cards in a row keep one height (user, build .55). Food matters on Thieving only:
   // muted elsewhere, amber when low, red with an amber card border when there is none.
   let foodAlert = false;

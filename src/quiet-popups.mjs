@@ -1,6 +1,6 @@
 // "Hide Folks' gain popups" (build .96): while the setting is on, the XP, item, currency, mastery and preservation
 // popups that come from a Folk's turn are not queued; the player's own actions show theirs as before. Game-facing;
-// the rule is in popup-rules.mjs, passed in from setup.mjs.
+// the rule is in popup-model.mjs, passed in from setup.mjs.
 //
 // A Folk's turn: delegation.mjs sets `hiring.folkTurn` while it ticks the delegated skills (actions, wages, Hiring XP,
 // mastery), and `hiring.acting` covers a Folk's action wherever it runs.

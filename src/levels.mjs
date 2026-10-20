@@ -41,7 +41,7 @@ export function install(ctx, { getHiring, rules, log }) {
   };
 
   const mediaFor = (m) => {
-    if (m.icon === 'reserve') return hiring.getMediaURL('img/payroll_reserve.webp');
+    if (m.icon === 'reserve') return hiring.getMediaURL('assets/payroll_reserve.webp');
     if (m.icon === 'hiring') return hiring.media;
     return hiring.portrait(m.icon);
   };

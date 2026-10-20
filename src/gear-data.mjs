@@ -61,7 +61,7 @@ export function superiorSkillcapePackage({ hasSuperiorCapeOfCompletion = true } 
     name: 'Superior Hiring Skillcape',
     category: 'Combat',
     type: 'Armour',
-    media: 'img/skillcape_superior.webp',
+    media: 'assets/skillcape_superior.webp',
     ignoreCompletion: false,
     obtainFromItemLog: false,
     golbinRaidExclusive: false,
@@ -75,7 +75,7 @@ export function superiorSkillcapePackage({ hasSuperiorCapeOfCompletion = true } 
   };
   const purchase = {
     id: SUPERIOR_SKILLCAPE_ID,
-    media: 'img/skillcape_superior.webp',
+    media: 'assets/skillcape_superior.webp',
     category: 'melvorTotH:SuperiorSkillcapes',
     contains: { items: [{ id: `worker_folks:${SUPERIOR_SKILLCAPE_ID}`, quantity: 1 }] },
     cost: { items: [], currencies: GP(10000000) },
@@ -109,7 +109,7 @@ export function lesserRelicPackage() {
       name: 'Hiring Lesser Relic',
       category: 'Combat',
       type: 'Consumable',
-      media: 'img/lesser_relic.webp',
+      media: 'assets/lesser_relic.webp',
       tier: 'none',
       ignoreCompletion: true,
       obtainFromItemLog: false,

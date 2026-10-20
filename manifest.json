@@ -3,5 +3,5 @@
   "version": "1.2.0",
   "namespace": "worker_folks",
   "setup": "setup.mjs",
-  "icon": "img/icon.svg"
+  "icon": "assets/icon.svg"
 }

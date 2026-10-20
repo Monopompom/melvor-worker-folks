@@ -23,7 +23,7 @@ test('Overseers Outfit: four pieces in the game\'s format, +2% Hiring XP each, s
     assert.deepEqual(item.modifiers, { skillXP: [{ skillID: HIRING_ID, value: OUTFIT_XP_PER_PIECE }] });
     assert.equal(item.itemType, 'Equipment');
     assert.deepEqual(item.equipRequirements, []);
-    assert.match(item.media, /^img\/town_\w+\.webp$/);
+    assert.match(item.media, /^assets\/town_\w+\.webp$/);
   }
   assert.equal(new Set(Object.values(OUTFIT)).size, 4);
   assert.deepEqual(Object.values(OUTFIT), ['Helmet', 'Platebody', 'Platelegs', 'Boots']);

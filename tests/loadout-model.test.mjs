@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { slotsForTier, isSkillingItem, helpsSkill, normalizeLoadout, reconcileLoadout, equipQuantity, isFolkGear, gearSummary } from '../src/loadout-rules.mjs';
+import { slotsForTier, isSkillingItem, helpsSkill, normalizeLoadout, reconcileLoadout, equipQuantity, isFolkGear, gearSummary } from '../src/loadout-model.mjs';
 
 test('slots open cumulatively by tier; expansion slots need the expansion', () => {
   assert.deepEqual(slotsForTier('Newbie'), ['melvorD:Cape', 'melvorD:Gloves']);
@@ -76,7 +76,7 @@ test('gearSummary counts filled of open slots and flags charge items at zero', (
 });
 
 test('slotLayout: every slot with the tier that opens it; expansion slots only when present', async () => {
-  const { slotLayout } = await import('../src/loadout-rules.mjs');
+  const { slotLayout } = await import('../src/loadout-model.mjs');
   const junior = slotLayout('Junior');
   assert.deepEqual(junior.filter((s) => s.open).map((s) => s.id), slotsForTier('Junior'));
   assert.equal(junior.find((s) => s.id === 'melvorD:Ring').opensAt, 'Middle');

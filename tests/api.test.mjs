@@ -89,3 +89,21 @@ test('folkView copies the place and leaves the record alone', () => {
   assert.deepEqual(v.place, { q: 2, r: 3 });
   assert.equal(v.status, 'working');
 });
+
+test('api v2: workerOf asks the skill who would act; registerLocationText sets and clears the line', () => {
+  const { hiring, refreshed } = makeHiring();
+  const folk = hiring.crew.hire('Junior');
+  const mining = { id: 'melvorD:Mining' };
+  hiring.game = { skills: { getObjectByID: (id) => (id === mining.id ? mining : undefined) } };
+  hiring.actorFor = (skill) => (skill === mining ? folk : undefined);
+  const api = createApi({ getHiring: () => hiring, model });
+  assert.equal(api.version, 2);
+  assert.equal(api.workerOf('melvorD:Mining').id, folk.id);
+  assert.equal(api.workerOf('melvorD:Fishing'), undefined);
+  const fn = (v) => `At ${v.name}'s hex`;
+  const off = api.registerLocationText(fn);
+  assert.equal(hiring.locationText, fn);
+  off();
+  assert.equal(hiring.locationText, undefined);
+  assert.equal(refreshed(), 2);
+});

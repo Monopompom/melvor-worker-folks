@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-10-20.119';
+export const BUILD = '2026-10-20.121';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -71,7 +71,7 @@ export async function setup(ctx) {
   const wages = await ctx.loadModule('src/wages.mjs');
   const perks = await ctx.loadModule('src/mastery-perks.mjs');
   const promotion = await ctx.loadModule('src/promotion.mjs');
-  const loadoutRules = await ctx.loadModule('src/loadout-rules.mjs');
+  const loadoutRules = await ctx.loadModule('src/loadout-model.mjs');
   const loadout = await ctx.loadModule('src/loadout.mjs');
   // Every tooltip in the mod goes through one module (build .91, the user: the same look as Voyage's).
   const tips = (await ctx.loadModule('src/tips.mjs')).install(ctx, { log });
@@ -85,13 +85,13 @@ export async function setup(ctx) {
     popupDidRender,
     log,
   });
-  const consumptionRules = await ctx.loadModule('src/consumption-rules.mjs');
+  const consumptionRules = await ctx.loadModule('src/consumption-model.mjs');
   const consumption = await ctx.loadModule('src/consumption.mjs');
   const milestones = await ctx.loadModule('src/milestones.mjs');
   const levels = await ctx.loadModule('src/levels.mjs');
   const quietPopups = await ctx.loadModule('src/quiet-popups.mjs');
-  const popupRules = await ctx.loadModule('src/popup-rules.mjs');
-  const healthRules = await ctx.loadModule('src/health-rules.mjs');
+  const popupRules = await ctx.loadModule('src/popup-model.mjs');
+  const healthRules = await ctx.loadModule('src/health-model.mjs');
   const health = await ctx.loadModule('src/health.mjs');
   const resume = await ctx.loadModule('src/resume.mjs');
   const payroll = await ctx.loadModule('src/payroll.mjs');
@@ -99,7 +99,7 @@ export async function setup(ctx) {
   const pricing = await ctx.loadModule('src/pricing.mjs');
   const shop = await ctx.loadModule('src/shop.mjs');
   const hiringModule = await ctx.loadModule('src/hiring-skill.mjs');
-  const delegationRules = await ctx.loadModule('src/delegation-rules.mjs');
+  const delegationRules = await ctx.loadModule('src/delegation-model.mjs');
   const skillControl = await ctx.loadModule('src/skill-control.mjs');
   const delegation = await ctx.loadModule('src/delegation.mjs');
   const offline = await ctx.loadModule('src/offline.mjs');
@@ -107,7 +107,7 @@ export async function setup(ctx) {
   const acting = await ctx.loadModule('src/acting.mjs');
   const shopData = await ctx.loadModule('src/shop-data.mjs');
   const gearData = await ctx.loadModule('src/gear-data.mjs');
-  const discoveryRules = await ctx.loadModule('src/discovery-rules.mjs');
+  const discoveryRules = await ctx.loadModule('src/discovery-model.mjs');
   const discoveries = await ctx.loadModule('src/discoveries.mjs');
 
   // 1. Language strings were installed in step 0 (needed before any skill/page name is read).

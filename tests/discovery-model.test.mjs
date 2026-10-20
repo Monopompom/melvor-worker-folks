@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { petRollIntervalMs, petChancePerHour, relicRollLevel, PET_ROLL_FACTOR } from '../src/discovery-rules.mjs';
+import { petRollIntervalMs, petChancePerHour, relicRollLevel, PET_ROLL_FACTOR } from '../src/discovery-model.mjs';
 
 test('the crew shares one pet roll: interval halved and split across working Folks', () => {
   assert.equal(PET_ROLL_FACTOR, 0.5);

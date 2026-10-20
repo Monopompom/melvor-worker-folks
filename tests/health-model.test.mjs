@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   maxHpFor, currentHp, damageRoll, applyDamage, shouldEat, foodHeal, eatPlan, regenAmount,
   freezeUntil, freezeRemaining, activeFreezes, FREEZE_MS, foodLineState, FOOD_LOW,
-} from '../src/health-rules.mjs';
+} from '../src/health-model.mjs';
 
 test('max HP rises with tier; saved null hp means full', () => {
   assert.equal(maxHpFor('Newbie'), 300);

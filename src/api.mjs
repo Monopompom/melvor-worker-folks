@@ -3,7 +3,7 @@
 // Pure: the Hiring skill and the Folk model are injected (mod modules cannot import their siblings).
 
 /** Bumped when something here changes in a way a caller must know about. Voyage refuses an older one. */
-export const API_VERSION = 1;
+export const API_VERSION = 2;
 
 const placeCopy = (place) => (place === null || place === undefined ? null : Object.freeze({ q: place.q, r: place.r }));
 
@@ -83,6 +83,19 @@ export function createApi({ getHiring, model, version = API_VERSION }) {
       const off = hiring().guards.register(kind, fn);
       hiring().refreshGuarded();
       return () => { off(); hiring().refreshGuarded(); };
+    },
+    /** The Folk a start of this skill goes to now (it runs it, or would be given it), or undefined: the player (v2). */
+    workerOf: (skillId) => {
+      const skill = hiring().game?.skills?.getObjectByID(skillId);
+      const folk = skill === undefined ? undefined : hiring().actorFor(skill);
+      return folk === undefined ? undefined : view(folk);
+    },
+    /** fn(folkView) returns the card's and the Worker box's line for where the Folk is ('' for none) (v2). */
+    registerLocationText: (fn) => {
+      if (typeof fn !== 'function') throw new Error('location text must be a function');
+      hiring().locationText = fn;
+      hiring().refreshGuarded();
+      return () => { if (hiring().locationText === fn) hiring().locationText = undefined; hiring().refreshGuarded(); };
     },
     /** Asks for the guarded buttons and the Shop's lines to be drawn again (call after the player moves). */
     refresh: () => hiring().refreshGuarded(),

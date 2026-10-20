@@ -39,7 +39,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
     constructor(namespace, game) {
       super(namespace, 'Hiring', game, 'FolkSlot');
       // The gold-ringed icon, as Voyage's in the sidebar (the user, build .90).
-      this._media = 'img/icon.webp';
+      this._media = 'assets/icon.webp';
       this.renderQueue = new MasterySkillRenderQueue();
       /** Active actions a Folk may hold, computed on character load. */
       this.delegableSkills = [];
@@ -123,7 +123,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
     }
 
     portrait(tier) {
-      return this.getMediaURL(`img/worker_folk_${tier.toLowerCase()}.webp`);
+      return this.getMediaURL(`assets/worker_folk_${tier.toLowerCase()}.webp`);
     }
 
     /**
@@ -158,6 +158,41 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       if (this.guards.count(kind) === 0) return '';
       const { folk } = request;
       return this.guards.check(kind, folk === undefined ? request : { ...request, folk: folkView(folk, this.statusOf(folk)) })?.reason ?? '';
+    }
+
+    /**
+     * Why this Folk can't be picked in this skill's Worker box ('' = it can): its own hex for the Folk already on the
+     * skill, and for any other the move (Voyage 6b: assigning puts the Folk on your hex, within 1 hex of it).
+     */
+    pickRefusal(folk, skill) {
+      if (folk === undefined || skill === undefined) return '';
+      return folk.skillId === skill.id ? this.workRefusal(folk, skill) : this.refusal('staff', { action: 'assign', folk, skillId: skill.id, skill });
+    }
+
+    /**
+     * The Folk a start of this skill goes to right now (it runs the skill, or the next start is delegated to it), or
+     * undefined when the player would do it. Another mod reads this to judge the start where that Folk stands.
+     */
+    actorFor(skill) {
+      if (skill === undefined) return undefined;
+      if (this.delegated.has(skill)) return this.crew.bySkill(skill.id);
+      const pending = this.pendingFor(skill);
+      const folk = pending === null ? undefined : pending ?? this.crew.bySkill(skill.id);
+      if (folk === undefined) return undefined;
+      const way = rules.decideStart({ hasFolk: true, folkAvailable: this.folkAvailable(folk), isDelegated: false, delegatedCount: this.delegated.size, shiftSlots: this.shiftSlots });
+      return way === 'delegate' ? folk : undefined;
+    }
+
+    /** The line another mod gives for where a Folk is ('' without one): the card and the Worker box show it. */
+    whereText(folk) {
+      if (typeof this.locationText !== 'function') return '';
+      try {
+        const text = this.locationText(folkView(folk, this.statusOf(folk)));
+        return typeof text === 'string' ? text : '';
+      } catch (err) {
+        console.error('[Worker Folks] location text failed', err);
+        return '';
+      }
     }
 
     /** Whether this Folk may work this skill where it stands ('' = yes). */
@@ -291,12 +326,14 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       const status = this.statusOf(folk);
       const skill = this.skillOf(folk);
       const cls = `wf-text-${status} font-w700`;
-      lines.push({ icon: this.getMediaURL(`img/status_${status}.webp`), text: getLangString(`MOD_WF_STATUS_${status}`), cls });
+      lines.push({ icon: this.getMediaURL(`assets/status_${status}.webp`), text: getLangString(`MOD_WF_STATUS_${status}`), cls });
       // A Folk that can't be picked says how to get it back (build .55).
       if (status === 'strike') lines.push({ text: getLangString('MOD_WF_TILE_FIX_strike'), cls: 'text-warning' });
       if (status === 'cooldown') lines.push({ text: templateLangString('MOD_WF_TILE_FIX_cooldown', { time: this.cooldownLeft(folk) }), cls: 'text-warning' });
+      const where = this.whereText(folk);
+      if (where !== '') lines.push({ text: where, cls: 'wf-subtle' });
       // Refused by another mod for this page's skill (Voyage: not on this hex): the reason on the tile, never a popup.
-      const why = this.workRefusal(folk, pageSkill);
+      const why = this.pickRefusal(folk, pageSkill);
       if (why !== '') lines.push({ text: why, cls: 'text-warning' });
       if (folk.skillId !== null) {
         // "⛏ Woodcutting (🌳 Oak Tree)": skill icon + name, then the current action in brackets.
@@ -322,7 +359,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
     /** Entries for a skill page's Worker dropdown. */
     workerOptions(skill) {
       return rules.workerOptions({
-        folks: this.crew.all.map((f) => ({ id: f.id, name: f.name, tier: f.tier, skillId: f.skillId, available: this.folkAvailable(f) && this.workRefusal(f, skill) === '', lines: this.folkLines(f, skill) })),
+        folks: this.crew.all.map((f) => ({ id: f.id, name: f.name, tier: f.tier, skillId: f.skillId, available: this.folkAvailable(f) && this.pickRefusal(f, skill) === '', lines: this.folkLines(f, skill) })),
         skillId: skill.id,
         skillNameOf: (id) => this.skillName(id),
       });
@@ -362,6 +399,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       }
       const folk = this.crew.byId(folkId);
       if (folk === undefined) return false;
+      if (folk.skillId !== skill.id && this.refused('staff', { action: 'assign', folk, skillId: skill.id, skill })) return false;
       const current = this.skillOf(folk);
       const mode = rules.moveMode({
         currentSkillId: folk.skillId,
@@ -485,7 +523,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
           const doneKey = { cut: 'MOD_WF_RESERVE_CUT', bank: 'MOD_WF_RESERVE_BANK' }[plan.outcome] ?? 'MOD_WF_RESERVE_DONE';
           this.game.notifications.createSuccessNotification('worker_folks:reserve',
             templateLangString(doneKey, { amount: n(plan.deposit), currency: name }),
-            this.getMediaURL('img/payroll_reserve.webp'));
+            this.getMediaURL('assets/payroll_reserve.webp'));
           return true;
         },
       });
@@ -508,7 +546,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         emptyText: () => getLangString(this.hasLicence('Newbie') ? 'MOD_WF_NO_WORKERS_DESC_LICENSED' : 'MOD_WF_NO_WORKERS_DESC'),
         onOpenShop: () => this.openShop(),
         status: (folk) => this.statusOf(folk),
-        statusIcon: (status) => this.getMediaURL(`img/status_${status}.webp`),
+        statusIcon: (status) => this.getMediaURL(`assets/status_${status}.webp`),
         statusText: (status) => getLangString(`MOD_WF_STATUS_${status}`),
         assignmentText: (folk) => this.assignmentText(folk),
         // The assignment line says it on its own; the line under it says how (build .61, user layout).
@@ -635,6 +673,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         frozenSlots: () => this.health?.frozenSlotsView() ?? [],
         frozenTitle: () => getLangString('MOD_WF_SLOT_FROZEN_TITLE'),
         frozenReason: () => this.health?.freezeReason() ?? '',
+        whereText: (folk) => this.whereText(folk),
         cooldownText: (folk) => (folk.cooldownTicks > 0 ? templateLangString('MOD_WF_CARD_COOLDOWN', { time: this.cooldownLeft(folk) }) : ''),
       });
       layout?.dressCards();

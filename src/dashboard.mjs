@@ -162,7 +162,7 @@ export function install(ctx, { getHiring, model, milestones, tips, popupDidRende
         // the row's tooltip (scan A-07, A-10, build .112).
         first: folk.name.split(' ')[0],
         status,
-        statusIcon: hiring.getMediaURL(`img/status_${status}.webp`),
+        statusIcon: hiring.getMediaURL(`assets/status_${status}.webp`),
         statusText: getLangString(`MOD_WF_STATUS_${status}`),
         skillIcon: skill?.media,
         skillText,
