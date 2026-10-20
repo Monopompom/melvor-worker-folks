@@ -5,7 +5,7 @@ import { createFolk, normalizeFolk, migrateRoot, parseRoot, serializeRoot, SAVE_
 
 test('createFolk fills defaults and rejects bad input', () => {
   const f = createFolk({ id: 'a', slot: 0, tier: 'Newbie', name: 'Ada' });
-  assert.deepEqual(f, { id: 'a', slot: 0, tier: 'Newbie', name: 'Ada', skillId: null, loadout: {}, debt: 0, debtCurrency: null, debtMs: 0, onStrike: false, cooldownTicks: 0, wageCarry: 0, overtime: false, strikes: 0, restartWhenReady: false, hp: null, place: null, travel: 'idle', hiredAt: 0 });
+  assert.deepEqual(f, { id: 'a', slot: 0, tier: 'Newbie', name: 'Ada', skillId: null, loadout: {}, debt: 0, debtCurrency: null, debtMs: 0, onStrike: false, cooldownTicks: 0, wageCarry: 0, overtime: false, strikes: 0, restartWhenReady: false, hp: null, place: null, travel: 'idle', hiredAt: 0, traitState: { traits: [], waiting: [], counts: {} } });
   assert.throws(() => createFolk({ id: 'a', slot: -1, tier: 'Newbie', name: 'Ada' }));
   assert.throws(() => createFolk({ id: 'a', slot: 0, tier: 'Boss', name: 'Ada' }));
   assert.throws(() => createFolk({ id: '', slot: 0, tier: 'Newbie', name: 'Ada' }));
@@ -25,7 +25,7 @@ test('normalizeFolk repairs optional fields and rejects impossible records', () 
 test('migrateRoot upgrades a pre-version root (v0) to the current version', () => {
   const legacy = { folks: [{ id: 'a', slot: 0, tier: 'Junior', name: 'Cora' }] };
   const { root, applied } = migrateRoot(legacy);
-  assert.deepEqual(applied, [0, 1, 2, 3]);
+  assert.deepEqual(applied, [0, 1, 2, 3, 4]);
   assert.equal(root.v, SAVE_VERSION);
   assert.equal(root.folks[0].strikes, 0);
   assert.equal(root.folks[0].cooldownTicks, 0);
@@ -40,6 +40,15 @@ test('v1 → v2 converts a running wall-clock cooldown into ticks and flags unpa
   assert.ok(folk.cooldownTicks > 1100 && folk.cooldownTicks <= 1200);
   assert.equal(folk.onStrike, true);
   assert.equal(folk.debtMs, 0);
+});
+
+test('v4 → v5 gives every Folk an empty trait state; parseRoot keeps a saved one', () => {
+  const v4 = { v: 4, folks: [{ id: 'a', slot: 0, tier: 'Senior', name: 'Cora', strikes: 3 }] };
+  const { root } = migrateRoot(v4);
+  assert.deepEqual(root.folks[0].traitState, { traits: [], waiting: [], counts: {} });
+  const saved = { traits: [{ id: 'Loyal' }], waiting: [{ id: 'Lucky' }], counts: { Frugal: 1000 } };
+  const parsed = parseRoot({ v: 5, folks: [{ id: 'a', slot: 0, tier: 'Senior', name: 'Cora', traitState: saved }] });
+  assert.deepEqual(parsed.root.folks[0].traitState, saved);
 });
 
 test('migrateRoot is a no-op on a current root and leaves newer roots alone', () => {
@@ -97,18 +106,19 @@ test('serializeRoot / parseRoot round-trip preserves every field', () => {
 // A real save: slot 3 (FolksScanB) in the browser, Worker Folks 1.2.0, read from the game save on 20 Oct 2026.
 const realV3 = readFileSync(new URL('./fixtures/save-v3-folksscanb.json', import.meta.url), 'utf8').trim();
 
-test('a real v3 save migrates to v4: every Folk kept as it was, with no place and not travelling', () => {
+test('a real v3 save migrates to v5: every Folk kept as it was, with no place, not travelling and no traits', () => {
   const before = JSON.parse(realV3);
   const r = parseRoot(realV3);
-  assert.deepEqual(r.applied, [3]);
+  assert.deepEqual(r.applied, [3, 4]);
   assert.equal(r.corrupt, false);
   assert.equal(r.dropped, 0);
-  assert.equal(r.root.v, 4);
+  assert.equal(r.root.v, 5);
   assert.equal(r.root.folks.length, before.folks.length);
   r.root.folks.forEach((folk, i) => {
-    const { place, travel, ...rest } = folk;
+    const { place, travel, traitState, ...rest } = folk;
     assert.equal(place, null);
     assert.equal(travel, 'idle');
+    assert.deepEqual(traitState, { traits: [], waiting: [], counts: {} });
     assert.deepEqual(rest, before.folks[i], folk.name);
   });
   assert.deepEqual(r.root.reserve, before.reserve);

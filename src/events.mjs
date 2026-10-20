@@ -17,6 +17,8 @@ export const EVENT_NAMES = [
   'offlineTicks',
   // A Folk's place or travel changed (the API, Voyage phase 6).
   'folkMoved',
+  // A Folk learned a trait, one waits for a slot, takes one or faded: { folk, type, trait, offline }.
+  'folkTrait',
 ];
 
 export function createEventBus(names = EVENT_NAMES, { onError } = {}) {

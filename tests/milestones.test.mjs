@@ -9,9 +9,9 @@ import {
 test('milestones are sorted by level and match the design table', () => {
   const levels = MILESTONES.map((m) => m.level);
   assert.deepEqual(levels, [...levels].sort((a, b) => a - b));
-  assert.deepEqual(levels, [5, 10, 20, 25, 35, 40, 55, 60, 65, 80, 85, 95, 99, 100, 110, 120]);
-  assert.equal(visibleMilestones(99).length, 13);
-  assert.equal(visibleMilestones(120).length, 16);
+  assert.deepEqual(levels, [5, 10, 15, 20, 25, 35, 40, 55, 60, 65, 80, 85, 95, 99, 100, 110, 120]);
+  assert.equal(visibleMilestones(99).length, 14);
+  assert.equal(visibleMilestones(120).length, 17);
 });
 
 test('milestone state respects the level cap', () => {

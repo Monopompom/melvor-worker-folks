@@ -159,6 +159,22 @@ function fillCard(col, folk, view) {
     const key = JSON.stringify(effects);
     if (el.dataset.wfKey !== key) { el.dataset.wfKey = key; el.replaceChildren(effectsFragment(effects)); }
   });
+  set('traits', (el) => {
+    const icons = view.traits?.(folk)?.icons ?? [];
+    const key = JSON.stringify(icons.map((t) => [t.media, t.name, t.kind, t.tip]));
+    if (el.dataset.wfKey !== key) {
+      el.dataset.wfKey = key;
+      el.replaceChildren(...icons.map((t) => {
+        const img = document.createElement('img');
+        img.className = `wf-trait-icon wf-trait-${t.kind}`;
+        img.src = t.media;
+        img.alt = t.name;
+        return img;
+      }));
+      icons.forEach((t, i) => view.tip(el.children[i], t.tip));
+    }
+    el.classList.toggle('d-none', icons.length === 0);
+  });
   set('skill', (el) => {
     const media = view.skillMedia(folk);
     const text = folk.skillId === null ? (view.unassignedText?.() ?? '') : view.assignmentText(folk);
@@ -253,6 +269,13 @@ function fillCard(col, folk, view) {
     if (el.className !== className) el.className = className;
     el.disabled = refusals.gear !== '';
     el.onclick = () => view.onGear(folk);
+  });
+  set('traits-button', (el) => {
+    const traits = view.traits?.(folk);
+    el.classList.toggle('d-none', traits === undefined);
+    if (traits === undefined) return;
+    setText(el, traits.buttonText);
+    el.onclick = () => view.onTraits(folk);
   });
   set('promote', (el) => {
     const possible = view.canPromote(folk);

@@ -259,7 +259,7 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
     }
     else if (hiring.debtText(holder) !== null) {
       const d = hiring.debtText(holder);
-      status = templateLangString('MOD_WF_CTRL_DEBT', { name: holder.name, amount: d.amount, minutes: d.minutes });
+      status = templateLangString(d.loyal ? 'MOD_WF_CTRL_DEBT_LOYAL' : 'MOD_WF_CTRL_DEBT', { name: holder.name, amount: d.amount, minutes: d.minutes });
       tone = 'text-warning font-w600';
     } else {
       const action = hiring.currentActionName(skill);

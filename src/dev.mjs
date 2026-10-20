@@ -169,6 +169,16 @@ export function install({ hiring, log, tiers }) {
       hiring.crew.touch();
       return true;
     },
+    /** workerFolksDev.trait(0, 'Lucky'): the Folk learns that trait now (Specialist in its current skill). */
+    trait(id, traitId) {
+      const folk = hiring.crew.byId(ref(id));
+      if (folk === undefined || hiring.traits === undefined) return false;
+      return hiring.traits.devTeach(folk, traitId);
+    },
+    /** A Folk's traits: held, waiting for a slot, and the counts toward the others. */
+    traits(id) {
+      return hiring.crew.byId(ref(id))?.traitState;
+    },
     poolXP(xp) {
       hiring.addMasteryPoolXP(game.defaultRealm, xp);
       return hiring.poolPercent();

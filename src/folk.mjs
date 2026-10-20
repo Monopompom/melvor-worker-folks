@@ -1,7 +1,7 @@
 // Folk record model, validation and save-root migrations. Pure: no game globals.
 
 export const TIERS = ['Newbie', 'Junior', 'Middle', 'Senior', 'Expert'];
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 /**
  * A Folk's travel state: 'idle' stays on its place, 'with' goes along with the player, 'walking' is on its way somewhere
  * alone (Voyage, phase 6). Only 'idle' works.
@@ -47,6 +47,8 @@ export function createFolk({ id, slot, tier, name, hiredAt = 0 }) {
     place: null,
     travel: 'idle',
     hiredAt,
+    /** Earned traits: held, waiting for a free slot, and the counts toward each (src/traits-model.mjs). */
+    traitState: { traits: [], waiting: [], counts: {} },
   };
 }
 
@@ -65,6 +67,19 @@ function normalizeLoadoutShape(raw) {
 export function normalizePlace(raw) {
   if (raw === null || typeof raw !== 'object' || !Number.isInteger(raw.q) || !Number.isInteger(raw.r)) return null;
   return { q: raw.q, r: raw.r };
+}
+
+/** A clean trait state from whatever the save holds: unknown ids stay (a mod that adds them may load later). */
+export function normalizeTraitState(raw) {
+  const entry = (t) => (t !== null && typeof t === 'object' && typeof t.id === 'string'
+    ? (typeof t.skillId === 'string' ? { id: t.id, skillId: t.skillId } : { id: t.id })
+    : null);
+  const list = (a) => (Array.isArray(a) ? a.map(entry).filter((t) => t !== null) : []);
+  const counts = {};
+  if (raw?.counts !== null && typeof raw?.counts === 'object') {
+    for (const [k, v] of Object.entries(raw.counts)) if (typeof v === 'number' && Number.isFinite(v) && v > 0) counts[k] = v;
+  }
+  return { traits: list(raw?.traits), waiting: list(raw?.waiting), counts };
 }
 
 const nonNegNumber = (v, fallback = 0) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : fallback);
@@ -94,6 +109,7 @@ export function normalizeFolk(raw) {
   folk.hp = typeof raw.hp === 'number' && Number.isFinite(raw.hp) && raw.hp >= 0 ? Math.floor(raw.hp) : null;
   folk.place = normalizePlace(raw.place);
   folk.travel = TRAVEL.includes(raw.travel) ? raw.travel : 'idle';
+  folk.traitState = normalizeTraitState(raw.traitState);
   return folk;
 }
 
@@ -165,6 +181,12 @@ export const MIGRATIONS = {
     ...root,
     v: 4,
     folks: (Array.isArray(root.folks) ? root.folks : []).map((f) => ({ ...f, place: null, travel: 'idle' })),
+  }),
+  // v5: earned traits, every Folk from zero.
+  4: (root) => ({
+    ...root,
+    v: 5,
+    folks: (Array.isArray(root.folks) ? root.folks : []).map((f) => ({ ...f, traitState: { traits: [], waiting: [], counts: {} } })),
   }),
 };
 

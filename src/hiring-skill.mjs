@@ -594,7 +594,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
             return {
               debtOnly: true,
               owedText: templateLangString('MOD_WF_DEBT_OWED', { amount: d.amount }),
-              noteText: working ? templateLangString('MOD_WF_DEBT_NOTE_WORKING', { minutes: d.minutes }) : getLangString('MOD_WF_DEBT_NOTE_IDLE'),
+              noteText: !working ? getLangString('MOD_WF_DEBT_NOTE_IDLE')
+                : d.loyal ? getLangString('MOD_WF_DEBT_NOTE_LOYAL') : templateLangString('MOD_WF_DEBT_NOTE_WORKING', { minutes: d.minutes }),
             };
           }
           const fmt = (parts) => Object.entries(parts).map(([id, amount]) => `${numberWithCommas(amount)} ${this.game.currencies.getObjectByID(id)?.name ?? id}`).join(' + ');
@@ -676,6 +677,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
           return { text: templateLangString('MOD_WF_BUTTON_GEAR_COUNT', { filled: `${s.filled}`, open: `${s.open}` }), tip, out: s.out.length > 0 };
         },
         onGear: (folk) => { if (!this.refused('gear', { folk })) this.loadout?.openLoadout(folk); },
+        traits: (folk) => this.traits?.cardView(folk),
+        onTraits: (folk) => this.traits?.openTraits(folk),
         hp: (folk) => this.health?.hpView(folk),
         frozenSlots: () => this.health?.frozenSlotsView() ?? [],
         frozenTitle: () => getLangString('MOD_WF_SLOT_FROZEN_TITLE'),
@@ -836,7 +839,14 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
     }
 
     perksOf(folk) {
-      return perks.combinedPerks(this.masteryLevelOf(folk), this.bonusPerks(), { overtimeOn: folk.overtime, overtimeWageFactor: this.levels?.overtimeWageFactor() ?? 2 });
+      // Workaholic makes Overtime cheaper, on top of the Hiring 85 milestone.
+      const overtimeWageFactor = (this.levels?.overtimeWageFactor() ?? 2) * this.traitEffects(folk).overtimeWageFactor;
+      return perks.combinedPerks(this.masteryLevelOf(folk), this.bonusPerks(), { overtimeOn: folk.overtime, overtimeWageFactor });
+    }
+
+    /** What the Folk's earned traits add up to (nothing before the traits slice is in). */
+    traitEffects(folk) {
+      return this.traits?.effectsOf(folk) ?? { interval: 0, xp: 0, preservation: 0, doubling: 0, masteryXP: 0, wageFactor: 1, overtimeWageFactor: 1, graceFactor: 1, cooldownFactor: 1, neverStrikes: false };
     }
 
     // Hooks read by payroll.mjs and acting.mjs
@@ -846,10 +856,10 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       return perks.totalWageDiscount(p.wageRaise, p.wageDiscount, (this.levels?.wageDiscount() ?? 0) / 100);
     }
 
-    /** Multiplier on the tier wage: the seniority raise (40% → 100% by mastery) times the overtime factor. */
+    /** Multiplier on the tier wage: the seniority raise (40% → 100% by mastery) times the overtime factor and traits. */
     wageFactor(folk) {
       const p = this.perksOf(folk);
-      return p.wageFactor * p.wageRaise;
+      return p.wageFactor * p.wageRaise * this.traitEffects(folk).wageFactor;
     }
 
     wageRaise(folk) {
@@ -857,7 +867,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
     }
 
     graceMs(folk) {
-      return this.perksOf(folk).graceMs;
+      return this.perksOf(folk).graceMs * this.traitEffects(folk).graceFactor;
     }
 
     /** "In debt" details for the card, the Worker box and the offline summary, or null. */
@@ -866,11 +876,12 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       if (payroll === undefined || this.struck(folk) || !this.owing(folk)) return null;
       const currency = this.game.currencies.getObjectByID(folk.debtCurrency ?? 'melvorD:GP');
       const minutes = Math.ceil(payroll.graceLeftMs(folk) / 60000);
-      return { amount: `${numberWithCommas(folk.debt)} ${currency?.name ?? ''}`.trim(), minutes: `${minutes}` };
+      // Loyal never strikes: its lines say the wages wait instead of a countdown.
+      return { amount: `${numberWithCommas(folk.debt)} ${currency?.name ?? ''}`.trim(), minutes: `${minutes}`, loyal: this.traits?.neverStrikes(folk) === true };
     }
 
     cooldownFactor(folk) {
-      return this.perksOf(folk).cooldownMult;
+      return this.perksOf(folk).cooldownMult * this.traitEffects(folk).cooldownFactor;
     }
 
     severanceFree(folk) {
@@ -891,7 +902,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
     addFolkMastery(folk, intervalMs) {
       const slot = this.slotOf(folk);
       if (slot === undefined) return;
-      let xp = perks.masteryXPForAction({ level: this.getMasteryLevel(slot), intervalMs, tier: folk.tier, modifierPercent: this.getMasteryXPModifier(slot) });
+      const modifierPercent = this.getMasteryXPModifier(slot) + this.traitEffects(folk).masteryXP;
+      let xp = perks.masteryXPForAction({ level: this.getMasteryLevel(slot), intervalMs, tier: folk.tier, modifierPercent });
       if (this.game.modifiers.halveMasteryXP > 0) xp /= 2;
       this.addMasteryXP(slot, xp);
       this.addMasteryPoolXP(slot.realm, this.getMasteryXPToAddToPool(xp));

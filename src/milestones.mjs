@@ -5,6 +5,7 @@
 export const MILESTONES = [
   { level: 5, key: 'RESERVE_24', icon: 'reserve' },
   { level: 10, key: 'PROMOTIONS', icon: 'hiring' },
+  { level: 15, key: 'FORGET', icon: 'hiring' },
   { level: 20, key: 'LICENCE_JUNIOR', icon: 'Junior' },
   { level: 25, key: 'APOLOGY', icon: 'hiring' },
   { level: 35, key: 'RESERVE_72', icon: 'reserve' },
@@ -22,6 +23,7 @@ export const MILESTONES = [
 ];
 
 export const PROMOTION_LEVEL = 10;
+export const FORGET_LEVEL = 15;
 export const APOLOGY_LEVEL = 25;
 export const AUTO_RESTART_LEVEL = 55;
 export const OVERTIME_LEVEL = 85;

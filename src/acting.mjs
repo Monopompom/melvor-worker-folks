@@ -36,20 +36,26 @@ export function install(ctx, { getHiring, rate, log }) {
     hiring.loadout?.modifierSources(folk, skill).forEach(({ source, modifiers }) => table.addModifiers(source, modifiers));
     const tier = rate.tierModifiers(folk.tier, { preservationDisabled: !!game.currentGamemode.disablePreservation });
     const perk = hiring.perksOf?.(folk) ?? { skillXP: 0, intervalPercent: 0 };
-    const bonusXP = tier.skillXP + rate.crewBonus(workingExperts(folk)) + perk.skillXP;
-    const interval = tier.skillInterval + perk.intervalPercent;
+    // Earned traits: Specialist only in its own skill, Night Owl only while the player fights.
+    const trait = hiring.traits?.effectsOf(folk, skill.id) ?? { interval: 0, xp: 0, preservation: 0, doubling: 0 };
+    const bonusXP = tier.skillXP + rate.crewBonus(workingExperts(folk)) + perk.skillXP + trait.xp;
+    const interval = tier.skillInterval + perk.intervalPercent + trait.interval;
+    const preservation = tier.skillPreservationChance + trait.preservation;
     const data = {};
     if (interval !== 0) data.skillInterval = [{ skillID: skill.id, value: interval }];
-    if (tier.skillPreservationChance !== 0) data.skillPreservationChance = [{ skillID: skill.id, value: tier.skillPreservationChance }];
+    if (preservation !== 0) data.skillPreservationChance = [{ skillID: skill.id, value: preservation }];
     if (bonusXP !== 0) data.skillXP = [{ skillID: skill.id, value: bonusXP }];
+    if (trait.doubling !== 0) data.skillItemDoublingChance = [{ skillID: skill.id, value: trait.doubling }];
     if (Object.keys(data).length > 0) table.addModifiers(sourceFor(folk), game.getModifierValuesFromData(data));
     return table;
   };
 
   const tableFor = (folk, skill) => {
     let entry = tables.get(folk.id);
-    if (entry === undefined || entry.dirty || entry.skillId !== skill.id) {
-      entry = { table: buildTable(folk, skill), dirty: false, skillId: skill.id };
+    // Night Owl's XP counts only while the player fights: such a table follows combat starting and ending.
+    const fighting = hiring.traits?.followsCombat(folk) === true && hiring.traits.fighting();
+    if (entry === undefined || entry.dirty || entry.skillId !== skill.id || entry.fighting !== fighting) {
+      entry = { table: buildTable(folk, skill), dirty: false, skillId: skill.id, fighting };
       tables.set(folk.id, entry);
     }
     return entry.table;

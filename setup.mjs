@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-10-20.130';
+export const BUILD = '2026-10-20.131';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -109,6 +109,8 @@ export async function setup(ctx) {
   const gearData = await ctx.loadModule('src/gear-data.mjs');
   const discoveryRules = await ctx.loadModule('src/discovery-model.mjs');
   const discoveries = await ctx.loadModule('src/discoveries.mjs');
+  const traitRules = await ctx.loadModule('src/traits-model.mjs');
+  const traits = await ctx.loadModule('src/traits.mjs');
 
   // 1. Language strings were installed in step 0 (needed before any skill/page name is read).
 
@@ -275,6 +277,15 @@ export async function setup(ctx) {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     rules: discoveryRules,
     petId: `worker_folks:${gearData.PET_ID}`,
+    log,
+  });
+
+  // 9. Earned traits: counted from what each Folk does, after payroll (Frugal reads whether a wage was paid).
+  traits.install(ctx, {
+    getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+    model: traitRules,
+    popupDidRender,
+    titleName,
     log,
   });
 

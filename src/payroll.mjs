@@ -224,7 +224,7 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     folk.debtCurrency = id;
     folk.debtMs = next.debtMs;
     hiring.renderQueue.folks = true;
-    if (next.strike) {
+    if (next.strike && !hiring.traits?.neverStrikes(folk)) {
       strike(folk, skill);
       return;
     }
@@ -240,7 +240,7 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     if (d === null) return;
     game.notifications.createInfoNotification(
       'worker_folks:debt',
-      templateLangString('MOD_WF_DEBT_NOTIFICATION', { name: folk.name, skill: hiring.skillName(skill), amount: d.amount, minutes: d.minutes }),
+      templateLangString(d.loyal ? 'MOD_WF_DEBT_NOTIFICATION_LOYAL' : 'MOD_WF_DEBT_NOTIFICATION', { name: folk.name, skill: hiring.skillName(skill), amount: d.amount, minutes: d.minutes }),
       hiring.portrait(folk.tier),
     );
   };

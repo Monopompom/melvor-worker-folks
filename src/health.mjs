@@ -48,6 +48,7 @@ export function install(ctx, { getHiring, rules, time, log }) {
       if (!(amount > 0)) return false;
       const result = rules.applyDamage(api.hpOf(folk), amount);
       api.setHp(folk, result.hp);
+      if (!result.dead) hiring.traits?.onHurt(folk, result.hp, api.maxHpOf(folk));
       log(`${folk.name} takes ${amount} damage${cause === undefined ? '' : ` (${cause})`} (${result.hp}/${api.maxHpOf(folk)})`);
       if (result.dead) {
         api.kill(folk, { skill, cause });

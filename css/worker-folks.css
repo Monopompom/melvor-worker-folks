@@ -200,6 +200,18 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 /* A tier's effects (build .73): each piece is a flex item, so a piece that doesn't fit moves to the next line whole,
    and only one longer than the line wraps inside itself; the value is in its tone's colour. */
 .wf-effects { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 4px; font-size: 0.9rem; line-height: 1.4; }
+/* Earned traits: the card's icons and the Traits popup's rows. A bad one has an amber ring: it can be forgotten. */
+.wf-card-traits { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.wf-trait-icon { width: 32px; height: 32px; border-radius: 6px; background: var(--wf-well); padding: 3px; object-fit: contain; }
+.wf-trait-icon.wf-trait-bad { outline: 2px solid var(--wf-alert); outline-offset: 1px; }
+.wf-traits { display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.wf-trait-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 8px 10px; border-radius: 6px; background: var(--wf-tile); border: 1px solid var(--wf-line-soft); }
+.wf-trait-row .wf-trait-icon { width: 40px; height: 40px; }
+.wf-trait-row.wf-trait-bad { border-color: var(--wf-alert); }
+.wf-trait-row.wf-trait-empty, .wf-trait-row.wf-trait-locked { display: block; background: transparent; border-style: dashed; color: var(--wf-subtle); }
+.wf-trait-waiting, .wf-trait-note { font-size: 0.9rem; }
+.wf-trait-note { border-top: 1px solid var(--wf-line); padding-top: 8px; }
+@media (max-width: 480px) { .wf-trait-row { grid-template-columns: 40px minmax(0, 1fr); } .wf-trait-row .btn { grid-column: 1 / -1; } }
 .wf-effect { min-width: 0; }
 .wf-worker-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 /* Worn gear on a Worker popup tile (build .54): 20px icons; amber ring when a charge item ran out. */

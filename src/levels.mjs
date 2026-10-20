@@ -29,6 +29,8 @@ export function install(ctx, { getHiring, rules, log }) {
     promotionsUnlocked: () => rules.promotionsUnlocked(hiring.level),
     promotionLevel: rules.PROMOTION_LEVEL,
     apologyUnlocked: () => rules.apologyUnlocked(hiring.level),
+    forgetUnlocked: () => hiring.level >= rules.FORGET_LEVEL,
+    forgetLevel: rules.FORGET_LEVEL,
     apologyLevel: rules.APOLOGY_LEVEL,
     autoRestart: () => rules.autoRestartUnlocked(hiring.level),
     overtimeWageFactor: () => rules.overtimeWageFactor(hiring.level),

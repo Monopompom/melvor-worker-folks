@@ -98,6 +98,18 @@ Infernal Core, Elder Crown or FrostSpark Amulet with Throne of the Herald) and a
 carries, and keeps working. Firing asks for confirmation, returns carried items to the
 bank, clears the slot's mastery and refunds nothing.
 
+## Traits
+
+A Folk learns **traits** from what it does and what happens to it: long hours in one skill,
+how it is paid, what it is promoted to, its failures and hard knocks. Some are good, some
+are a mixed bag, some are bad; a few bad ones fade again, the rest stay. You see a trait only
+once it is learned: a notification says so, the trait's icon appears on the card (its
+tooltip says what it does) and **Traits** on the card lists them. A Folk has four trait
+slots, opened by its mastery at 1, 25, 50 and 99; a trait learned while every open slot is
+full waits for the next one that frees. From Hiring 15, **Forget** removes a trait for a
+quarter of the tier's next hire price, and the Folk could learn it again only from the
+start. Traits stay through promotion and leave with a Folk that is fired or dies.
+
 ## Wages, reserve and strikes
 
 Every action a Folk completes costs its hourly wage pro-rated by the action's length
@@ -128,7 +140,7 @@ Hiring gains 5% of every skill XP drop your Folks earn (the share is a setting) 
 as a "+N Hiring XP" notification like any other skill. Open
 **View Milestones** on the Hiring page for the full list. The levels unlock management
 features: the Payroll Reserve at 5 (24 h of the whole crew's wages, growing to 72 h at 35,
-7 days at 65 and 30 days at 95), promotions at 10, Licences at 20 / 40 / 60 / 80, the
+7 days at 65 and 30 days at 95), promotions at 10, forgetting a trait at 15, Licences at 20 / 40 / 60 / 80, the
 apology bonus at 25, automatic restart of a Folk's skill after a settlement at 55, cheaper
 Overtime (×1.5 wages) at 85, a free Shift Slot at 99 and, with Throne of the Herald, -10%
 wages at 100, a second free Shift Slot at 110 and 50% promotion fees at 120. Locked

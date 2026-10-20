@@ -6,9 +6,9 @@
 export function install(ctx, { getHiring, log }) {
   let hiring;
   /** Per offline session: actions completed and skills released, by skill id. */
-  let tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], active: false };
+  let tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], traits: [], active: false };
   const reset = () => {
-    tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], active: true };
+    tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], traits: [], active: true };
   };
 
   ctx.onModsLoaded(() => {
@@ -50,7 +50,7 @@ export function install(ctx, { getHiring, log }) {
     const ticks = Math.floor(ms / TICK_INTERVAL);
     tracker.active = false;
     hiring.events.emit('offlineTicks', { ticks, ms });
-    if (info.offlineProgress === undefined || (tracker.actions.size === 0 && tracker.released.size === 0 && tracker.died.length === 0 && tracker.debts.length === 0 && tracker.struck.length === 0)) return;
+    if (info.offlineProgress === undefined || (tracker.actions.size === 0 && tracker.released.size === 0 && tracker.died.length === 0 && tracker.debts.length === 0 && tracker.struck.length === 0 && tracker.traits.length === 0)) return;
     const container = info.offlineProgress.messageContainer;
     if (container === undefined) return;
     // Welcome Back lines in the game's own style (scan C-08, C-09, C-10, build .112):
@@ -94,7 +94,7 @@ export function install(ctx, { getHiring, log }) {
     // Debt and strikes are reported with their state on return (a strike may have settled itself).
     tracker.debts.forEach(({ folk, skill, media }) => {
       const d = hiring.debtText(folk);
-      if (d !== null) lines.push({ media, html: fill('MOD_WF_OFFLINE_DEBT', { name: folk.name, skill, amount: d.amount, minutes: d.minutes }, { amount: 'text-danger' }, media) });
+      if (d !== null) lines.push({ media, html: fill(d.loyal ? 'MOD_WF_OFFLINE_DEBT_LOYAL' : 'MOD_WF_OFFLINE_DEBT', { name: folk.name, skill, amount: d.amount, minutes: d.minutes }, { amount: 'text-danger' }, media) });
     });
     tracker.struck.forEach(({ folk, skill, media }) => {
       const currency = this.currencies.getObjectByID(folk.debtCurrency ?? 'melvorD:GP');
@@ -102,6 +102,18 @@ export function install(ctx, { getHiring, log }) {
       if (folk.onStrike) {
         lines.push({ media, html: fill('MOD_WF_OFFLINE_STRUCK', { name: folk.name, skill, amount: `${numberWithCommas(folk.debt)} ${currency?.name ?? ''}`.trim() }, { amount: 'text-danger' }, media), fix: getLangString('MOD_WF_OFFLINE_STRUCK_FIX') });
       } else lines.push({ media, html: fill('MOD_WF_OFFLINE_STRUCK_SETTLED', { name: folk.name, skill }, {}, media) });
+    });
+    // Traits: what a Folk learned or lost while you were away, the trait's own icon first; a good one green, a bad one
+    // red, a fade green (a bad trait gone).
+    tracker.traits.forEach(({ folk, type, trait }) => {
+      const t = hiring.traits;
+      if (t === undefined) return;
+      const kind = t.kindOf(trait);
+      const tone = type === 'faded' ? 'text-success' : type === 'waiting' ? '' : kind === 'good' ? 'text-success' : kind === 'bad' ? 'text-danger' : '';
+      const key = { learned: 'MOD_WF_TRAIT_LEARNED', waiting: 'MOD_WF_TRAIT_WAITING', slotted: 'MOD_WF_TRAIT_SLOTTED', faded: 'MOD_WF_TRAIT_FADED' }[type];
+      if (key === undefined) return;
+      const text = fill(key, { name: folk.name, trait: t.nameOf(trait), effect: t.effectOf(trait) }, tone === '' ? {} : { trait: tone });
+      lines.push({ html: `<span class="text-nowrap"><img class="skill-icon-xs" src="${t.mediaOf(trait)}" alt=""></span> ${text}` });
     });
     // The header: icon and text on one centred flex row. The lines: plain centred text that wraps, the icon inline.
     const header = createElement('h5', { className: 'd-flex align-items-center justify-content-center font-w600 mb-1 mt-3', parent: container });
@@ -134,6 +146,10 @@ export function install(ctx, { getHiring, log }) {
     hiring.events.on('folkStruck', ({ folk, skill }) => {
       if (!tracker.active) return;
       tracker.struck.push({ folk, skill: hiring.skillName(skill), media: skill?.media, skillId: skill?.id });
+    });
+    hiring.events.on('folkTrait', ({ folk, type, trait }) => {
+      if (!tracker.active) return;
+      tracker.traits.push({ folk, type, trait });
     });
   });
 }
