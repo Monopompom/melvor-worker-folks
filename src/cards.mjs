@@ -236,6 +236,8 @@ function fillCard(col, folk, view) {
     setAttr(el, 'aria-expanded', `${expanded}`);
     el.onclick = () => view.onToggleExpand(folk);
   });
+  // Another mod's refusals (Voyage): the button greys, the reason is the line under the buttons.
+  const refusals = view.refusals?.(folk) ?? { promote: '', fire: '', gear: '' };
   set('gear', (el) => {
     const gear = view.gear(folk);
     setText(el, gear.text);
@@ -244,6 +246,7 @@ function fillCard(col, folk, view) {
     // Amber when a worn item ran out (needs attention); blue outline otherwise, like Details.
     const className = `btn btn-sm ${gear.out ? 'btn-outline-warning' : 'btn-outline-info'}`;
     if (el.className !== className) el.className = className;
+    el.disabled = refusals.gear !== '';
     el.onclick = () => view.onGear(folk);
   });
   set('promote', (el) => {
@@ -252,11 +255,19 @@ function fillCard(col, folk, view) {
     const className = `btn btn-sm btn-block ${view.promoteReady(folk) ? 'btn-primary' : 'btn-outline-primary'}`;
     el.closest('[data-wf="promote-row"]')?.classList.toggle('d-none', !possible);
     if (el.className !== className) el.className = className;
+    el.disabled = refusals.promote !== '';
     el.onclick = () => view.onPromote(folk);
   });
   set('fire', (el) => {
     setText(el, view.fireText());
+    el.disabled = refusals.fire !== '';
     el.onclick = () => view.onFire(folk);
+  });
+  set('staff-why', (el) => {
+    const promotable = view.canPromote(folk);
+    const text = [...new Set([promotable ? refusals.promote : '', refusals.gear, refusals.fire].filter((r) => r !== ''))].join(' ');
+    setText(el, text);
+    el.classList.toggle('d-none', text === '');
   });
   set('details', (el) => {
     el.classList.toggle('d-none', !expanded);

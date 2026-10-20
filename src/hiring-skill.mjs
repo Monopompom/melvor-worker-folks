@@ -20,7 +20,7 @@ const swalClass = (extra = {}) => {
   return typeof createSwalCustomClass === 'function' ? createSwalCustomClass(cls) : cls;
 };
 
-export function createHiringClass({ popupDidRender, titleName = (s) => s, time, selectDelegable, log, createCrew, createEventBus, folkModel, pickName, renderFolkCards, renderReservePanel, produceRate, rules, perks, promotion, pricing, tips, layout, dashboard }) {
+export function createHiringClass({ popupDidRender, titleName = (s) => s, time, selectDelegable, log, createCrew, createEventBus, createGuards, folkView, folkModel, pickName, renderFolkCards, renderReservePanel, produceRate, rules, perks, promotion, pricing, tips, layout, dashboard }) {
   class FolkSlotAction extends MasteryAction {
     constructor(namespace, data, game, skill) {
       super(namespace, data, game);
@@ -47,6 +47,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       this.excludedSkillIds = [];
       /** Mod-wide event bus; other slices subscribe here instead of patching each other. */
       this.events = createEventBus();
+      /** What other mods refuse (src/guards.mjs, through the API): none registered = everything as before. */
+      this.guards = createGuards({ onError: (err, kind) => console.error(`[Worker Folks] a ${kind} guard failed; allowed`, err) });
       /** Every hired Folk. Persisted inside this skill's save region (see encode). */
       this.crew = createCrew({
         bus: this.events,
@@ -149,6 +151,31 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
     folkAvailable(folk) {
       const status = this.statusOf(folk);
       return status !== 'cooldown' && status !== 'strike';
+    }
+
+    /** Why another mod (Voyage) refuses this, or '' when nothing does. Guards see a read-only view of the Folk. */
+    refusal(kind, request = {}) {
+      if (this.guards.count(kind) === 0) return '';
+      const { folk } = request;
+      return this.guards.check(kind, folk === undefined ? request : { ...request, folk: folkView(folk, this.statusOf(folk)) })?.reason ?? '';
+    }
+
+    /** Whether this Folk may work this skill where it stands ('' = yes). */
+    workRefusal(folk, skill) {
+      return folk === undefined || skill === undefined ? '' : this.refusal('work', { folk, skillId: skill.id, skill });
+    }
+
+    /** True (with the reason in a toast) when refused: for paths that reach an action without its button. */
+    refused(kind, request) {
+      const why = this.refusal(kind, request);
+      if (why !== '') this.game.notifications.createErrorNotification(`worker_folks:${kind}`, why);
+      return why !== '';
+    }
+
+    /** Guarded buttons and the Shop's lines follow a change outside this mod (the player moved, a guard came). */
+    refreshGuarded() {
+      this.renderQueue.folks = true;
+      this.refreshShop?.();
     }
 
     stopFolk(folk) {
@@ -268,6 +295,9 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       // A Folk that can't be picked says how to get it back (build .55).
       if (status === 'strike') lines.push({ text: getLangString('MOD_WF_TILE_FIX_strike'), cls: 'text-warning' });
       if (status === 'cooldown') lines.push({ text: templateLangString('MOD_WF_TILE_FIX_cooldown', { time: this.cooldownLeft(folk) }), cls: 'text-warning' });
+      // Refused by another mod for this page's skill (Voyage: not on this hex): the reason on the tile, never a popup.
+      const why = this.workRefusal(folk, pageSkill);
+      if (why !== '') lines.push({ text: why, cls: 'text-warning' });
       if (folk.skillId !== null) {
         // "⛏ Woodcutting (🌳 Oak Tree)": skill icon + name, then the current action in brackets.
         const segments = [{ icon: this.game.skills.getObjectByID(folk.skillId)?.media, text: this.skillName(folk.skillId) }];
@@ -292,7 +322,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
     /** Entries for a skill page's Worker dropdown. */
     workerOptions(skill) {
       return rules.workerOptions({
-        folks: this.crew.all.map((f) => ({ id: f.id, name: f.name, tier: f.tier, skillId: f.skillId, available: this.folkAvailable(f), lines: this.folkLines(f, skill) })),
+        folks: this.crew.all.map((f) => ({ id: f.id, name: f.name, tier: f.tier, skillId: f.skillId, available: this.folkAvailable(f) && this.workRefusal(f, skill) === '', lines: this.folkLines(f, skill) })),
         skillId: skill.id,
         skillNameOf: (id) => this.skillName(id),
       });
@@ -529,10 +559,12 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
           const shortOf = (parts) => fmt(Object.fromEntries(Object.entries(parts)
             .map(([id, amount]) => [id, Math.ceil(amount - (this.game.currencies.getObjectByID(id)?.amount ?? 0))])
             .filter(([, missing]) => missing > 0)));
-          const canSettle = payroll.canSettle(folk);
+          // Another mod's refusal (Voyage) comes first: it greys both buttons and is the line under them.
+          const blocked = this.refusal('staff', { action: 'settle', folk });
+          const canSettle = blocked === '' && payroll.canSettle(folk);
           const apologyOpen = this.levels === undefined || this.levels.apologyUnlocked();
-          const canApologise = payroll.canSettle(folk, { apology: true });
-          const reason = !canSettle ? templateLangString('MOD_WF_SETTLE_NEED', { amount: shortOf(plain.parts) })
+          const canApologise = blocked === '' && payroll.canSettle(folk, { apology: true });
+          const reason = blocked !== '' ? blocked : !payroll.canSettle(folk) ? templateLangString('MOD_WF_SETTLE_NEED', { amount: shortOf(plain.parts) })
             : apologyOpen && !canApologise ? templateLangString('MOD_WF_APOLOGY_NEED', { amount: shortOf(apology.parts) })
               : '';
           return {
@@ -546,8 +578,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
               : templateLangString('MOD_WF_BUTTON_APOLOGY', { amount: fmt(apology.parts) }),
             canSettle,
             canApologise,
-            onSettle: () => payroll.settle(folk),
-            onApologise: () => payroll.settle(folk, { apology: true }),
+            onSettle: () => { if (!this.refused('staff', { action: 'settle', folk })) payroll.settle(folk); },
+            onApologise: () => { if (!this.refused('staff', { action: 'settle', folk })) payroll.settle(folk, { apology: true }); },
           };
         },
         masterySlot: (folk) => this.slotOf(folk),
@@ -567,6 +599,12 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         promoteReady: (folk) => this.promotionPlanFor(folk).ok,
         onPromote: (folk) => this.promote(folk),
         onFire: (folk) => this.fire(folk),
+        /** What another mod refuses on this card ('' each when nothing): Promote, Fire, Gear. */
+        refusals: (folk) => ({
+          promote: this.refusal('staff', { action: 'promote', folk }),
+          fire: this.refusal('staff', { action: 'fire', folk }),
+          gear: this.refusal('gear', { folk }),
+        }),
         perkLines: (folk) => this.perkLines(folk),
         overtime: (folk) => {
           const p = this.perksOf(folk);
@@ -592,7 +630,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
           }
           return { text: templateLangString('MOD_WF_BUTTON_GEAR_COUNT', { filled: `${s.filled}`, open: `${s.open}` }), tip, out: s.out.length > 0 };
         },
-        onGear: (folk) => this.loadout?.openLoadout(folk),
+        onGear: (folk) => { if (!this.refused('gear', { folk })) this.loadout?.openLoadout(folk); },
         hp: (folk) => this.health?.hpView(folk),
         frozenSlots: () => this.health?.frozenSlotsView() ?? [],
         frozenTitle: () => getLangString('MOD_WF_SLOT_FROZEN_TITLE'),
@@ -859,6 +897,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
 
     /** Opens the promotion modal; applies the promotion when confirmed and still valid. */
     promote(folk) {
+      if (this.refused('staff', { action: 'promote', folk })) return;
       const plan = this.promotionPlanFor(folk);
       if (plan.nextTier === null) return;
       // The requirements on a grey band; the fee after the GP icon in bold amber, red when you can't pay (scan C-22, build .112). Body size throughout.
@@ -935,6 +974,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
 
     /** Confirms, returns the loadout, then fires. */
     fire(folk) {
+      if (this.refused('staff', { action: 'fire', folk })) return;
       SwalLocale.fire({
         didRender: popupDidRender,
         title: templateLangString('MOD_WF_FIRE_TITLE', { name: titleName(folk.name) }),

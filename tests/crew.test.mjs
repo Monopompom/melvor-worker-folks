@@ -63,7 +63,7 @@ test('serialize/load round-trip, slot cap on load and crewChanged emission', () 
 test('load migrates a pre-version root', () => {
   const { crew } = make(4);
   const report = crew.load({ folks: [{ id: 'old', slot: 1, tier: 'Junior', name: 'Old' }] });
-  assert.deepEqual(report.applied, [0, 1, 2]);
+  assert.deepEqual(report.applied, [0, 1, 2, 3]);
   assert.equal(crew.bySlot(1).strikes, 0);
 });
 

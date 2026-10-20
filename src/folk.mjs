@@ -1,7 +1,9 @@
 // Folk record model, validation and save-root migrations. Pure: no game globals.
 
 export const TIERS = ['Newbie', 'Junior', 'Middle', 'Senior', 'Expert'];
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
+/** A Folk's travel state: 'idle' stays on its place, 'with' goes along with the player (Voyage, phase 6). */
+export const TRAVEL = ['idle', 'with'];
 
 const TIER_SET = new Set(TIERS);
 
@@ -38,6 +40,9 @@ export function createFolk({ id, slot, tier, name, hiredAt = 0 }) {
     restartWhenReady: false,
     /** null = full health (max HP depends on the tier). */
     hp: null,
+    /** Map hex { q, r } the Folk stands on; null = no place (no Voyage, or hired before 6b). */
+    place: null,
+    travel: 'idle',
     hiredAt,
   };
 }
@@ -51,6 +56,12 @@ function normalizeLoadoutShape(raw) {
     out[slot] = { id: entry.id, qty: Number.isInteger(entry.qty) && entry.qty > 0 ? entry.qty : 1 };
   }
   return out;
+}
+
+/** A plain hex { q, r } with integer coordinates, or null. Never a game object. */
+export function normalizePlace(raw) {
+  if (raw === null || typeof raw !== 'object' || !Number.isInteger(raw.q) || !Number.isInteger(raw.r)) return null;
+  return { q: raw.q, r: raw.r };
 }
 
 const nonNegNumber = (v, fallback = 0) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : fallback);
@@ -78,6 +89,8 @@ export function normalizeFolk(raw) {
   folk.strikes = Number.isInteger(raw.strikes) && raw.strikes >= 0 ? raw.strikes : 0;
   folk.restartWhenReady = raw.restartWhenReady === true;
   folk.hp = typeof raw.hp === 'number' && Number.isFinite(raw.hp) && raw.hp >= 0 ? Math.floor(raw.hp) : null;
+  folk.place = normalizePlace(raw.place);
+  folk.travel = TRAVEL.includes(raw.travel) ? raw.travel : 'idle';
   return folk;
 }
 
@@ -143,6 +156,12 @@ export const MIGRATIONS = {
     v: 3,
     folks: (Array.isArray(root.folks) ? root.folks : []).map((f) => ({ ...f, hp: null, restartWhenReady: false })),
     frozen: {},
+  }),
+  // v4: a place on the map and a travel state (Voyage phase 6). No place = as before.
+  3: (root) => ({
+    ...root,
+    v: 4,
+    folks: (Array.isArray(root.folks) ? root.folks : []).map((f) => ({ ...f, place: null, travel: 'idle' })),
   }),
 };
 

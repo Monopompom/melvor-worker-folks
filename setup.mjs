@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-10-19.118';
+export const BUILD = '2026-10-20.119';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -60,6 +60,8 @@ export async function setup(ctx) {
   const page = await ctx.loadModule('src/page.mjs');
   const folkModel = await ctx.loadModule('src/folk.mjs');
   const { createEventBus } = await ctx.loadModule('src/events.mjs');
+  const { createGuards } = await ctx.loadModule('src/guards.mjs');
+  const apiModule = await ctx.loadModule('src/api.mjs');
   const { pickName } = await ctx.loadModule('src/names.mjs');
   const { createCrew } = await ctx.loadModule('src/crew.mjs');
   const { renderFolkCards, effectsFragment } = await ctx.loadModule('src/cards.mjs');
@@ -117,7 +119,7 @@ export async function setup(ctx) {
   // 3. Register the skill class first, then the data package that references it.
   const { Hiring } = createHiringClass({
     popupDidRender, titleName, time,
-    selectDelegable, log, createCrew, createEventBus, folkModel, pickName, renderFolkCards, renderReservePanel, produceRate,
+    selectDelegable, log, createCrew, createEventBus, createGuards, folkView: apiModule.folkView, folkModel, pickName, renderFolkCards, renderReservePanel, produceRate,
     rules: delegationRules,
     perks,
     promotion,
@@ -130,6 +132,8 @@ export async function setup(ctx) {
     pkg.skills.add(Hiring);
   }).add();
   await ctx.gameData.addPackage('data/hiring.json');
+  // 3b. The API other mods read as mod.api.worker_folks (Voyage, phase 6): Folks, places, events, guards.
+  ctx.api(apiModule.createApi({ getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'), model: folkModel }));
   // Shop purchases depend on which expansions are loaded (game data is registered
   // before the Mod Manager starts, so namespace presence is reliable here).
   const expansions = {

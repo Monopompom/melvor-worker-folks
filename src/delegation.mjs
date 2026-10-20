@@ -24,7 +24,8 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
     const folk = folkFor(skill);
     return rules.decideStart({
       hasFolk: folk !== undefined,
-      folkAvailable: folk === undefined || hiring.folkAvailable(folk),
+      // Another mod may refuse the Folk this skill where it stands (Voyage's work guard): unavailable, with its reason.
+      folkAvailable: folk === undefined || (hiring.folkAvailable(folk) && hiring.workRefusal(folk, skill) === ''),
       isDelegated: hiring.delegated.has(skill),
       delegatedCount: hiring.delegated.size,
       shiftSlots: hiring.shiftSlots,
@@ -77,6 +78,11 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
         return false;
       case 'unavailable': {
         const folk = folkFor(skillFor(action));
+        const why = folk === undefined ? '' : hiring.workRefusal(folk, skillFor(action));
+        if (why !== '') {
+          this.notifications.createErrorNotification('worker_folks:unavailable', why);
+          return true;
+        }
         // The refusal says how to fix it, per status (scan B-14, build .112).
         const status = folk === undefined ? 'strike' : hiring.statusOf(folk);
         this.notifications.createErrorNotification(

@@ -87,9 +87,22 @@ export function install(ctx, { getHiring, pricing, licencePurchase, hirePurchase
     );
     if (shiftSlot !== undefined) shiftSlot._defaultPurchaseRequirements.push(slotCap);
     liveRequirements.push(crewSpace, slotCap);
+    addStaffRequirement();
+  };
+
+  // Another mod's staff guard (Voyage: hire only in a town) as a line on every hire, met or not, so the Shop says
+  // before the click. Added once the first staff guard exists; without one the hires look as before.
+  let staffRequirement;
+  const addStaffRequirement = () => {
+    if (staffRequirement !== undefined || hiring === undefined || hireTier.size === 0 || hiring.guards.count('staff') === 0) return;
+    const why = () => hiring.refusal('staff', { action: 'hire' });
+    staffRequirement = new LiveRequirement('WorkerFolksStaff', () => why() === '', () => why() || getLangString('MOD_WF_REQ_HIRE_HERE'));
+    hireTier.forEach((_, purchase) => purchase._defaultPurchaseRequirements.push(staffRequirement));
+    liveRequirements.push(staffRequirement);
   };
 
   const refreshShop = () => {
+    addStaffRequirement();
     liveRequirements.forEach((r) => r.refresh());
     game.shop.renderQueue.costs = true;
     game.shop.renderQueue.requirements = true;
@@ -112,6 +125,7 @@ export function install(ctx, { getHiring, pricing, licencePurchase, hirePurchase
     /** Run after the shop package is registered and before the shop menu is built. */
     afterShopData() {
       hiring = getHiring();
+      hiring.refreshShop = refreshShop;
       indexPurchases();
       addLiveRequirements();
     },

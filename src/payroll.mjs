@@ -151,6 +151,14 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     const skill = folk.skillId === null ? undefined : game.skills.getObjectByID(folk.skillId);
     if (skill === undefined || skill.isActive || hiring.delegated.has(skill)) return false;
     if (!hiring.folkAvailable(folk)) return false;
+    // Refused where it stands (Voyage's work guard): it stays idle and says why, rather than the skill's own lock
+    // popup opening on whatever page is shown (together-check, 16 Oct 2026).
+    const why = hiring.workRefusal(folk, skill);
+    if (why !== '') {
+      game.notifications.createInfoNotification('worker_folks:restart', templateLangString('MOD_WF_AUTO_RESTART_REFUSED', { name: folk.name, skill: hiring.skillName(skill), reason: why }), hiring.portrait(folk.tier));
+      log(`${folk.name} not restarted on ${skill.id}: ${why}`);
+      return false;
+    }
     try {
       startAgain(skill, pick);
     } catch (err) {

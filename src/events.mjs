@@ -15,6 +15,8 @@ export const EVENT_NAMES = [
   'loadoutChanged',
   'folkDied',
   'offlineTicks',
+  // A Folk's place or travel changed (the API, Voyage phase 6).
+  'folkMoved',
 ];
 
 export function createEventBus(names = EVENT_NAMES, { onError } = {}) {
