@@ -63,6 +63,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       this.stopping = undefined;
       /** True while forceStop runs: the mod stops a skill, not the player (delegation.mjs hand-over). */
       this.forcing = false;
+      /** The skill whose Folk a hand-over click is stopping: the player's start right after takes it (delegation.mjs). */
+      this.handingOver = undefined;
       /**
        * skill → folk id | null: a working Folk picked on another page moves when that page
        * starts; null means the player takes the skill over at its next start.
@@ -81,6 +83,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       this.events.on('folkReleased', ({ skill: released, folk }) => {
         if (folk === undefined) return;
         this.pending.forEach((id, skill) => {
+          // A hand-over click: the player's start that follows takes the skill, once it is accepted (delegation.mjs).
+          if (id === null && skill === released && this.handingOver === skill) return;
           if (id === folk.id || (id === null && skill === released)) this.applyPending(skill);
         });
       });
@@ -175,9 +179,11 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
      */
     actorFor(skill) {
       if (skill === undefined) return undefined;
-      if (this.delegated.has(skill)) return this.crew.bySkill(skill.id);
       const pending = this.pendingFor(skill);
-      const folk = pending === null ? undefined : pending ?? this.crew.bySkill(skill.id);
+      // You picked: the next start is yours even while the Folk still works it, so it is judged where you stand.
+      if (pending === null) return undefined;
+      if (this.delegated.has(skill)) return this.crew.bySkill(skill.id);
+      const folk = pending ?? this.crew.bySkill(skill.id);
       if (folk === undefined) return undefined;
       const way = rules.decideStart({ hasFolk: true, folkAvailable: this.folkAvailable(folk), isDelegated: false, delegatedCount: this.delegated.size, shiftSlots: this.shiftSlots });
       return way === 'delegate' ? folk : undefined;

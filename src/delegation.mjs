@@ -72,6 +72,23 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
   //    Shift Slot the start is refused (idleChecker returning true aborts start()).
   ctx.patch(Game, 'idleChecker').replace(function (original, action) {
     if (hiring === undefined || this.isGolbinRaid) return original(action);
+    // You picked: the Folk leaves the skill only when your start is accepted. Another mod may refuse it where you
+    // stand (Voyage: no trees on your hex), and then the Folk keeps its job.
+    if (skillFor(action) !== undefined && hiring.pendingFor(action) === null) {
+      const refused = original(action);
+      if (refused !== true) hiring.applyPending(action);
+      return refused;
+    }
+    // A Folk picked while busy on another skill moves at this start: only if it still may (another mod may refuse it
+    // now: you walked off since the pick). Refused, the start waits and the Folk on the skill keeps it.
+    const moving = skillFor(action) === undefined ? undefined : hiring.pendingFor(action);
+    if (moving !== undefined && moving !== null) {
+      const why = hiring.refusal('staff', { action: 'assign', folk: moving, skillId: action.id, skill: action });
+      if (why !== '') {
+        this.notifications.createErrorNotification('worker_folks:unavailable', why);
+        return true;
+      }
+    }
     if (skillFor(action) !== undefined) hiring.applyPending(action);
     switch (decide(action)) {
       case 'delegate':
@@ -109,7 +126,8 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
   //    took a second click. The same click now starts the player on the Folk's pick (build .83, the user's call).
   const WRAPPED = Symbol('worker_folks.stopWrapped');
   const takeOver = (skill, pick) => {
-    if (skill.isActive || hiring.delegated.has(skill) || hiring.crew.bySkill(skill.id) !== undefined) return;
+    if (skill.isActive || hiring.delegated.has(skill)) return;
+    if (hiring.crew.bySkill(skill.id) !== undefined && hiring.pending.get(skill) !== null) return;
     try {
       resume.startAgain(skill, pick);
       log(`hand-over: you took ${skill.id}`);
@@ -125,12 +143,15 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
       const handOver = !hiring.forcing && !ticking && game._isInOnlineLoop && hiring.pending.get(this) === null;
       const pick = handOver ? (picks.get(this) ?? resume.selectionOf(this)) : null;
       const previous = hiring.stopping;
+      const handing = hiring.handingOver;
       hiring.stopping = this;
+      if (handOver) hiring.handingOver = this;
       let stopped;
       try {
         stopped = proto.stop.apply(this, args);
       } finally {
         hiring.stopping = previous;
+        hiring.handingOver = handing;
       }
       // After the click handler: a click that also starts something (another area's Start) has run by then.
       if (handOver && stopped !== false) queueMicrotask(() => takeOver(this, pick));
