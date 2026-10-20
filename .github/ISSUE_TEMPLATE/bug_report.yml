@@ -1,0 +1,102 @@
+name: Bug report
+description: Something in Worker Folks doesn't work as it should.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. One bug per issue, please, and check the open issues first in case it is already known.
+
+  - type: input
+    id: mod-version
+    attributes:
+      label: Worker Folks version
+      description: Shown on the mod's mod.io page and in the in-game Mod Manager.
+      placeholder: "1.2.0"
+    validations:
+      required: true
+
+  - type: input
+    id: game-version
+    attributes:
+      label: Melvor Idle version
+      description: Bottom of the game's sidebar.
+      placeholder: "1.3.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Steam
+        - Epic Games Store
+        - Browser
+        - iOS
+        - Android
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: game-mode
+    attributes:
+      label: Game mode
+      options:
+        - Standard
+        - Hardcore
+        - Adventure
+        - Ancient Relics
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: expansions
+    attributes:
+      label: Expansions
+      options:
+        - label: Throne of the Herald
+        - label: Atlas of Discovery
+        - label: Into the Abyss
+
+  - type: textarea
+    id: other-mods
+    attributes:
+      label: Other mods
+      description: Every other mod you have loaded. A conflict between mods is a common cause.
+      placeholder: "Voyage: Far Shores, SEMI Core, ..."
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Hire a Folk
+        2. Assign it to Mining
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console errors
+      description: "Optional but very helpful: open the developer console (F12, or Ctrl+Shift+I / Cmd+Option+I) and paste any red lines that mention Worker Folks."
+      render: text
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Optional. Drag images here.
