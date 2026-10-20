@@ -40,21 +40,24 @@ export function install(ctx, { getHiring, rules, time, log }) {
       api.setHp(folk, plan.hp);
       return plan.eaten;
     },
-    /** Hurts the Folk; it eats if it can, and dies at zero. Returns true when it died. */
-    damage(folk, amount, { skill } = {}) {
+    /**
+     * Hurts the Folk, and it dies at zero. It eats if it can (`eat` false: it can't, as for hunger on the road), and
+     * `cause` ('hunger') names the death. Returns true when it died.
+     */
+    damage(folk, amount, { skill, eat = true, cause } = {}) {
       if (!(amount > 0)) return false;
       const result = rules.applyDamage(api.hpOf(folk), amount);
       api.setHp(folk, result.hp);
-      log(`${folk.name} takes ${amount} damage (${result.hp}/${api.maxHpOf(folk)})`);
+      log(`${folk.name} takes ${amount} damage${cause === undefined ? '' : ` (${cause})`} (${result.hp}/${api.maxHpOf(folk)})`);
       if (result.dead) {
-        api.kill(folk, { skill });
+        api.kill(folk, { skill, cause });
         return true;
       }
-      if (rules.shouldEat(result.hp, api.maxHpOf(folk))) api.eat(folk);
+      if (eat && rules.shouldEat(result.hp, api.maxHpOf(folk))) api.eat(folk);
       return false;
     },
     /** Death: the skill stops, gear returns to the bank, the Folk leaves and its slot freezes for 24 h. */
-    kill(folk, { skill } = {}) {
+    kill(folk, { skill, cause } = {}) {
       const working = skill ?? hiring.skillOf(folk);
       const offline = !game._isInOnlineLoop;
       hiring.forceStop(working); // also clears a Thieving stun so the skill really ends
@@ -62,12 +65,11 @@ export function install(ctx, { getHiring, rules, time, log }) {
       const until = rules.freezeUntil(Date.now());
       hiring.crew.freeze(folk.slot, until);
       hiring.crew.fire(folk.id, { reason: 'died' });
-      hiring.events.emit('folkDied', { folk, skill: working, offline });
-      game.notifications.createErrorNotification(
-        'worker_folks:died',
-        templateLangString('MOD_WF_DIED', { name: folk.name, skill: working === undefined ? '' : hiring.skillName(working), slot: `${folk.slot + 1}` }),
-        hiring.portrait(folk.tier),
-      );
+      hiring.events.emit('folkDied', { folk, skill: working, offline, cause });
+      // The death names its cause (hunger on the road) or the skill it died at; a Folk with neither just died.
+      const vars = { name: folk.name, skill: working === undefined ? '' : hiring.skillName(working), slot: `${folk.slot + 1}` };
+      const key = cause === 'hunger' ? 'MOD_WF_DIED_HUNGER' : working === undefined ? 'MOD_WF_DIED_PLAIN' : 'MOD_WF_DIED';
+      game.notifications.createErrorNotification('worker_folks:died', templateLangString(key, vars), hiring.portrait(folk.tier));
       log(`${folk.name} died on ${working?.id ?? '-'}; slot ${folk.slot} frozen until ${new Date(until).toISOString()}`);
     },
     /** Failed pickpocket: the Folk takes the NPC's hit instead of the player. */
@@ -82,7 +84,8 @@ export function install(ctx, { getHiring, rules, time, log }) {
       regenCounter = 0;
       let changed = false;
       hiring.crew.all.forEach((folk) => {
-        if (folk.hp === null) return;
+        // A Folk on the road with you (another mod's crew) doesn't rest, so it heals only once put down somewhere.
+        if (folk.hp === null || folk.travel === 'with') return;
         const max = api.maxHpOf(folk);
         folk.hp = Math.min(max, folk.hp + rules.regenAmount(max));
         if (folk.hp >= max) folk.hp = null;

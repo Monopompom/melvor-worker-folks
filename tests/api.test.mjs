@@ -33,7 +33,14 @@ function makeHiring() {
   const crew = createCrew({ bus: events, model, pickName: () => `Folk${n}`, maxSlots: 4, makeId: () => `id${(n += 1)}`, now: () => 0 });
   const guards = createGuards();
   let refreshed = 0;
-  const hiring = { events, crew, guards, statusOf: () => 'idle', refreshGuarded: () => { refreshed += 1; } };
+  const pending = new Map();
+  const hiring = {
+    events, crew, guards, pending,
+    statusOf: () => 'idle',
+    refreshGuarded: () => { refreshed += 1; },
+    clearPending: (skill) => pending.delete(skill),
+    delegableSkills: [],
+  };
   return { hiring, refreshed: () => refreshed };
 }
 
@@ -43,7 +50,7 @@ test('api: version, read-only views, places and travel with a folkMoved event', 
   assert.equal(api.version, API_VERSION);
   const folk = hiring.crew.hire('Junior');
   const v = api.folkById(folk.id);
-  assert.deepEqual(v, { id: folk.id, name: folk.name, tier: 'Junior', slot: 0, skillId: null, status: 'idle', place: null, travel: 'idle', hp: null });
+  assert.deepEqual(v, { id: folk.id, name: folk.name, tier: 'Junior', slot: 0, skillId: null, status: 'idle', place: null, travel: 'idle', hp: null, maxHp: undefined, portrait: undefined });
   assert.ok(Object.isFrozen(v));
   assert.equal(api.folkById('nobody'), undefined);
 
@@ -97,7 +104,7 @@ test('api v2: workerOf asks the skill who would act; registerLocationText sets a
   hiring.game = { skills: { getObjectByID: (id) => (id === mining.id ? mining : undefined) } };
   hiring.actorFor = (skill) => (skill === mining ? folk : undefined);
   const api = createApi({ getHiring: () => hiring, model });
-  assert.equal(api.version, 2);
+  assert.ok(api.version >= 2);
   assert.equal(api.workerOf('melvorD:Mining').id, folk.id);
   assert.equal(api.workerOf('melvorD:Fishing'), undefined);
   const fn = (v) => `At ${v.name}'s hex`;
@@ -106,4 +113,53 @@ test('api v2: workerOf asks the skill who would act; registerLocationText sets a
   off();
   assert.equal(hiring.locationText, undefined);
   assert.equal(refreshed(), 2);
+});
+
+test('api v3: a Folk going along stops its work and its pending move; skills, assign and maxHp', () => {
+  const { hiring } = makeHiring();
+  const mining = { id: 'melvorD:Mining', name: 'Mining' };
+  const fishing = { id: 'melvorD:Fishing', name: 'Fishing' };
+  hiring.delegableSkills = [mining, fishing];
+  const set = [];
+  hiring.setWorker = (skill, id) => { set.push([skill.id, id]); return hiring.crew.assign(id, skill.id); };
+  hiring.health = { maxHpOf: () => 200 };
+  const folk = hiring.crew.hire('Junior');
+  const api = createApi({ getHiring: () => hiring, model });
+  assert.equal(api.version, 3);
+  assert.equal(api.folkById(folk.id).maxHp, 200);
+  hiring.portrait = (tier) => `assets/worker_folk_${tier.toLowerCase()}.webp`;
+  assert.equal(api.folkById(folk.id).portrait, `assets/worker_folk_${folk.tier.toLowerCase()}.webp`);
+
+  assert.equal(api.assign(folk.id, 'melvorD:Mining'), true);
+  assert.deepEqual(set, [['melvorD:Mining', folk.id]], 'assign goes through the Worker box path, guards included');
+  assert.deepEqual(api.skills().map((s) => [s.id, s.holder]), [['melvorD:Mining', folk.id], ['melvorD:Fishing', null]]);
+  assert.equal(api.assign(folk.id, 'melvorD:Nope'), false);
+  assert.equal(api.assign('nobody', 'melvorD:Mining'), false);
+
+  hiring.pending.set(fishing, folk.id);
+  assert.equal(api.setTravel(folk.id, 'with'), true);
+  assert.equal(folk.skillId, null, 'going along unassigns');
+  assert.equal(hiring.pending.has(fishing), false, 'and drops a move waiting for it');
+  assert.equal(api.travelOf(folk.id), 'with');
+
+  assert.equal(api.assign(folk.id, null), true);
+  hiring.setWorker = () => false;
+  assert.equal(api.assign(folk.id, 'melvorD:Mining'), false, 'a refused pick is false');
+});
+
+test('api v3: hurt never eats, names the cause and reports a death', () => {
+  const { hiring } = makeHiring();
+  const folk = hiring.crew.hire('Junior');
+  const calls = [];
+  let hp = 100;
+  hiring.health = {
+    maxHpOf: () => 100,
+    hpOf: () => hp,
+    damage: (f, amount, opts) => { calls.push([f.id, amount, opts]); hp -= amount; return hp <= 0; },
+  };
+  const api = createApi({ getHiring: () => hiring, model });
+  assert.deepEqual(api.hurt(folk.id, 10, { cause: 'hunger' }), { hp: 90, dead: false });
+  assert.deepEqual(calls[0], [folk.id, 10, { eat: false, cause: 'hunger' }]);
+  assert.deepEqual(api.hurt(folk.id, 90, { cause: 'hunger' }), { hp: 0, dead: true });
+  assert.equal(api.hurt('nobody', 5), undefined);
 });

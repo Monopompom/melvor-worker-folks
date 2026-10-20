@@ -107,3 +107,14 @@ test('frozen slots are skipped by hire, expire with the clock and survive a roun
   assert.equal(crew.freeSlot({ limit: 1 }), -1);
   assert.ok(a);
 });
+
+test('a Folk going along with the player stops going along when given a skill', () => {
+  const { crew } = make();
+  const a = crew.hire('Newbie');
+  a.travel = 'with';
+  crew.assign(a.id, null);
+  assert.equal(a.travel, 'with', 'taking a skill away keeps it on the road');
+  crew.assign(a.id, 'melvorD:Mining');
+  assert.equal(a.travel, 'idle');
+  assert.equal(a.skillId, 'melvorD:Mining');
+});

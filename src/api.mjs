@@ -3,12 +3,15 @@
 // Pure: the Hiring skill and the Folk model are injected (mod modules cannot import their siblings).
 
 /** Bumped when something here changes in a way a caller must know about. Voyage refuses an older one. */
-export const API_VERSION = 2;
+export const API_VERSION = 3;
 
 const placeCopy = (place) => (place === null || place === undefined ? null : Object.freeze({ q: place.q, r: place.r }));
 
-/** A read-only view of a Folk. */
-export function folkView(folk, status) {
+/**
+ * A read-only view of a Folk. `hp` null means full health; `maxHp` (v3) is undefined where health isn't known;
+ * `portrait` (build .124) is the URL of its rank's picture, as on its card.
+ */
+export function folkView(folk, status, maxHp, portrait) {
   return Object.freeze({
     id: folk.id,
     name: folk.name,
@@ -19,6 +22,8 @@ export function folkView(folk, status) {
     place: placeCopy(folk.place),
     travel: folk.travel,
     hp: folk.hp,
+    maxHp,
+    portrait,
   });
 }
 
@@ -34,7 +39,8 @@ function viewPayload(payload, view) {
 export function createApi({ getHiring, model, version = API_VERSION }) {
   const { normalizePlace, TRAVEL } = model;
   const hiring = () => getHiring();
-  const view = (folk) => folkView(folk, hiring().statusOf(folk));
+  const view = (folk) => folkView(folk, hiring().statusOf(folk), hiring().health?.maxHpOf(folk), hiring().portrait?.(folk.tier));
+  const skillById = (skillId) => hiring().delegableSkills.find((s) => s.id === skillId);
   const record = (id) => hiring().crew.byId(id);
   const moved = (folk, from) => {
     hiring().events.emit('folkMoved', { folk, from: placeCopy(from.place), fromTravel: from.travel });
@@ -62,15 +68,47 @@ export function createApi({ getHiring, model, version = API_VERSION }) {
       return true;
     },
     travelOf: (id) => record(id)?.travel,
-    /** 'idle' (stays on its place) or 'with' (goes along with the player). */
+    /**
+     * 'idle' (stays on its place) or 'with' (goes along with the player). A Folk going along stops its work (v3): it is
+     * unassigned, and a move waiting for it in a Worker box is dropped.
+     */
     setTravel: (id, travel) => {
       const folk = record(id);
       if (folk === undefined || !TRAVEL.includes(travel)) return false;
       if (folk.travel === travel) return true;
       const from = { place: folk.place, travel: folk.travel };
+      if (travel === 'with') {
+        hiring().pending.forEach((pendingId, skill) => { if (pendingId === id) hiring().clearPending(skill); });
+        if (folk.skillId !== null) hiring().crew.assign(id, null);
+      }
       folk.travel = travel;
       moved(folk, from);
       return true;
+    },
+    /** The skills a Folk can be given: [{ id, name, holder }] (`holder`: the Folk on it, or null) (v3). */
+    skills: () => Object.freeze(hiring().delegableSkills.map((s) => Object.freeze({ id: s.id, name: s.name, holder: hiring().crew.bySkill(s.id)?.id ?? null }))),
+    /**
+     * Gives a Folk a skill as the Worker box does, guards included (null: takes its skill away). False when refused, or
+     * for an unknown Folk or skill (v3).
+     */
+    assign: (id, skillId) => {
+      const folk = record(id);
+      if (folk === undefined) return false;
+      if (skillId === null) return folk.skillId === null ? true : hiring().crew.assign(id, null) !== false;
+      const skill = skillById(skillId);
+      if (skill === undefined) return false;
+      return hiring().setWorker(skill, id) !== false;
+    },
+    /**
+     * Hurts a Folk by `amount` HP; it can't eat against it, and it dies at zero as from any other harm. `cause` names
+     * the death ('hunger'). Returns { hp, dead }, or undefined for an unknown Folk (v3).
+     */
+    hurt: (id, amount, { cause } = {}) => {
+      const folk = record(id);
+      const health = hiring().health;
+      if (folk === undefined || health === undefined) return undefined;
+      const dead = health.damage(folk, amount, { eat: false, cause });
+      return Object.freeze({ hp: dead ? 0 : health.hpOf(folk), dead });
     },
     /** Subscribes to a Worker Folks event; payloads carry Folk views. Returns the function that unsubscribes. */
     on: (name, fn) => {

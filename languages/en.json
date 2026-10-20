@@ -242,6 +242,8 @@
   "MOD_WF_CARD_FOOD": "Food: ${item} ×${count}",
   "MOD_WF_FOOD_OUT": "${name} ate your last ${item}. Set food in your combat Food slot, or the Folk can't heal.",
   "MOD_WF_DIED": "${name} died while working ${skill}. Slot ${slot} is frozen for 24 h.",
+  "MOD_WF_DIED_HUNGER": "${name} died of hunger on the road. Slot ${slot} is frozen for 24 h.",
+  "MOD_WF_DIED_PLAIN": "${name} died. Slot ${slot} is frozen for 24 h.",
   "MOD_WF_SLOT_FROZEN_TITLE": "Frozen slot",
   "MOD_WF_SLOT_FROZEN": "Slot ${slot} · ${time} left",
   "MOD_WF_SLOT_FROZEN_WHY": "A Folk died here on the job. Nobody can be hired into this slot for ${hours} h after a death.",
