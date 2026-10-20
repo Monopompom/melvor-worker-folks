@@ -2,8 +2,11 @@
 
 export const TIERS = ['Newbie', 'Junior', 'Middle', 'Senior', 'Expert'];
 export const SAVE_VERSION = 4;
-/** A Folk's travel state: 'idle' stays on its place, 'with' goes along with the player (Voyage, phase 6). */
-export const TRAVEL = ['idle', 'with'];
+/**
+ * A Folk's travel state: 'idle' stays on its place, 'with' goes along with the player, 'walking' is on its way somewhere
+ * alone (Voyage, phase 6). Only 'idle' works.
+ */
+export const TRAVEL = ['idle', 'with', 'walking'];
 
 const TIER_SET = new Set(TIERS);
 

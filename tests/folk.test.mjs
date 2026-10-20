@@ -122,6 +122,7 @@ test('place and travel: only plain integer hexes and known states survive', () =
   const base = { id: 'a', slot: 0, tier: 'Newbie', name: 'A' };
   assert.deepEqual(normalizeFolk({ ...base, place: { q: -3, r: 7, extra: 1 } }).place, { q: -3, r: 7 });
   for (const bad of [{ q: 1.5, r: 0 }, { q: '1', r: 0 }, [1, 2], 'here', 5]) assert.equal(normalizeFolk({ ...base, place: bad }).place, null);
-  assert.equal(normalizeFolk({ ...base, travel: 'walking' }).travel, 'idle');
+  assert.equal(normalizeFolk({ ...base, travel: 'flying' }).travel, 'idle');
+  assert.equal(normalizeFolk({ ...base, travel: 'walking' }).travel, 'walking');
   assert.equal(normalizeFolk({ ...base, travel: 'with' }).travel, 'with');
 });

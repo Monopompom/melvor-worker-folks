@@ -66,7 +66,7 @@ test('api: version, read-only views, places and travel with a folkMoved event', 
   assert.equal(api.setPlace('nobody', { q: 0, r: 0 }), false);
   assert.equal(api.setTravel(folk.id, 'with'), true);
   assert.equal(api.travelOf(folk.id), 'with');
-  assert.equal(api.setTravel(folk.id, 'walking'), false);
+  assert.equal(api.setTravel(folk.id, 'flying'), false);
   assert.equal(api.setPlace(folk.id, null), true);
   assert.equal(moves.length, 3);
   assert.deepEqual(moves[0].from, null);
@@ -125,7 +125,7 @@ test('api v3: a Folk going along stops its work and its pending move; skills, as
   hiring.health = { maxHpOf: () => 200 };
   const folk = hiring.crew.hire('Junior');
   const api = createApi({ getHiring: () => hiring, model });
-  assert.equal(api.version, 3);
+  assert.ok(api.version >= 3);
   assert.equal(api.folkById(folk.id).maxHp, 200);
   hiring.portrait = (tier) => `assets/worker_folk_${tier.toLowerCase()}.webp`;
   assert.equal(api.folkById(folk.id).portrait, `assets/worker_folk_${folk.tier.toLowerCase()}.webp`);
@@ -145,6 +145,26 @@ test('api v3: a Folk going along stops its work and its pending move; skills, as
   assert.equal(api.assign(folk.id, null), true);
   hiring.setWorker = () => false;
   assert.equal(api.assign(folk.id, 'melvorD:Mining'), false, 'a refused pick is false');
+});
+
+test('api v4: a Folk walking alone stops its work as one going along does', () => {
+  const { hiring } = makeHiring();
+  const mining = { id: 'melvorD:Mining', name: 'Mining' };
+  hiring.delegableSkills = [mining];
+  hiring.setWorker = (skill, id) => hiring.crew.assign(id, skill.id);
+  const folk = hiring.crew.hire('Middle');
+  const api = createApi({ getHiring: () => hiring, model });
+  assert.equal(api.version, 4);
+  assert.equal(api.assign(folk.id, 'melvorD:Mining'), true);
+  hiring.pending.set(mining, folk.id);
+  assert.equal(api.setTravel(folk.id, 'walking'), true);
+  assert.equal(api.travelOf(folk.id), 'walking');
+  assert.equal(folk.skillId, null, 'walking unassigns');
+  assert.equal(hiring.pending.has(mining), false);
+  assert.equal(api.folkById(folk.id).travel, 'walking');
+  // Arriving: given its work, it is no longer walking.
+  assert.equal(api.assign(folk.id, 'melvorD:Mining'), true);
+  assert.equal(api.travelOf(folk.id), 'idle');
 });
 
 test('api v3: hurt never eats, names the cause and reports a death', () => {

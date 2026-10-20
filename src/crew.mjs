@@ -107,8 +107,8 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
     },
     /**
      * Assigns a skill (or null). One Folk per skill: a previous holder is unassigned. A Folk given a skill stops going
-     * along with the player (travel 'with' becomes 'idle'): it works, so it stays put, and heals again. This also frees
-     * a Folk left on the road by a mod that is no longer loaded.
+     * along with the player or walking (its travel becomes 'idle'): it works, so it stays put, and heals again. This
+     * also frees a Folk left on the road by a mod that is no longer loaded.
      */
     assign(id, skillId) {
       const folk = this.byId(id);
@@ -116,7 +116,7 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
       if (skillId !== null) {
         const holder = this.bySkill(skillId);
         if (holder !== undefined && holder !== folk) this.assign(holder.id, null);
-        if (folk.travel === 'with') folk.travel = 'idle';
+        if (folk.travel !== 'idle') folk.travel = 'idle';
       }
       const previous = folk.skillId;
       if (previous === skillId) return true;

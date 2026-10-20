@@ -3,7 +3,7 @@
 // Pure: the Hiring skill and the Folk model are injected (mod modules cannot import their siblings).
 
 /** Bumped when something here changes in a way a caller must know about. Voyage refuses an older one. */
-export const API_VERSION = 3;
+export const API_VERSION = 4;
 
 const placeCopy = (place) => (place === null || place === undefined ? null : Object.freeze({ q: place.q, r: place.r }));
 
@@ -69,15 +69,15 @@ export function createApi({ getHiring, model, version = API_VERSION }) {
     },
     travelOf: (id) => record(id)?.travel,
     /**
-     * 'idle' (stays on its place) or 'with' (goes along with the player). A Folk going along stops its work (v3): it is
-     * unassigned, and a move waiting for it in a Worker box is dropped.
+     * 'idle' (stays on its place), 'with' (goes along with the player) or 'walking' (on its way alone, v4). A Folk that
+     * leaves its place stops its work (v3): it is unassigned, and a move waiting for it in a Worker box is dropped.
      */
     setTravel: (id, travel) => {
       const folk = record(id);
       if (folk === undefined || !TRAVEL.includes(travel)) return false;
       if (folk.travel === travel) return true;
       const from = { place: folk.place, travel: folk.travel };
-      if (travel === 'with') {
+      if (travel !== 'idle') {
         hiring().pending.forEach((pendingId, skill) => { if (pendingId === id) hiring().clearPending(skill); });
         if (folk.skillId !== null) hiring().crew.assign(id, null);
       }

@@ -84,8 +84,8 @@ export function install(ctx, { getHiring, rules, time, log }) {
       regenCounter = 0;
       let changed = false;
       hiring.crew.all.forEach((folk) => {
-        // A Folk on the road with you (another mod's crew) doesn't rest, so it heals only once put down somewhere.
-        if (folk.hp === null || folk.travel === 'with') return;
+        // A Folk on the road (with you, or walking alone) doesn't rest, so it heals only once put down somewhere.
+        if (folk.hp === null || folk.travel !== 'idle') return;
         const max = api.maxHpOf(folk);
         folk.hp = Math.min(max, folk.hp + rules.regenAmount(max));
         if (folk.hp >= max) folk.hp = null;

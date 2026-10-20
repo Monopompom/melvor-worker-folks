@@ -117,4 +117,8 @@ test('a Folk going along with the player stops going along when given a skill', 
   crew.assign(a.id, 'melvorD:Mining');
   assert.equal(a.travel, 'idle');
   assert.equal(a.skillId, 'melvorD:Mining');
+  const b = crew.hire('Newbie');
+  b.travel = 'walking';
+  crew.assign(b.id, 'melvorD:Fishing');
+  assert.equal(b.travel, 'idle', 'a walking Folk given a skill has arrived');
 });
