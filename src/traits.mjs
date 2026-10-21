@@ -32,6 +32,12 @@ export function install(ctx, { getHiring, model, popupDidRender, titleName = (s)
     : templateLangString(`MOD_WF_TRAIT_${trait.id}`, { skill: skillNameOf(trait.skillId) }));
   const effectOf = (trait) => (model.traitDef(trait.id) === undefined ? ''
     : templateLangString(`MOD_WF_TRAIT_${trait.id}_DESC`, { skill: skillNameOf(trait.skillId) }));
+  /**
+   * The effect after a notice's colon ("learned Loyal: never strikes…"): lower case where it starts with a plain word
+   * (build .367, the colon rule); the tooltip's own line keeps the capital.
+   */
+  const AFTER = ['Loyal', 'Resentful'];
+  const effectAfter = (trait) => (AFTER.includes(trait.id) ? getLangString(`MOD_WF_TRAIT_${trait.id}_AFTER`) : effectOf(trait));
   const lastsOf = (trait) => {
     const def = model.traitDef(trait.id);
     if (def === undefined) return '';
@@ -48,7 +54,7 @@ export function install(ctx, { getHiring, model, popupDidRender, titleName = (s)
   // ---- Learning, fading, notices ------------------------------------------------
 
   const notify = (folk, change) => {
-    const vars = { name: folk.name, trait: nameOf(change.trait), effect: effectOf(change.trait) };
+    const vars = { name: folk.name, trait: nameOf(change.trait), effect: effectAfter(change.trait) };
     const kind = kindOf(change.trait);
     const n = game.notifications;
     const media = mediaOf(change.trait);
@@ -277,6 +283,7 @@ export function install(ctx, { getHiring, model, popupDidRender, titleName = (s)
     },
     nameOf,
     effectOf,
+    effectAfter,
     mediaOf,
     kindOf,
     /** The dev console: learns `id` now (Specialist in the Folk's skill). */

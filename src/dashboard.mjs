@@ -11,6 +11,8 @@
 // redraws At work, Made and the pill when something changed and the page is shown; markDirty() asks for that.
 
 const CONTAINER_ID = 'worker-folks-container';
+/** Milestones whose name starts with a plain word: the Next pill shows them lower case after its colon. */
+const PILL_AFTER = ['APOLOGY', 'FREE_SLOT_1', 'FREE_SLOT_2', 'WAGES_10', 'FORGET'];
 export const BLOCK_ID = 'worker-folks-overview';
 
 export function install(ctx, { getHiring, model, milestones, tips, popupDidRender, log }) {
@@ -197,7 +199,9 @@ export function install(ctx, { getHiring, model, milestones, tips, popupDidRende
     if (!next.capped && typeof exp !== 'undefined') {
       percent = Math.floor(100 * model.progressTo(hiring.xp, exp.levelToXP(hiring.level), exp.levelToXP(next.level)));
     }
-    return { level: next.level, text: getLangString(`MOD_WF_MILESTONE_${next.key}`), capped: next.capped, percent };
+    // After the pill's colon, so lower case where the name starts with a plain word (build .367); the milestone list keeps it.
+    const pill = PILL_AFTER.includes(next.key) ? `MOD_WF_MILESTONE_${next.key}_PILL` : `MOD_WF_MILESTONE_${next.key}`;
+    return { level: next.level, text: getLangString(pill), capped: next.capped, percent };
   };
 
   // ---- Drawing ----

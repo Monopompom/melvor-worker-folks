@@ -112,7 +112,7 @@ export function install(ctx, { getHiring, log }) {
       const tone = type === 'faded' ? 'text-success' : type === 'waiting' ? '' : kind === 'good' ? 'text-success' : kind === 'bad' ? 'text-danger' : '';
       const key = { learned: 'MOD_WF_TRAIT_LEARNED', waiting: 'MOD_WF_TRAIT_WAITING', slotted: 'MOD_WF_TRAIT_SLOTTED', faded: 'MOD_WF_TRAIT_FADED' }[type];
       if (key === undefined) return;
-      const text = fill(key, { name: folk.name, trait: t.nameOf(trait), effect: t.effectOf(trait) }, tone === '' ? {} : { trait: tone });
+      const text = fill(key, { name: folk.name, trait: t.nameOf(trait), effect: (t.effectAfter ?? t.effectOf)(trait) }, tone === '' ? {} : { trait: tone });
       lines.push({ html: `<span class="text-nowrap"><img class="skill-icon-xs" src="${t.mediaOf(trait)}" alt=""></span> ${text}` });
     });
     // The header: icon and text on one centred flex row. The lines: plain centred text that wraps, the icon inline.

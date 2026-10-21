@@ -959,21 +959,23 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       const plan = this.promotionPlanFor(folk);
       if (plan.nextTier === null) return;
       // The requirements on a grey band; the fee after the GP icon in bold amber, red when you can't pay (scan C-22, build .112). Body size throughout.
-      const row = (met, text) => `<div class="${met ? 'text-success' : 'text-danger'}">${met ? '✓' : '✗'} ${text}</div>`;
+      // Each row says in its tooltip what the requirement is and where it comes from (build .367, the user).
+      const row = (met, text, key) => `<div class="${met ? 'text-success' : 'text-danger'}" data-wf-req="${key}" tabindex="0">${met ? '✓' : '✗'} ${text}</div>`;
+      const masteryIcon = typeof cdnMedia === 'function' ? `<img class="skill-icon-xs mr-1" src="${cdnMedia('assets/media/main/mastery_header.png')}" alt="">` : '';
       const diplomaText = plan.diploma === undefined ? '?' : `<img class="skill-icon-xs mr-1" src="${plan.diploma.media}" alt="">${plan.diploma.name}`;
       const gpShort = plan.blockers.includes('gp');
       const fee = `<img class="skill-icon-xs mr-1" src="${this.game.gp.media}" alt="GP"><span class="font-w600 ${gpShort ? 'text-danger' : 'text-warning'}">${numberWithCommas(plan.cost)}</span>`;
-      const feeRow = `<div><span class="${gpShort ? 'text-danger' : 'text-success'}">${gpShort ? '✗' : '✓'}</span> ${templateLangString('MOD_WF_PROMO_COST', { cost: fee, percent: `${Math.round((this.levels?.promotionCostRate() ?? promotion.PROMOTION_COST_RATE) * 100)}` })}</div>`;
+      const feeRow = `<div data-wf-req="gp" tabindex="0"><span class="${gpShort ? 'text-danger' : 'text-success'}">${gpShort ? '✗' : '✓'}</span> ${templateLangString('MOD_WF_PROMO_COST', { cost: fee, percent: `${Math.round((this.levels?.promotionCostRate() ?? promotion.PROMOTION_COST_RATE) * 100)}` })}</div>`;
       const html = `
         <div class="text-left">
           <div class="wf-band">
-          ${this.levels === undefined ? '' : row(!plan.blockers.includes('level'), templateLangString('MOD_WF_PROMO_LEVEL', { level: `${this.levels.promotionLevel}`, now: `${this.level}` }))}
-          ${row(!plan.blockers.includes('licence'), templateLangString('MOD_WF_PROMO_LICENCE', { role: this.roleName(plan.nextTier) }))}
-          ${row(!plan.blockers.includes('mastery'), templateLangString('MOD_WF_PROMO_MASTERY', { gate: `${plan.gate}`, level: `${this.masteryLevelOf(folk)}` }))}
-          ${row(!plan.blockers.includes('diploma'), templateLangString('MOD_WF_PROMO_DIPLOMA', { item: diplomaText }))}
+          ${this.levels === undefined ? '' : row(!plan.blockers.includes('level'), templateLangString('MOD_WF_PROMO_LEVEL', { level: `${this.levels.promotionLevel}`, now: `${this.level}` }), 'level')}
+          ${row(!plan.blockers.includes('licence'), templateLangString('MOD_WF_PROMO_LICENCE', { role: this.roleName(plan.nextTier) }), 'licence')}
+          ${row(!plan.blockers.includes('mastery'), masteryIcon + templateLangString('MOD_WF_PROMO_MASTERY', { gate: `${plan.gate}`, level: `${this.masteryLevelOf(folk)}` }), 'mastery')}
+          ${row(!plan.blockers.includes('diploma'), templateLangString('MOD_WF_PROMO_DIPLOMA', { item: diplomaText }), 'diploma')}
           ${feeRow}
           </div>
-          ${plan.ok ? '' : `<div class="text-warning mt-2">${this.promotionNeedsText(folk, plan)}</div>`}
+          ${plan.ok ? '' : `<div class="text-warning mt-2">${this.promotionNeedsLines(folk, plan).map((l) => `<div>${l}</div>`).join('')}</div>`}
           <div class="mt-2">${getLangString('MOD_WF_PROMO_KEEPS')}</div>
         </div>`;
       SwalLocale.fire({
@@ -992,7 +994,19 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         focusCancel: !plan.ok,
         confirmButtonText: getLangString('MOD_WF_BUTTON_PROMOTE'),
         // Disabled while a requirement is missing: the red rows and the amber line say which.
-        didOpen: () => { if (!plan.ok) { const b = Swal.getConfirmButton(); if (b) b.disabled = true; } },
+        didOpen: (el) => {
+          if (!plan.ok) { const b = Swal.getConfirmButton(); if (b) b.disabled = true; }
+          const role = this.roleName(plan.nextTier);
+          const tip = {
+            level: templateLangString('MOD_WF_PROMO_TIP_LEVEL', { level: `${this.levels?.promotionLevel ?? ''}` }),
+            licence: templateLangString('MOD_WF_PROMO_TIP_LICENCE', { role }),
+            mastery: templateLangString('MOD_WF_PROMO_TIP_MASTERY', { name: folk.name, gate: `${plan.gate}`, role }),
+            diploma: plan.diploma === undefined ? '' : [{ parts: [{ text: getLangString('MOD_WF_PROMO_TIP_DIPLOMA') }, { item: plan.diploma }] }],
+            gp: getLangString('MOD_WF_PROMO_TIP_GP'),
+          };
+          el.querySelectorAll('[data-wf-req]').forEach((r) => tips?.set(r, tip[r.dataset.wfReq] ?? ''));
+        },
+        didDestroy: () => tips?.sweep(),
       }).then((result) => {
         if (!result.isConfirmed) return;
         const fresh = this.promotionPlanFor(folk);
@@ -1013,6 +1027,11 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
 
     /** "Can't promote X yet. Still needed: …", naming each missing requirement. */
     promotionNeedsText(folk, plan) {
+      return this.promotionNeedsLines(folk, plan).join(' ');
+    }
+
+    /** The same as two lines: "Can't promote X yet." and "Still needed: …" (the dialog puts each on its own line). */
+    promotionNeedsLines(folk, plan) {
       const needs = plan.blockers.map((b) => {
         switch (b) {
           case 'level': return templateLangString('MOD_WF_PROMO_NEED_level', { level: `${this.levels?.promotionLevel ?? ''}` });
@@ -1023,7 +1042,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
           default: return b;
         }
       });
-      return templateLangString('MOD_WF_PROMO_BLOCKED', { name: folk.name, needs: needs.join(', ') });
+      return [templateLangString('MOD_WF_PROMO_BLOCKED', { name: folk.name }), templateLangString('MOD_WF_PROMO_STILL_NEEDED', { needs: needs.join(', ') })];
     }
 
     returnLoadout(folk) {
