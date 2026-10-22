@@ -81,6 +81,17 @@ export function install(ctx, { getHiring, rate, log }) {
   };
 
   const isFolkRun = (skill) => hiring !== undefined && (hiring.delegated.has(skill) || hiring.decideStart?.(skill) === 'delegate');
+  /**
+   * Restarts a skill's action timer after a failed action. Cartography has no startActionTimer (only GatheringSkill
+   * does; in 1.3.1 the call threw and the error escaped the delegated tick, so a Trainee's first failed survey broke the
+   * game loop, build .136): its mode starters are left alone and the timer runs again for the interval it just ran.
+   */
+  const restartTimer = (skill) => {
+    if (typeof skill.startActionTimer === 'function') { skill.startActionTimer(); return; }
+    const timer = skill.actionTimer;
+    if (timer === undefined || typeof timer.start !== 'function') return;
+    timer.start(Math.max(1, timer.maxTicks) * TICK_INTERVAL);
+  };
 
   ctx.onModsLoaded(() => {
     hiring = getHiring();
@@ -117,7 +128,7 @@ export function install(ctx, { getHiring, rate, log }) {
         if (rewardsInsideBody && hiring.acting.outcome === 'fail') {
           // Cartography resolves rewards inside mode-specific bodies: a failed
           // action simply gives nothing and the timer restarts.
-          this.startActionTimer();
+          restartTimer(this);
           return undefined;
         }
         return original();

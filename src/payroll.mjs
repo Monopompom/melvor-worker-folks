@@ -63,6 +63,10 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     capacityHours() {
       return hiring.levels?.reserveCapacityHours() ?? Infinity;
     },
+    /** The capacity written as the milestones write it: "24 h", "72 h", "7 days", "30 days" (build .136). */
+    capacityText() {
+      return milestones.capacityText(api.capacityHours(), templateLangString);
+    },
     capacityOf(currencyId) {
       const hours = api.capacityHours();
       if (hours === Infinity) return Infinity;
@@ -214,6 +218,9 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     if (split.fromReserve > 0) hiring.crew.adjustReserve(id, -split.fromReserve);
     if (split.fromBank > 0) cur.remove(split.fromBank);
     warnReserve(id);
+    // What was paid, for the Welcome Back summary's wages line (build .136).
+    const paid = split.fromReserve + split.fromBank;
+    if (paid > 0) hiring.events.emit('folkPaid', { folk, skill, currencyId: id, amount: paid, offline: !game._isInOnlineLoop });
     if (split.unpaid === 0) {
       if (folk.debt === 0 && folk.debtMs !== 0) folk.debtMs = 0;
       return;

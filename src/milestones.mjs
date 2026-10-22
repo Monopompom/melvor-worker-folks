@@ -52,6 +52,20 @@ export function reserveCapacityHours(level) {
   return 0;
 }
 
+/** A reserve capacity reads in days from a week on ("7 days", "30 days"), in hours under it ("24 h", "72 h"). */
+export const CAPACITY_DAYS_FROM = 168;
+
+/**
+ * One way to write a reserve capacity wherever it is printed (the help popup, the Tips table), so they all agree
+ * with the milestone names (build .136). `t(key, vars)` is the language template; the hours and days keys carry
+ * the unit.
+ */
+export function capacityText(hours, t) {
+  return hours >= CAPACITY_DAYS_FROM
+    ? t('MOD_WF_CAPACITY_DAYS', { days: `${Math.floor(hours / 24)}` })
+    : t('MOD_WF_CAPACITY_HOURS', { hours: `${hours}` });
+}
+
 export function promotionsUnlocked(level) {
   return level >= PROMOTION_LEVEL;
 }

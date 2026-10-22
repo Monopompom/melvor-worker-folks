@@ -19,6 +19,8 @@ export const EVENT_NAMES = [
   'folkMoved',
   // A Folk learned a trait, one waits for a slot, takes one or faded: { folk, type, trait, offline }.
   'folkTrait',
+  // A wage left the reserve or the bank for an action: { folk, skill, currencyId, amount, offline } (build .136).
+  'folkPaid',
 ];
 
 export function createEventBus(names = EVENT_NAMES, { onError } = {}) {

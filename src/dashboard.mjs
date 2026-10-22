@@ -12,7 +12,6 @@
 
 const CONTAINER_ID = 'worker-folks-container';
 /** Milestones whose name starts with a plain word: the Next pill shows them lower case after its colon. */
-const PILL_AFTER = ['APOLOGY', 'FREE_SLOT_1', 'FREE_SLOT_2', 'WAGES_10', 'FORGET'];
 export const BLOCK_ID = 'worker-folks-overview';
 
 export function install(ctx, { getHiring, model, milestones, tips, popupDidRender, log }) {
@@ -78,7 +77,8 @@ export function install(ctx, { getHiring, model, milestones, tips, popupDidRende
     table.append(head);
     for (const [level, hours] of [...milestones.RESERVE_STEPS].sort((a, b) => a[0] - b[0])) {
       const row = el('tr');
-      row.append(el('td', '', `${level}`), el('td', 'font-w600 wf-num', hours >= 168 ? templateLangString('MOD_WF_TIP_12_DAYS', { days: `${hours / 24}` }) : `${hours}\u00a0h`));
+      // Written as the milestones and the reserve help write it (build .136).
+      row.append(el('td', '', `${level}`), el('td', 'font-w600 wf-num', milestones.capacityText(hours, templateLangString)));
       table.append(row);
     }
     return table;
@@ -200,7 +200,7 @@ export function install(ctx, { getHiring, model, milestones, tips, popupDidRende
       percent = Math.floor(100 * model.progressTo(hiring.xp, exp.levelToXP(hiring.level), exp.levelToXP(next.level)));
     }
     // After the pill's colon, so lower case where the name starts with a plain word (build .367); the milestone list keeps it.
-    const pill = PILL_AFTER.includes(next.key) ? `MOD_WF_MILESTONE_${next.key}_PILL` : `MOD_WF_MILESTONE_${next.key}`;
+    const pill = `MOD_WF_MILESTONE_${next.key}`; // after " · " the milestone keeps its capital (build .136)
     return { level: next.level, text: getLangString(pill), capped: next.capped, percent };
   };
 

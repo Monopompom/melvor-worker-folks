@@ -272,7 +272,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
         const grid = document.createElement('div');
         grid.className = 'wf-slot-grid';
         const lockedLine = document.createElement('div');
-        lockedLine.className = 'wf-slot-locked-line d-none';
+        lockedLine.className = 'wf-slot-locked-line text-warning d-none'; // amber like the picker's locked line (build .136)
         const layout = rules.slotLayout(folk.tier, expansions())
           .map((l) => ({ ...l, slot: slotObj(l.id) }))
           .filter((l) => l.slot !== undefined);

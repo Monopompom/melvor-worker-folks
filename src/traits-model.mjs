@@ -127,15 +127,7 @@ export function resetProgress(state, source) {
 export function settle(state, { level, tier }) {
   const changes = [];
   const open = openSlots(level);
-  const place = (trait) => {
-    if (state.traits.length < open) {
-      state.traits.push(trait);
-      changes.push({ type: 'learned', trait });
-    } else {
-      state.waiting.push(trait);
-      changes.push({ type: 'waiting', trait });
-    }
-  };
+  const place = (trait) => placeTrait(state, trait, open, changes);
   // Fading first, so a slot it frees can take a trait learned in the same pass.
   const faded = (t) => {
     const def = BY_ID.get(t.id);
@@ -174,6 +166,41 @@ export function settle(state, { level, tier }) {
   return changes;
 }
 
+/** A learned trait takes an open slot, or waits for one when every open slot is full. */
+function placeTrait(state, trait, open, changes) {
+  if (state.traits.length < open) {
+    state.traits.push(trait);
+    changes.push({ type: 'learned', trait });
+  } else {
+    state.waiting.push(trait);
+    changes.push({ type: 'waiting', trait });
+  }
+}
+
+/**
+ * Learns a trait another mod counts and teaches (API v5, Voyage's travel traits): it takes an open slot or waits, as
+ * the table's own do. Returns the changes, none when the Folk already holds it or waits on it.
+ */
+export function earn(state, id, { level }) {
+  if (typeof id !== 'string' || id === '' || has(state, id)) return [];
+  const changes = [];
+  placeTrait(state, { id }, openSlots(level), changes);
+  return changes;
+}
+
+/**
+ * Takes a held or waiting trait away as a fade (another mod's own fading rule, API v5): its count restarts and the
+ * queue moves up. Returns the changes, the fade first; none when the Folk doesn't have it.
+ */
+export function drop(state, id, { level, tier }) {
+  const trait = state.traits.find((t) => t.id === id) ?? state.waiting.find((t) => t.id === id);
+  if (trait === undefined) return [];
+  state.traits = state.traits.filter((t) => t.id !== id);
+  state.waiting = state.waiting.filter((t) => t.id !== id);
+  restartLearning(state, id);
+  return [{ type: 'faded', trait }, ...settle(state, { level, tier })];
+}
+
 /** Forgets the held trait at `index`: its slot frees, its count restarts, the queue moves up. */
 export function forget(state, index, { level, tier }) {
   const trait = state.traits[index];
@@ -183,17 +210,41 @@ export function forget(state, index, { level, tier }) {
   return { trait, changes: settle(state, { level, tier }) };
 }
 
+/** The effects another mod's trait may have here (API v5): the plain ones, percentages within ±OUTSIDE_LIMIT. */
+export const OUTSIDE_EFFECTS = ['interval', 'xp', 'preservation', 'doubling', 'masteryXP', 'wage'];
+export const OUTSIDE_LIMIT = 50;
+
+/** Another mod's effects, cleaned: known keys, finite numbers, clamped. Anything else gives {}. */
+export function cleanOutsideEffects(raw) {
+  const out = {};
+  if (raw === null || typeof raw !== 'object') return out;
+  for (const key of OUTSIDE_EFFECTS) {
+    const v = raw[key];
+    if (typeof v === 'number' && Number.isFinite(v) && v !== 0) out[key] = Math.max(-OUTSIDE_LIMIT, Math.min(OUTSIDE_LIMIT, v));
+  }
+  return out;
+}
+
 /**
  * What a Folk's held traits add up to while it works `skillId` (null when it works nothing). `fighting` is true while
- * the player is in combat. Unknown ids add nothing. Wage, grace and cooldown come back as factors.
+ * the player is in combat. `outside(trait)` gives another mod's trait its effects (cleaned here). Unknown ids add
+ * nothing. Wage, grace and cooldown come back as factors.
  */
-export function effectsOf(traits, { skillId = null, fighting = false } = {}) {
+export function effectsOf(traits, { skillId = null, fighting = false, outside } = {}) {
   const out = {
     interval: 0, xp: 0, preservation: 0, doubling: 0, masteryXP: 0,
     wageFactor: 1, overtimeWageFactor: 1, graceFactor: 1, cooldownFactor: 1, neverStrikes: false,
   };
+  // Another mod's traits add up first and the sums are clamped (build .136; each alone was, so two could pass the limit).
+  const ext = {};
   for (const t of traits ?? []) {
-    const e = BY_ID.get(t.id)?.effects;
+    if (BY_ID.has(t.id) || outside === undefined) continue;
+    const e = cleanOutsideEffects(outside(t));
+    for (const key of OUTSIDE_EFFECTS) if (e[key] !== undefined) ext[key] = (ext[key] ?? 0) + e[key];
+  }
+  const extClamped = cleanOutsideEffects(ext);
+  for (const t of [...(traits ?? []), { id: '\u0000outside' }]) {
+    const e = t.id === '\u0000outside' ? extClamped : BY_ID.get(t.id)?.effects;
     if (e === undefined) continue;
     out.interval += e.interval ?? 0;
     out.xp += e.xp ?? 0;

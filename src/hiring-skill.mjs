@@ -464,7 +464,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
             { head: getLangString('MOD_WF_RESERVE_HELP_ORDER_HEAD'), body: [getLangString('MOD_WF_RESERVE_HELP_ORDER'), getLangString('MOD_WF_RESERVE_HELP_STRIKE')] },
             ...(capacity > 0 && capacity !== Infinity ? [{
               head: getLangString('MOD_WF_RESERVE_HELP_CAP_HEAD'),
-              body: [templateLangString('MOD_WF_RESERVE_HELP_CAP', { hours: `${capacity}` }), getLangString('MOD_WF_RESERVE_HELP_COVERS'), getLangString('MOD_WF_RESERVE_HELP_GROWS')],
+              // "30 days", as the milestone and the Tips table say it, never "720 h" (build .136).
+              body: [templateLangString('MOD_WF_RESERVE_HELP_CAP', { capacity: this.payroll.capacityText() }), getLangString('MOD_WF_RESERVE_HELP_COVERS'), getLangString('MOD_WF_RESERVE_HELP_GROWS')],
             }] : []),
           ]
           : [{ head: getLangString('MOD_WF_SLOT_FROZEN_HEAD'), body: (this.health?.freezeReason() ?? '').split(/(?<=[.!?])\s+/) }]; // one sentence a line
@@ -569,9 +570,9 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
           const skill = this.skillOf(folk);
           if (skill === undefined) return getLangString('MOD_WF_CARD_SKILL_NONE_HINT');
           if (!this.delegated.has(skill)) {
-            // Not "ready" while striking or resting (build .81); the strike band and the cooldown line say the rest.
+            // Not "ready" while striking (build .81); the strike band says the rest. A cooling-down Folk never gets
+            // here: the card prints the cooldown line (with its time left) in place of this text (build .136).
             if (this.struck(folk)) return templateLangString('MOD_WF_CARD_STOPPED_STRIKE', { skill: this.skillName(skill) });
-            if (folk.cooldownTicks > 0) return getLangString('MOD_WF_CARD_STOPPED_RESTING');
             return templateLangString('MOD_WF_CARD_READY', { skill: this.skillName(skill) });
           }
           const action = this.currentActionName(skill);
@@ -674,7 +675,9 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
             parts.push({ text: after });
             tip.push({ parts });
           }
-          return { text: templateLangString('MOD_WF_BUTTON_GEAR_COUNT', { filled: `${s.filled}`, open: `${s.open}` }), tip, out: s.out.length > 0 };
+          // Amber with its reason on the button (build .136), as the Worker tile says it.
+          const count = templateLangString('MOD_WF_BUTTON_GEAR_COUNT', { filled: `${s.filled}`, open: `${s.open}` });
+          return { text: s.out.length > 0 ? `${count} · ${templateLangString('MOD_WF_TILE_GEAR_OUT', { count: `${s.out.length}` })}` : count, tip, out: s.out.length > 0 };
         },
         onGear: (folk) => { if (!this.refused('gear', { folk })) this.loadout?.openLoadout(folk); },
         traits: (folk) => this.traits?.cardView(folk),
@@ -967,8 +970,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       const fee = `<img class="skill-icon-xs mr-1" src="${this.game.gp.media}" alt="GP"><span class="font-w600 ${gpShort ? 'text-danger' : 'text-warning'}">${numberWithCommas(plan.cost)}</span>`;
       const feeRow = `<div data-wf-req="gp" tabindex="0"><span class="${gpShort ? 'text-danger' : 'text-success'}">${gpShort ? '✗' : '✓'}</span> ${templateLangString('MOD_WF_PROMO_COST', { cost: fee, percent: `${Math.round((this.levels?.promotionCostRate() ?? promotion.PROMOTION_COST_RATE) * 100)}` })}</div>`;
       const html = `
-        <div class="text-left">
-          <div class="wf-band">
+        <div>
+          <div class="wf-band text-left">
           ${this.levels === undefined ? '' : row(!plan.blockers.includes('level'), templateLangString('MOD_WF_PROMO_LEVEL', { level: `${this.levels.promotionLevel}`, now: `${this.level}` }), 'level')}
           ${row(!plan.blockers.includes('licence'), templateLangString('MOD_WF_PROMO_LICENCE', { role: this.roleName(plan.nextTier) }), 'licence')}
           ${row(!plan.blockers.includes('mastery'), masteryIcon + templateLangString('MOD_WF_PROMO_MASTERY', { gate: `${plan.gate}`, level: `${this.masteryLevelOf(folk)}` }), 'mastery')}

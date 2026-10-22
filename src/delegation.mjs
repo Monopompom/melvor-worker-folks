@@ -179,15 +179,23 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
     hiring.folkTurn = true; // quiet-popups.mjs: what these ticks queue comes from the Folks
     try {
       for (const skill of Array.from(hiring.delegated)) {
-        if (!skill.isActive) {
+        try {
+          if (!skill.isActive) {
+            hiring.release(skill);
+            continue;
+          }
+          // The timer fires its action on the tick that brings ticksLeft to 0.
+          const fires = skill.actionTimer.isActive && skill.actionTimer.ticksLeft === 1;
+          const intervalMs = skill.actionTimer.maxTicks * TICK_INTERVAL;
+          skill.activeTick();
+          if (fires) hiring.delegatedActionDone(skill, intervalMs);
+        } catch (err) {
+          // A Folk's error never stops the game loop (it escaped Game.tick and repeated on every reload, build .136):
+          // the skill is stopped and released, the error logged.
+          log(`${skill.id}: a delegated tick failed, the Folk stops`, err);
+          try { hiring.forceStop(skill); } catch (e) { log('stop after the failed tick failed', e); }
           hiring.release(skill);
-          continue;
         }
-        // The timer fires its action on the tick that brings ticksLeft to 0.
-        const fires = skill.actionTimer.isActive && skill.actionTimer.ticksLeft === 1;
-        const intervalMs = skill.actionTimer.maxTicks * TICK_INTERVAL;
-        skill.activeTick();
-        if (fires) hiring.delegatedActionDone(skill, intervalMs);
       }
     } finally {
       ticking = false;

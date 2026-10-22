@@ -3,12 +3,12 @@
 // This module: opens the summary modal when only Folks were working, appends a
 // per-Folk block to the summary, and emits `offlineTicks` for later timers.
 
-export function install(ctx, { getHiring, log }) {
+export function install(ctx, { getHiring, time, log }) {
   let hiring;
-  /** Per offline session: actions completed and skills released, by skill id. */
-  let tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], traits: [], active: false };
+  /** Per offline session: actions completed and skills released, by skill id; wages paid, by currency id. */
+  let tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], traits: [], wages: new Map(), active: false };
   const reset = () => {
-    tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], traits: [], active: true };
+    tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], traits: [], wages: new Map(), active: true };
   };
 
   ctx.onModsLoaded(() => {
@@ -50,7 +50,7 @@ export function install(ctx, { getHiring, log }) {
     const ticks = Math.floor(ms / TICK_INTERVAL);
     tracker.active = false;
     hiring.events.emit('offlineTicks', { ticks, ms });
-    if (info.offlineProgress === undefined || (tracker.actions.size === 0 && tracker.released.size === 0 && tracker.died.length === 0 && tracker.debts.length === 0 && tracker.struck.length === 0 && tracker.traits.length === 0)) return;
+    if (info.offlineProgress === undefined || (tracker.actions.size === 0 && tracker.released.size === 0 && tracker.died.length === 0 && tracker.debts.length === 0 && tracker.struck.length === 0 && tracker.traits.length === 0 && tracker.wages.size === 0)) return;
     const container = info.offlineProgress.messageContainer;
     if (container === undefined) return;
     // Welcome Back lines in the game's own style (scan C-08, C-09, C-10, build .112):
@@ -77,6 +77,14 @@ export function install(ctx, { getHiring, log }) {
     tracker.actions.forEach((count, skillId) => {
       const d = describe(skillId);
       lines.push({ media: d.media, html: fill(count === 1 ? 'MOD_WF_OFFLINE_LINE_ONE' : 'MOD_WF_OFFLINE_LINE', { name: d.name, skill: d.skill, count: numberWithCommas(count) }, { count: 'text-success' }, d.media) });
+    });
+    // The wages paid while you were away, one line a currency, its icon before the amount (the game's own "You spent"
+    // line says the total without the reason); the hours as the Payroll band writes them (the user, 22 Oct 2026).
+    const hours = time.hoursText(ms / 3600000);
+    tracker.wages.forEach((amount, currencyId) => {
+      const currency = this.currencies.getObjectByID(currencyId);
+      const paid = numberWithCommas(Math.floor(amount));
+      lines.push({ media: currency?.media, html: templateLangString('MOD_WF_OFFLINE_WAGES', { amount: currency?.media ? icon(currency.media, paid) : esc(paid), currency: esc(currency?.name ?? currencyId), hours }) });
     });
     // A skill a strike or a death released already has its own line: no "stopped: restock" line for it (C-10).
     const explained = new Set([...tracker.struck.map((t) => t.skillId), ...tracker.died.map((t) => t.skillId)]);
@@ -150,6 +158,10 @@ export function install(ctx, { getHiring, log }) {
     hiring.events.on('folkTrait', ({ folk, type, trait }) => {
       if (!tracker.active) return;
       tracker.traits.push({ folk, type, trait });
+    });
+    hiring.events.on('folkPaid', ({ currencyId, amount }) => {
+      if (!tracker.active) return;
+      tracker.wages.set(currencyId, (tracker.wages.get(currencyId) ?? 0) + amount);
     });
   });
 }

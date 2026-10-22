@@ -28,25 +28,57 @@ export function install(ctx, { getHiring, model, popupDidRender, titleName = (s)
 
   // ---- Names and texts ------------------------------------------------------
 
-  const nameOf = (trait) => (model.traitDef(trait.id) === undefined ? trait.id
-    : templateLangString(`MOD_WF_TRAIT_${trait.id}`, { skill: skillNameOf(trait.skillId) }));
-  const effectOf = (trait) => (model.traitDef(trait.id) === undefined ? ''
-    : templateLangString(`MOD_WF_TRAIT_${trait.id}_DESC`, { skill: skillNameOf(trait.skillId) }));
+  /**
+   * Another mod's traits (API v5, Voyage's travel traits), by id: { kind, media, name, effect, effectAfter, lasts }, the
+   * texts strings or functions. One that isn't registered (its mod not loaded) still shows, by its id.
+   */
+  const outside = (trait) => hiring?.outsideTraits?.get(trait.id);
+  /** A registered trait's Worker Folks effects for this Folk: an object, or a function of { id, skillId, place }. */
+  const outsideEffects = (trait, folk, skillId) => {
+    const e = outside(trait)?.effects;
+    if (typeof e !== 'function') return e;
+    try {
+      const place = folk.place === null || folk.place === undefined ? null : Object.freeze({ q: folk.place.q, r: folk.place.r });
+      return e(Object.freeze({ id: folk.id, skillId, place }));
+    } catch (err) { log('trait effects failed', err); return undefined; }
+  };
+  const outsideText = (value) => {
+    try { return String((typeof value === 'function' ? value() : value) ?? ''); } catch (e) { log('trait text failed', e); return ''; }
+  };
+
+  const nameOf = (trait) => {
+    if (model.traitDef(trait.id) !== undefined) return templateLangString(`MOD_WF_TRAIT_${trait.id}`, { skill: skillNameOf(trait.skillId) });
+    const o = outside(trait);
+    return o === undefined ? trait.id : outsideText(o.name) || trait.id;
+  };
+  const effectOf = (trait) => {
+    if (model.traitDef(trait.id) !== undefined) return templateLangString(`MOD_WF_TRAIT_${trait.id}_DESC`, { skill: skillNameOf(trait.skillId) });
+    const o = outside(trait);
+    return o === undefined ? '' : outsideText(o.effect);
+  };
   /**
    * The effect after a notice's colon ("learned Loyal: never strikes…"): lower case where it starts with a plain word
    * (build .367, the colon rule); the tooltip's own line keeps the capital.
    */
-  const AFTER = ['Loyal', 'Resentful'];
-  const effectAfter = (trait) => (AFTER.includes(trait.id) ? getLangString(`MOD_WF_TRAIT_${trait.id}_AFTER`) : effectOf(trait));
+  const AFTER = ['Loyal', 'Resentful', 'Workaholic'];
+  const effectAfter = (trait) => {
+    if (AFTER.includes(trait.id)) return getLangString(`MOD_WF_TRAIT_${trait.id}_AFTER`);
+    const o = outside(trait);
+    return o?.effectAfter === undefined ? effectOf(trait) : outsideText(o.effectAfter);
+  };
   const lastsOf = (trait) => {
     const def = model.traitDef(trait.id);
-    if (def === undefined) return '';
+    if (def === undefined) {
+      const o = outside(trait);
+      return o === undefined ? '' : outsideText(o.lasts);
+    }
     return def.fade === undefined ? getLangString('MOD_WF_TRAIT_FOR_GOOD') : getLangString(`MOD_WF_TRAIT_${trait.id}_FADES`);
   };
-  const kindOf = (trait) => model.traitDef(trait.id)?.kind ?? 'mixed';
+  const kindOf = (trait) => model.traitDef(trait.id)?.kind ?? outside(trait)?.kind ?? 'mixed';
   const mediaOf = (trait) => {
     const def = model.traitDef(trait.id);
-    return def === undefined ? hiring.media : hiring.getMediaURL(`assets/${def.icon}.webp`);
+    if (def !== undefined) return hiring.getMediaURL(`assets/${def.icon}.webp`);
+    return outside(trait)?.media ?? hiring.media;
   };
   /** The tooltip of a trait's icon: its name, what it does, how long it lasts. */
   const tipOf = (trait) => [{ text: nameOf(trait), cls: 'font-w600' }, effectOf(trait), { text: lastsOf(trait), cls: 'wf-subtle' }].filter((l) => l !== '');
@@ -175,7 +207,7 @@ export function install(ctx, { getHiring, model, popupDidRender, titleName = (s)
     fighting,
     /** What the Folk's held traits add up to while it works `skillId` (its own skill by default). */
     effectsOf(folk, skillId = folk.skillId) {
-      return model.effectsOf(folk.traitState?.traits, { skillId, fighting: fighting() });
+      return model.effectsOf(folk.traitState?.traits, { skillId, fighting: fighting(), outside: (t) => outsideEffects(t, folk, skillId) });
     },
     neverStrikes(folk) {
       return api.effectsOf(folk).neverStrikes;
@@ -202,10 +234,30 @@ export function install(ctx, { getHiring, model, popupDidRender, titleName = (s)
       cur.remove(cost);
       const { trait, changes } = model.forget(s, index, where(folk));
       log(`${folk.name} forgot ${trait.id} for ${cost} GP`);
+      // A mod that counts its own traits (API v5) starts that count again.
+      hiring.events.emit('folkTrait', { folk, type: 'forgotten', trait, offline: !game._isInOnlineLoop });
       apply(folk, changes);
       hiring.invalidateFolkTables?.();
       hiring.renderQueue.folks = true;
       return true;
+    },
+    /** Another mod's trait comes to the Folk (API v5): a slot or the queue, with the usual notice. False if not registered. */
+    earn(folk, id) {
+      if (hiring.outsideTraits?.has(id) !== true) return false;
+      const changes = model.earn(stateOf(folk), id, where(folk));
+      apply(folk, changes);
+      return changes.length > 0;
+    },
+    /** Another mod's trait fades by that mod's own rule (API v5). False when the Folk doesn't have it. */
+    drop(folk, id) {
+      const changes = model.drop(stateOf(folk), id, where(folk));
+      apply(folk, changes);
+      return changes.length > 0;
+    },
+    /** The ids a Folk holds and waits on: { held, waiting }. */
+    idsOf(folk) {
+      const s = stateOf(folk);
+      return { held: s.traits.map((t) => t.id), waiting: s.waiting.map((t) => t.id) };
     },
     /** The card's row: one icon per held trait with its tooltip, and the Traits button's text. */
     cardView(folk) {
@@ -267,7 +319,16 @@ export function install(ctx, { getHiring, model, popupDidRender, titleName = (s)
       if (forgetUnlocked() && s.traits.length > 0 && !canPay) {
         root.append(text('div', 'wf-trait-waiting text-warning', templateLangString('MOD_WF_FORGET_NEED', { amount: numberWithCommas(cost) })));
       }
-      root.append(text('div', 'wf-trait-note wf-subtle', getLangString('MOD_WF_TRAITS_NOTE')));
+      // The rules as help bands (build .136; a 300-character paragraph before), one idea a band.
+      const note = document.createElement('div');
+      note.className = 'wf-trait-note wf-help-body text-left';
+      for (const part of ['LEARN', 'SLOTS', 'FORGET']) {
+        const band = document.createElement('div');
+        band.className = 'wf-band';
+        band.append(text('div', 'wf-help-head', getLangString(`MOD_WF_TRAITS_NOTE_${part}_HEAD`)), text('p', 'wf-help-p', getLangString(`MOD_WF_TRAITS_NOTE_${part}`)));
+        note.append(band);
+      }
+      root.append(note);
       SwalLocale.fire({
         didRender: popupDidRender,
         title: templateLangString('MOD_WF_TRAITS_TITLE', { name: titleName(folk.name) }),

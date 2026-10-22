@@ -259,9 +259,26 @@ function fillCard(col, folk, view) {
   });
   // Another mod's refusals (Voyage): the button greys, the reason is the line under the buttons.
   const refusals = view.refusals?.(folk) ?? { promote: '', fire: '', gear: '' };
+  // Gear and Traits on a phone (build .136): the icon and the count, the word hidden but read out; the button's text
+  // "Gear 2/5" splits at its last space when it ends in a count.
+  const iconAndWords = (el, icon, text) => {
+    const m = /^(\S+)\s+(.+)$/.exec(text);
+    const word = m === null ? text : m[1];
+    const count = m === null ? '' : ` ${m[2]}`;
+    const key = `${icon}|${text}`;
+    if (el.dataset.wfIconText === key) return;
+    el.dataset.wfIconText = key;
+    const i = document.createElement('i');
+    i.className = `fa fa-fw ${icon} wf-btn-ico`;
+    i.setAttribute('aria-hidden', 'true');
+    const w = document.createElement('span');
+    w.className = 'wf-btn-word';
+    w.textContent = word;
+    el.replaceChildren(i, w, document.createTextNode(count));
+  };
   set('gear', (el) => {
     const gear = view.gear(folk);
-    setText(el, gear.text);
+    iconAndWords(el, 'fa-shield-alt', gear.text);
     // Melvor's tooltip, one line per worn item with its icon (src/tips.mjs; build .91).
     view.tip(el, gear.tip);
     // Amber when a worn item ran out (needs attention); blue outline otherwise, like Details.
@@ -274,13 +291,16 @@ function fillCard(col, folk, view) {
     const traits = view.traits?.(folk);
     el.classList.toggle('d-none', traits === undefined);
     if (traits === undefined) return;
-    setText(el, traits.buttonText);
+    iconAndWords(el, 'fa-star', traits.buttonText);
     el.onclick = () => view.onTraits(folk);
   });
   set('promote', (el) => {
     const possible = view.canPromote(folk);
     setText(el, view.promoteText());
-    const className = `btn btn-sm btn-block ${view.promoteReady(folk) ? 'btn-primary' : 'btn-outline-primary'}`;
+    // Ready: the upgrade blue. Not yet: the grey outline of a button that does nothing for now (a blue outline is
+    // the cancel colour; build .136). It stays clickable: the click opens the requirements, the only place that
+    // says what is still missing.
+    const className = `btn btn-sm btn-block ${view.promoteReady(folk) ? 'btn-primary' : 'btn-outline-secondary'}`;
     el.closest('[data-wf="promote-row"]')?.classList.toggle('d-none', !possible);
     if (el.className !== className) el.className = className;
     el.disabled = refusals.promote !== '';
@@ -376,7 +396,9 @@ function fillCard(col, folk, view) {
     // A disabled Settle / Apologise says why (grey only with the reason next to it).
     const why = el.querySelector('[data-wf="strike-why"]');
     if (why !== null) {
-      const reason = debtOnly ? '' : info.reason ?? '';
+      // The away reason is said once, under the buttons (build .136): the strike line keeps only its own.
+      const r0 = debtOnly ? '' : info.reason ?? '';
+      const reason = r0 !== '' && [refusals.promote, refusals.gear, refusals.fire].includes(r0) ? '' : r0;
       setText(why, reason);
       why.classList.toggle('d-none', reason === '');
     }

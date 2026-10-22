@@ -102,7 +102,7 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 /* Card (build .55): grey bands for who / work / health / actions, the actions band at the bottom. Build .61: the list
    doesn't stretch its columns any more; equalizeCards (cards.mjs) gives closed cards in a row one height, and an open
    Details grows only its own card. */
-#worker-folks-folks { align-items: flex-start; }
+#worker-folks-folks { align-items: flex-start; margin-left: 0; margin-right: 0; } /* .136: no row gutter past the column (LF-7) */
 .wf-card { min-height: 160px; display: flex; flex-direction: column; }
 .wf-card-body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; }
 .wf-band { background: var(--wf-band); border-radius: 6px; padding: 12px; } /* 12px on the page (build .87); 20px in popups */
@@ -210,7 +210,8 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 .wf-trait-row.wf-trait-bad { border-color: var(--wf-alert); }
 .wf-trait-row.wf-trait-empty, .wf-trait-row.wf-trait-locked { display: block; background: transparent; border-style: dashed; color: var(--wf-subtle); }
 .wf-trait-waiting, .wf-trait-note { font-size: 0.9rem; }
-.wf-trait-note { border-top: 1px solid var(--wf-line); padding-top: 8px; }
+.wf-trait-note { border-top: 1px solid var(--wf-line); padding-top: 8px; margin-top: 8px; }
+.wf-trait-note .wf-band { padding: 12px; }
 @media (max-width: 480px) { .wf-trait-row { grid-template-columns: 40px minmax(0, 1fr); } .wf-trait-row .btn { grid-column: 1 / -1; } }
 .wf-effect { min-width: 0; }
 .wf-worker-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
@@ -271,7 +272,7 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 .wf-slot-qty { position: absolute; right: 2px; bottom: 0; font-size: 0.8rem !important; line-height: 1; background: rgba(0,0,0,0.6); color: #fff; border-radius: 3px; padding: 1px 2px; }
 .wf-ui .wf-slot-qty.text-danger { color: #ff6b6b !important; } /* on the dark chip the bright red in every theme (B-15) */
 /* Item grid: 52px rows (48px tile + 6px gap); at least 4 rows are always visible, it scrolls past 6. */
-.wf-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, 52px); grid-auto-rows: 52px; align-content: start; gap: 6px; min-height: 226px; max-height: 342px; overflow-y: auto; min-width: min(86vw, 26rem); max-width: 100%; padding: 2px;
+.wf-picker-grid { display: grid; grid-template-columns: repeat(auto-fill, 52px); grid-auto-rows: 52px; align-content: start; gap: 6px; min-height: 226px; max-height: 342px; overflow-y: auto; min-width: min(100%, 26rem); max-width: 100%; padding: 2px;
   scrollbar-width: thin; scrollbar-color: var(--wf-thumb) transparent; } /* .99: the shared rule 4a.16, never the browser's bar */
 .wf-picker-none { grid-column: 1 / -1; }
 .wf-picker-item { position: relative; width: 52px; height: 52px; padding: 0; display: flex; align-items: center; justify-content: center; line-height: 1; }
@@ -290,7 +291,7 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 .wf-frozen-portrait { filter: grayscale(1) brightness(0.6); }
 /* Phones and tablets: main buttons are at least 40px tall to tap. */
 @media (pointer: coarse) {
-  .wf-ui .btn { min-height: 40px; }
+  .wf-ui .btn, .wf-card .btn, .wf-skill-control .btn { min-height: 40px; } /* .136: the card's buttons were 33px at 375 */
   .wf-help { min-width: 40px; }
 }
 
@@ -390,6 +391,23 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-layout-movable .wf-card-head { cursor: grab; }
 .wf-layout-movable .wf-card-head button { cursor: pointer; }
 .wf-card-col.sortable-ghost { opacity: 0.4; }
+/* A phone (build .136; at 375 the name had 65-103px beside the portrait, the badge and the grip: "Negoti/ator", four lines
+   for "Ingrid of Many Snacks"): the portrait and the status badge share the first row, the whole name under them at
+   the band's width, the grip hidden (a card is not dragged on touch). The who band's two nested flex rows become one
+   grid through display: contents, so the template stays as it is. */
+@media (max-width: 575.98px) {
+  .wf-card .wf-band-who > .d-flex { display: grid !important; grid-template-columns: auto minmax(0, 1fr); align-items: start; }
+  .wf-card .wf-band-who > .d-flex > .flex-fill, .wf-card .wf-band-who > .d-flex > .flex-fill > .justify-content-between { display: contents !important; }
+  .wf-card .wf-band-who > .d-flex > .wf-card-portrait { grid-row: 1; grid-column: 1; }
+  .wf-card .wf-band-who .justify-content-between > :last-child { grid-row: 1; grid-column: 2; justify-self: end; margin-left: 0; padding-left: 0; }
+  .wf-card .wf-band-who .justify-content-between > :first-child { grid-column: 1 / -1; margin-top: 8px; }
+  .wf-card .wf-band-who .wf-card-badges, .wf-card .wf-band-who .wf-effects, .wf-card .wf-band-who .wf-card-traits { grid-column: 1 / -1; }
+  .wf-card .wf-card-end .wf-grip { display: none; }
+  /* Details, Gear, Traits and Fire on one row: Gear and Traits as their icon and count (the words stay for a reader). */
+  .wf-card-actions .wf-btn-word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .wf-card-actions .wf-btn-ico { display: inline-block; }
+}
+.wf-card-actions .wf-btn-ico { display: none; margin-right: .3em; }
 .wf-layout-movable .wf-layout-head { cursor: grab; }
 .wf-layout-movable .wf-layout-head button { cursor: pointer; }
 .wf-layout-dragging .wf-layout-head { cursor: grabbing; }

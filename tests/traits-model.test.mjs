@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   TRAITS, traitDef, openSlots, nextSlotLevel, forgetCost, emptyTraitState, addProgress, resetProgress, settle,
-  forget, effectsOf, followsCombat, completeLearning,
+  forget, effectsOf, followsCombat, completeLearning, earn, drop, cleanOutsideEffects,
 } from '../src/traits-model.mjs';
 import { normalizeTraitState } from '../src/folk.mjs';
 
@@ -224,4 +224,50 @@ test('completeLearning fills a count so the next settle learns it', () => {
   assert.equal(completeLearning(s, 'Loyal'), true);
   settle(s, { level: 25, tier: 'Newbie' });
   assert.deepEqual(s.traits, [{ id: 'Specialist', skillId: 'melvorD:Mining' }, { id: 'Loyal' }]);
+});
+
+test('earn: a trait from another mod takes an open slot or waits, once; settle never fades it', () => {
+  const s = fresh();
+  const where = { level: 1, tier: 'Newbie' };
+  assert.deepEqual(earn(s, 'voyage:Seafarer', where), [{ type: 'learned', trait: { id: 'voyage:Seafarer' } }]);
+  assert.deepEqual(earn(s, 'voyage:Seafarer', where), []);
+  assert.deepEqual(earn(s, '', where), []);
+  assert.deepEqual(earn(s, 'voyage:Hardy', where), [{ type: 'waiting', trait: { id: 'voyage:Hardy' } }]);
+  assert.deepEqual(earn(s, 'voyage:Hardy', where), []);
+  // The table's rules leave it alone: no fade of its own, no effect.
+  assert.deepEqual(settle(s, { level: 1, tier: 'Expert' }), []);
+  assert.deepEqual(ids(s.traits), ['voyage:Seafarer']);
+  assert.deepEqual(effectsOf(s.traits).interval, 0);
+  // It survives the save's normalizing.
+  assert.deepEqual(normalizeTraitState(JSON.parse(JSON.stringify(s))).waiting, [{ id: 'voyage:Hardy' }]);
+});
+
+test('drop: a held or waiting trait fades, its count restarts and the queue moves up', () => {
+  const s = fresh();
+  const where = { level: 1, tier: 'Newbie' };
+  earn(s, 'voyage:Seasick', where);
+  earn(s, 'voyage:Footsore', where);
+  s.counts['voyage:Seasick'] = 5;
+  assert.deepEqual(drop(s, 'voyage:Seasick', where), [
+    { type: 'faded', trait: { id: 'voyage:Seasick' } },
+    { type: 'slotted', trait: { id: 'voyage:Footsore' } },
+  ]);
+  assert.equal(s.counts['voyage:Seasick'], undefined);
+  assert.deepEqual(ids(s.traits), ['voyage:Footsore']);
+  assert.deepEqual(drop(s, 'voyage:Seasick', where), []);
+  earn(s, 'voyage:Hardy', where);
+  assert.deepEqual(drop(s, 'voyage:Hardy', where), [{ type: 'faded', trait: { id: 'voyage:Hardy' } }]);
+  assert.deepEqual(s.waiting, []);
+});
+
+test('effectsOf: another mod\u2019s trait adds its cleaned plain effects, nothing else', () => {
+  const outside = (t) => ({ 'voyage:Haggler': { wage: 20 }, 'voyage:Homebody': { xp: 10, rate: 99 }, 'voyage:Wild': { interval: -500 } })[t.id];
+  const e = effectsOf([{ id: 'voyage:Haggler' }, { id: 'voyage:Homebody' }, { id: 'voyage:Wild' }, { id: 'voyage:Gone' }, { id: 'Frugal' }], { outside });
+  assert.ok(Math.abs(e.wageFactor - 1.2 * 0.8) < 1e-9);
+  assert.equal(e.xp, 10);
+  assert.equal(e.interval, -50, 'clamped to the limit');
+  assert.deepEqual(cleanOutsideEffects({ xp: 'lots', wage: NaN, doubling: 0, neverStrikes: true }), {});
+  assert.deepEqual(cleanOutsideEffects(null), {});
+  // Without a resolver another mod's ids add nothing, as before.
+  assert.equal(effectsOf([{ id: 'voyage:Haggler' }]).wageFactor, 1);
 });

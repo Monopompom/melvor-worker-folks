@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-10-21.132';
+export const BUILD = '2026-10-22.136';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -135,7 +135,8 @@ export async function setup(ctx) {
   }).add();
   await ctx.gameData.addPackage('data/hiring.json');
   // 3b. The API other mods read as mod.api.worker_folks (Voyage, phase 6): Folks, places, events, guards.
-  ctx.api(apiModule.createApi({ getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'), model: folkModel }));
+  ctx.api(apiModule.createApi({ getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'), model: folkModel, pricing,
+    rules: { promotion: { level: milestones.PROMOTION_LEVEL, mastery: promotion.MASTERY_GATE, costRate: promotion.PROMOTION_COST_RATE }, slotCaps: pricing.SHIFT_SLOT_CAP } }));
   // Shop purchases depend on which expansions are loaded (game data is registered
   // before the Mod Manager starts, so namespace presence is reliable here).
   const expansions = {
@@ -227,6 +228,12 @@ export async function setup(ctx) {
     log,
   });
 
+  // Mod Settings lists sections in the order they are first named: Hiring (XP share, quiet popups) above Wages
+  // (the user, 22 Oct 2026). The slices below add their settings to these same sections; the names stay as they are
+  // (saved values are keyed by them).
+  ctx.settings.section('Hiring');
+  ctx.settings.section('Wages');
+
   // 5c. Wages, Payroll Reserve, strikes, cooldowns (settings registered here).
   payroll.install(ctx, {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
@@ -262,6 +269,7 @@ export async function setup(ctx) {
   // 6. Offline: summary modal for Folk-only sessions, per-Folk lines, offlineTicks hook.
   offline.install(ctx, {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+    time,
     log,
   });
 

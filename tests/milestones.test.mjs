@@ -1,10 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   MILESTONES, visibleMilestones, milestoneState, reserveCapacityHours, promotionsUnlocked, apologyUnlocked,
   autoRestartUnlocked, overtimeWageFactor, freeShiftSlots, levelWageDiscount, promotionCostRate, hiringXPFor, xpToastSplit,
-  reserveRoom, capIncreaseModifications,
+  reserveRoom, capIncreaseModifications, capacityText, RESERVE_STEPS,
 } from '../src/milestones.mjs';
+
+const lang = JSON.parse(readFileSync(new URL('../languages/en.json', import.meta.url), 'utf8'));
+/** The game's template: ${name} from vars. */
+const t = (key, vars) => lang[key].replace(/\$\{(\w+)\}/g, (_, k) => vars[k]);
 
 test('milestones are sorted by level and match the design table', () => {
   const levels = MILESTONES.map((m) => m.level);
@@ -26,6 +31,18 @@ test('reserve capacity steps', () => {
   assert.equal(reserveCapacityHours(35), 72);
   assert.equal(reserveCapacityHours(65), 168);
   assert.equal(reserveCapacityHours(99), 720);
+});
+
+test('capacityText: hours under a week, days from one; the same words as the milestone names', () => {
+  assert.equal(capacityText(24, t), '24 h');
+  assert.equal(capacityText(72, t), '72 h');
+  assert.equal(capacityText(168, t), '7 days');
+  assert.equal(capacityText(720, t), '30 days');
+  // Every reserve step's milestone name ends with the same text the helper writes.
+  for (const [level, hours] of RESERVE_STEPS) {
+    const m = MILESTONES.find((x) => x.level === level);
+    assert.ok(lang[`MOD_WF_MILESTONE_${m.key}`].endsWith(capacityText(hours, t)), `${m.key} says ${capacityText(hours, t)}`);
+  }
 });
 
 test('feature gates by level', () => {
