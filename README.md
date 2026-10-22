@@ -177,6 +177,13 @@ Relics**, a consumable for **your** Consumable slot (-5% Folk wages, +5% Hiring 
 damage taken) that spends a charge on every Folk action and every attack of yours, like the
 game's own Lesser Relics.
 
+**The Steward**, Hiring's own Summoning familiar: Summoning 30, tier 2 (8 Green and 6 Silver shards and
+1,000 GP a craft, like the Leprechaun's coin). Worn by **you** in a Summon slot, it gives every Folk +5% skill
+XP and spends one charge per 30 seconds of crew work, whoever is working (a bigger crew spends no faster);
+its mark turns up at the same beat while your Folks work. Pair it with a Leprechaun (-5% Folk wages), a Monkey
+(+10 min of strike grace), a Devil (-10% strike cooldown), an Ent (+10% Hiring Skill XP), an Octopus (+10% Hiring
+Mastery XP) or a Pig (another +5% skill XP for every Folk). In a Folk's own Summon slot it does nothing.
+
 ## Settings
 
 Mod Settings → Worker Folks: wage difficulty, a preset from **No sweat** (free labour, no

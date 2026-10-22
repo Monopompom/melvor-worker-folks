@@ -129,10 +129,11 @@ export function install(ctx, { getHiring, rules, log }) {
   };
   ['consumeItemQuantities', 'consumeItemCharges', 'consumeSynergyTablets', 'consumeBankItem'].forEach(guard);
 
-  // Folks do not discover Summoning marks (v1).
+  // Folks do not discover Summoning marks (v1). Hiring's own mark (the Steward, rolled for the
+  // player after a Folk action) goes through: that roll is the player's, not the Folk's.
   if (typeof Summoning !== 'undefined') {
     ctx.patch(Summoning, 'rollMarksForSkill').replace(function (original, ...args) {
-      if (acting() !== undefined) return undefined;
+      if (acting() !== undefined && args[0] !== hiring) return undefined;
       return original(...args);
     });
   }

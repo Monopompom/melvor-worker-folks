@@ -158,6 +158,8 @@ export const LANG = {
     [SKILLCAPE_ID]: { name: 'MOD_WF_ITEM_Hiring_Skillcape' },
     [SUPERIOR_SKILLCAPE_ID]: { name: 'MOD_WF_ITEM_Superior_Hiring_Skillcape' },
     [LESSER_RELIC_ID]: { name: 'MOD_WF_ITEM_Hiring_Lesser_Relic' },
+    // the Steward tablet (src/steward-model.mjs STEWARD_ITEM_ID)
+    Summoning_Familiar_Steward: { name: 'MOD_WF_ITEM_Summoning_Familiar_Steward' },
   },
   pet: { [PET_ID]: { name: 'MOD_WF_PET_NAME', hint: 'MOD_WF_PET_HINT' } },
   relics: Object.fromEntries(RELICS.map((id) => [id, `MOD_WF_RELIC_${id}`])),

@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-10-22.136';
+export const BUILD = '2026-10-22.138';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -109,6 +109,8 @@ export async function setup(ctx) {
   const gearData = await ctx.loadModule('src/gear-data.mjs');
   const discoveryRules = await ctx.loadModule('src/discovery-model.mjs');
   const discoveries = await ctx.loadModule('src/discoveries.mjs');
+  const stewardRules = await ctx.loadModule('src/steward-model.mjs');
+  const steward = await ctx.loadModule('src/steward.mjs');
   const traitRules = await ctx.loadModule('src/traits-model.mjs');
   const traits = await ctx.loadModule('src/traits.mjs');
 
@@ -158,6 +160,8 @@ export async function setup(ctx) {
   for (const pkg of gearData.expansionGearPackages(expansions, hasPurchase)) {
     await ctx.gameData.addPackage({ $schema: '', namespace: 'worker_folks', data: pkg });
   }
+  // The Steward, Hiring's Summoning familiar: its tablet, recipe (Summoning 30) and synergies.
+  await ctx.gameData.addPackage({ $schema: '', namespace: 'worker_folks', data: stewardRules.stewardPackage() });
   Object.entries(gearData.LANG.items).forEach(([id, keys]) => {
     const item = game.items.getObjectByID(`worker_folks:${id}`);
     if (item === undefined) return;
@@ -285,6 +289,13 @@ export async function setup(ctx) {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     rules: discoveryRules,
     petId: `worker_folks:${gearData.PET_ID}`,
+    log,
+  });
+
+  // 8b. The Steward: worn by the player, a charge per 30 s of crew work, Hiring's mark rolled at the same beat.
+  steward.install(ctx, {
+    getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+    rules: stewardRules,
     log,
   });
 
