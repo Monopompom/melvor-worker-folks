@@ -395,6 +395,8 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
    for "Ingrid of Many Snacks"): the portrait and the status badge share the first row, the whole name under them at
    the band's width, the grip hidden (a card is not dragged on touch). The who band's two nested flex rows become one
    grid through display: contents, so the template stays as it is. */
+/* Gear and Traits' icons show only on a phone; this rule comes before the phone block so that block wins. */
+.wf-card-actions .wf-btn-ico { display: none; margin-right: .3em; }
 @media (max-width: 575.98px) {
   .wf-card .wf-band-who > .d-flex { display: grid !important; grid-template-columns: auto minmax(0, 1fr); align-items: start; }
   .wf-card .wf-band-who > .d-flex > .flex-fill, .wf-card .wf-band-who > .d-flex > .flex-fill > .justify-content-between { display: contents !important; }
@@ -405,9 +407,11 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
   .wf-card .wf-card-end .wf-grip { display: none; }
   /* Details, Gear, Traits and Fire on one row: Gear and Traits as their icon and count (the words stay for a reader). */
   .wf-card-actions .wf-btn-word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .wf-card-actions .wf-btn-ico { display: inline-block; }
+  .wf-card-actions .wf-btn-ico { display: inline-block; margin-right: .2em; }
+  /* Tighter so the four still share a row at 360 px with the icons in (a run-out Gear label may wrap). */
+  .wf-card-actions { gap: 4px; }
+  .wf-card-actions .btn { padding-left: .5rem; padding-right: .5rem; }
 }
-.wf-card-actions .wf-btn-ico { display: none; margin-right: .3em; }
 .wf-layout-movable .wf-layout-head { cursor: grab; }
 .wf-layout-movable .wf-layout-head button { cursor: pointer; }
 .wf-layout-dragging .wf-layout-head { cursor: grabbing; }

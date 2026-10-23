@@ -273,7 +273,7 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
     if (status !== '') parts.push(document.createTextNode(status));
     if (showSlots) {
       const piece = document.createElement('span');
-      piece.className = 'wf-ctrl-slots text-muted font-w400';
+      piece.className = 'wf-ctrl-slots wf-subtle font-w400';
       piece.textContent = status === '' ? slots : ` · ${slots}`;
       parts.push(piece);
     }

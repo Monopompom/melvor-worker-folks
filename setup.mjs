@@ -5,13 +5,13 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-10-22.138';
+export const BUILD = '2026-10-23.139';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
  * the zip). Set to true while developing from the unpacked folder.
  */
-const DEV = true;
+const DEV = false;
 
 export async function setup(ctx) {
   const log = DEV ? (...args) => console.log('[Worker Folks]', ...args) : () => {};
