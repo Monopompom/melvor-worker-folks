@@ -1186,14 +1186,6 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
 
     onLoad() {
       this.computeDelegableSkills();
-      // A Folk saved on a skill that is loaded but no longer handed out (Cartography since 23 Oct 2026) goes idle. A
-      // skill whose mod is not loaded this time is not in the registry, and its Folk keeps the job for when it is back.
-      for (const folk of this.crew.all) {
-        if (folk.skillId === null || this.skillOf(folk) !== undefined) continue;
-        if (this.game.activeActions.getObjectByID(folk.skillId) === undefined) continue;
-        log(`${folk.name} freed from ${folk.skillId}: no Folk works it`);
-        this.crew.assign(folk.id, null);
-      }
       // A skill added to an existing save starts locked. In gamemodes without
       // skill-unlock purchases that would just show a padlock forever.
       if (!this._unlocked && !this.game.currentGamemode.allowSkillUnlock) {

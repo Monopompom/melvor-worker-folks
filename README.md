@@ -11,11 +11,11 @@ while you fight, raid or train something else.
 2. **Hire a Trainee**. Each Folk you own makes the next one of that tier 20% more
    expensive, and your crew can never be larger than the number of skills Folks can hold
    (every gathering, crafting and artisan skill, including expansion and mod skills, but
-   never combat or Cartography: the map is yours to survey).
-3. Open any skill page (Woodcutting, Smithing, Archaeology...). A **Worker** box sits under
+   never combat).
+3. Open any skill page (Woodcutting, Smithing, Cartography...). A **Worker** box sits under
    the skill header: press the Worker button and pick **You** or one of your Folks in the
    window that opens (one tile per Folk with its Produce Rate, effects, wage and status). With a Folk chosen, start the
-   skill exactly as you always do (click the tree, press Create, start the dig...) and the
+   skill exactly as you always do (click the tree, press Create, start the survey...) and the
    Folk takes the job. It keeps working while you do anything else. Press **Stop** in the
    Worker box to end the shift, or switch the box back to **You**: a working Folk then keeps
    going until you start an action on that page yourself. Picking a Folk that is busy on
