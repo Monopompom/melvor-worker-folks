@@ -12,9 +12,14 @@ const skill = (id, extra = {}) => ({
 });
 
 test('keeps gathering/crafting style skills and drops combat-like actions', () => {
-  const actions = [skill('melvorD:Combat'), skill('melvorD:GolbinRaid'), skill('melvorD:Woodcutting'), skill('melvorAoD:Cartography')];
+  const actions = [skill('melvorD:Combat'), skill('melvorD:GolbinRaid'), skill('melvorD:Woodcutting'), skill('melvorD:Smithing')];
   const out = selectDelegable(actions, { combatLikeIds: ['melvorD:Combat', 'melvorD:GolbinRaid'] });
-  assert.deepEqual(out.map((a) => a.id), ['melvorD:Woodcutting', 'melvorAoD:Cartography']);
+  assert.deepEqual(out.map((a) => a.id), ['melvorD:Woodcutting', 'melvorD:Smithing']);
+});
+
+test('never hands out Cartography, whatever the options', () => {
+  const out = selectDelegable([skill('melvorAoD:Cartography'), skill('melvorD:Mining')]);
+  assert.deepEqual(out.map((a) => a.id), ['melvorD:Mining']);
 });
 
 test('drops actions that do not implement the contract', () => {
