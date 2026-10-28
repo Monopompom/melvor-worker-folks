@@ -45,6 +45,17 @@ test('Cartography restarts by mode; the survey queue is rebuilt in order', () =>
   assert.deepEqual(calls, ['queue a', 'queue b', 'queue start', 'auto h', 'paper p', 'upgrade d']);
 });
 
+test('Woodcutting with no tree to go back to is not started', () => {
+  let started = 0;
+  const wc = { activeTrees: new Set(), selectTree() {}, start() { started += 1; } };
+  startAgain(wc, undefined);
+  startAgain(wc, { trees: [] });
+  assert.equal(started, 0);
+  wc.activeTrees.add('oak');
+  startAgain(wc, undefined);
+  assert.equal(started, 1, 'a tree still selected: a plain start()');
+});
+
 test('a skill that keeps its own pick gets a plain start()', () => {
   let started = 0;
   const fishing = { selectedFish: 'shrimp', start() { started += 1; } };

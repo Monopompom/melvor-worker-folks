@@ -36,5 +36,8 @@ export function startAgain(skill, pick) {
     else if (pick.mode === 3 && pick.recipe !== undefined) skill.startMakingPaper(pick.recipe);
     else if (pick.mode === 4 && pick.digSite !== undefined) skill.startUpgradingMap(pick.digSite);
   } else if (pick?.digSite !== undefined && skill.currentDigSite === undefined) skill.startDigging(pick.digSite);
+  // Woodcutting with no tree has no interval (the largest of none is -Infinity) and its start() throws half-way,
+  // leaving the skill `isActive` with no timer: nothing to start on, so nothing is started.
+  else if (skill.activeTrees instanceof Set && skill.activeTrees.size === 0) return;
   else if (typeof skill.start === 'function') skill.start();
 }

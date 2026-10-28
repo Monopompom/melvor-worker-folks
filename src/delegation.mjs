@@ -169,6 +169,16 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
       if (tree === undefined || this.activeTrees.has(tree) || this.activeTrees.size < this.treeCutLimit) return;
       hiring.applyPending(this);
     });
+    //  A refused start (no free Shift Slot, the Folk unavailable, another mod's guard) kept the clicked tree selected
+    //  with nothing running: Mining and Harvesting drop their pick when start() says no, Woodcutting doesn't. The
+    //  next click on that tree only deselected it, and a click on another one met "Tree cutting limit reached".
+    //  A tree is selected only while Woodcutting runs, so a stopped skill keeps none.
+    ctx.patch(Woodcutting, 'selectTree').after(function () {
+      if (hiring === undefined || this.game.isGolbinRaid || this.isActive || hiring.delegated.has(this)) return;
+      if (this.activeTrees.size === 0) return;
+      this.activeTrees.clear();
+      this.renderQueue.selectedTrees = true;
+    });
   }
 
   // 3. Tick every delegated skill after the main action (online and offline
@@ -227,6 +237,9 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
       skill.resetActionState();
     });
     if (delegated.length > 0) log(`resumed delegated: ${delegated.map((s) => s.id).join(', ')}`);
+    // A tree a refused start left selected was saved with the game (before build .146): it would block the next click.
+    const wc = this.woodcutting;
+    if (wc?.activeTrees instanceof Set && wc.activeTrees.size > 0 && !wc.isActive && !hiring.delegated.has(wc)) wc.activeTrees.clear();
   });
 
   ctx.onCharacterLoaded(() => {
