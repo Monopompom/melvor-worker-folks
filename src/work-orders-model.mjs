@@ -1,7 +1,7 @@
 // Work Orders: the board's rules (the user, 28 Oct 2026). A board on the Hiring page asks for items that only Folks'
 // work fills: 2 Small orders at Hiring 8, 3 with Medium ones at 30, a reroll at 50, 4 with Large ones at 70. Each
 // order asks for about 2 / 6 / 16 hours of one Folk's work on a recipe you have unlocked, and pays a GP share of the
-// wages its own work cost (rolled per order, 0.5× to 3×), Hiring XP, and items: Medium a Hiring mastery token, Large
+// wages its own work cost (rolled per order, ×0.5 to ×3), Hiring XP, and items: Medium a Hiring mastery token, Large
 // one pick from a pool (tokens, a diploma, junk or gems). Every 24 h of game time the board refreshes: delivered and
 // untouched orders go, an order in progress gets one more day. A delivered order's place stays empty until then.
 // Pure: no game globals (tests/work-orders-model.test.mjs).
@@ -19,11 +19,11 @@ export const AGE_LIMIT = 1;
 export const SIZES = ['Small', 'Medium', 'Large'];
 /** Hours of one Folk's work at the recipe's base pace, Hiring XP in levels' worth at delivery, roll weight. */
 export const SIZE = {
-  Small: { hours: 2, xpLevels: 0.5, weight: 6, tokens: 0 },
-  Medium: { hours: 6, xpLevels: 1, weight: 3, tokens: 1 },
-  Large: { hours: 16, xpLevels: 2, weight: 1, tokens: 0 },
+  Small: { hours: 2, xpLevels: 0.1, weight: 6, tokens: 0 },
+  Medium: { hours: 6, xpLevels: 0.2, weight: 3, tokens: 1 },
+  Large: { hours: 16, xpLevels: 0.4, weight: 1, tokens: 0 },
 };
-/** The order's GP share of its wages: 0.5× to 3× in quarter steps, rolled when it appears. */
+/** The order's GP share of its wages: ×0.5 to ×3 in quarter steps, rolled when it appears. */
 export const GP_RATE = { min: 0.5, max: 3, step: 0.25 };
 /** Per skill, the newest recipes you have unlocked are the candidates (no Normal Logs at Woodcutting 99). */
 export const RECENT_RECIPES = 5;

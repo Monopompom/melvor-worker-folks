@@ -234,7 +234,7 @@ test('api v6: hirePrice and hire on the Shop\'s terms (licence, a free slot, the
   hiring.events.on('folkMoved', (e) => moves.push(e));
   const api = createApi({ getHiring: () => hiring, model, pricing });
   assert.equal(api.version, 7);
-  assert.equal(api.hirePrice('Newbie'), 500000);
+  assert.equal(api.hirePrice('Newbie'), 1000000);
   assert.equal(api.hirePrice('Captain'), undefined);
   assert.deepEqual(api.hire('Captain'), { refused: 'tier' });
   assert.deepEqual(api.hire('Newbie'), { refused: 'licence' });
@@ -244,13 +244,13 @@ test('api v6: hirePrice and hire on the Shop\'s terms (licence, a free slot, the
   const r = api.hire('Newbie', { name: 'Pip', travel: 'with', source: 'voyage' });
   assert.equal(r.folk.name, 'Pip');
   assert.equal(r.folk.travel, 'with');
-  assert.equal(r.price, 500000);
-  assert.deepEqual(paid, [500000]);
+  assert.equal(r.price, 1000000);
+  assert.deepEqual(paid, [1000000]);
   assert.equal(moves.length, 1, 'coming along is told as a move');
-  assert.equal(api.hirePrice('Newbie'), 600000, 'the next one costs more, as in the Shop');
+  assert.equal(api.hirePrice('Newbie'), 1200000, 'the next one costs more, as in the Shop');
   hiring.crew.hire('Junior');
   assert.deepEqual(api.hire('Newbie'), { refused: 'full' }, 'the crew cap counts every Folk');
-  assert.deepEqual(paid, [500000], 'a refused hire pays nothing');
+  assert.deepEqual(paid, [1000000], 'a refused hire pays nothing');
 });
 
 test('api v6: a hire at a share of the price pays that share, rounded up, and still raises the next price', async () => {
@@ -259,15 +259,15 @@ test('api v6: a hire at a share of the price pays that share, rounded up, and st
   const paid = [];
   hiring.hasLicence = () => true;
   hiring.folkCap = 5;
-  hiring.game = { gp: { amount: 260000, remove(n) { this.amount -= n; paid.push(n); } } };
+  hiring.game = { gp: { amount: 520000, remove(n) { this.amount -= n; paid.push(n); } } };
   const api = createApi({ getHiring: () => hiring, model, pricing });
   assert.deepEqual(api.hire('Newbie', { share: 0.6 }), { refused: 'gp' }, 'the share is what must be in hand');
   const r = api.hire('Newbie', { share: 0.5 });
-  assert.equal(r.price, 250000);
-  assert.deepEqual(paid, [250000]);
-  assert.equal(api.hirePrice('Newbie'), 600000);
+  assert.equal(r.price, 500000);
+  assert.deepEqual(paid, [500000]);
+  assert.equal(api.hirePrice('Newbie'), 1200000);
   hiring.game.gp.amount = 1e9;
-  assert.equal(api.hire('Newbie', { share: 1 / 3 }).price, 200000);
+  assert.equal(api.hire('Newbie', { share: 1 / 3 }).price, 400000);
   assert.equal(api.hire('Newbie', { share: 7 }).price, pricing.hirePrice('Newbie', 2), 'never more than the full price');
   assert.equal(api.hire('Newbie', { share: 0 }).price, Math.ceil(pricing.hirePrice('Newbie', 3) * 0.25), 'never less than a quarter (v7)');
 });
@@ -282,6 +282,33 @@ test('api v7: rules tells the hiring numbers another mod writes about', async ()
   assert.deepEqual(createApi({ getHiring: () => hiring, model }).rules(), { promotionLevel: undefined, masteryGates: [], promotionCostRate: undefined, slotCaps: [] }, 'nothing injected: empty, never a throw');
 });
 
+test('api rules: the per-tier numbers and Hiring level steps, only when given (build .147)', async () => {
+  const pricing = await import('../src/pricing.mjs');
+  const milestones = await import('../src/milestones.mjs');
+  const wages = await import('../src/wages.mjs');
+  const produceRate = await import('../src/produce-rate.mjs');
+  const qualification = await import('../src/qualification-model.mjs');
+  const { hiring } = makeHiring();
+  const api = createApi({ getHiring: () => hiring, model, rules: {
+    tiers: { hireBase: pricing.HIRE_BASE_PRICE, wages: wages.WAGE_PER_HOUR, produceRates: produceRate.RATE_BY_TIER, hiringXPPerHour: milestones.HIRING_XP_PER_HOUR, qualification: qualification.QUALIFICATION_LEVELS },
+    levels: { workOrders: 8, marks: 50, marksShare: 0.5, crewBonus: { per: 3, max: 15, topLevel: 99, topMax: 20 }, severance: [[1, 0.1], [45, 0.05], [90, 0]], qualificationLowering: 50 },
+  } });
+  const r = api.rules();
+  assert.deepEqual(r.hireBase, [1000000, 5000000, 15000000, 40000000, 120000000]);
+  assert.deepEqual(r.wages, [75000, 300000, 1000000, 3000000, 8000000]);
+  assert.deepEqual(r.produceRates, [60, 80, 100, 120, 140]);
+  assert.deepEqual(r.hiringXPPerHour, [60, 140, 220, 380, 600]);
+  assert.deepEqual(r.qualification, [10, 30, 50, 70, 90]);
+  assert.equal(r.workOrdersLevel, 8);
+  assert.equal(r.marksLevel, 50);
+  assert.equal(r.marksShare, 0.5);
+  assert.deepEqual(r.crewBonus, { per: 3, max: 15, topLevel: 99, topMax: 20 });
+  assert.deepEqual(r.firingSeverance, [[1, 0.1], [45, 0.05], [90, 0]]);
+  assert.equal(r.qualificationLowering, 50);
+  assert.ok(Object.isFrozen(r.hireBase) && Object.isFrozen(r.firingSeverance[0]), 'copies, frozen');
+  assert.equal('hireBase' in createApi({ getHiring: () => hiring, model }).rules(), false, 'absent when not given');
+});
+
 test('api v7: canHire says why a hire would be refused, and at what price', async () => {
   const pricing = await import('../src/pricing.mjs');
   const { hiring } = makeHiring();
@@ -292,11 +319,11 @@ test('api v7: canHire says why a hire would be refused, and at what price', asyn
   const api = createApi({ getHiring: () => hiring, model, pricing });
   assert.equal(api.version, 7);
   assert.deepEqual(api.canHire('Captain'), { ok: false, refused: 'tier' });
-  assert.deepEqual(api.canHire('Newbie', { share: 0.5 }), { ok: false, refused: 'licence', price: 250000 });
+  assert.deepEqual(api.canHire('Newbie', { share: 0.5 }), { ok: false, refused: 'licence', price: 500000 });
   licences.add('Newbie');
-  assert.deepEqual(api.canHire('Newbie', { share: 0.5 }), { ok: false, refused: 'gp', price: 250000 });
+  assert.deepEqual(api.canHire('Newbie', { share: 0.5 }), { ok: false, refused: 'gp', price: 500000 });
   hiring.game.gp.amount = 1e9;
-  assert.deepEqual(api.canHire('Newbie', { share: 0.5 }), { ok: true, price: 250000 });
+  assert.deepEqual(api.canHire('Newbie', { share: 0.5 }), { ok: true, price: 500000 });
   hiring.crew.hire('Junior');
-  assert.deepEqual(api.canHire('Newbie'), { ok: false, refused: 'full', price: 500000 });
+  assert.deepEqual(api.canHire('Newbie'), { ok: false, refused: 'full', price: 1000000 });
 });

@@ -25,7 +25,7 @@ test('board size and sizes by Hiring level', () => {
   assert.deepEqual([rerollUnlocked(49), rerollUnlocked(50)], [false, true]);
 });
 
-test('the GP share is 0.5× to 3× in quarter steps', () => {
+test('the GP share is ×0.5 to ×3 in quarter steps', () => {
   assert.equal(rollGpRate(() => 0), GP_RATE.min);
   assert.equal(rollGpRate(() => 0.9999), GP_RATE.max);
   for (let r = 0; r < 1; r += 0.07) {
@@ -117,10 +117,10 @@ test('deliver counts up to the quantity; orderFor finds the open order an item f
 
 test('rewards: a GP share of the wages, XP in levels worth, tokens and the Large extra; no GP with wages off', () => {
   const base = { size: 'Small', wages: 1000, gpRate: 1.75, extra: null };
-  assert.deepEqual(rewardFor(base, { xpToNext: 1000 }), { gp: 1750, xp: 500, tokens: 0, items: [], gems: 0 });
+  assert.deepEqual(rewardFor(base, { xpToNext: 1000 }), { gp: 1750, xp: 100, tokens: 0, items: [], gems: 0 });
   assert.equal(rewardFor(base, { xpToNext: 1000, wagesOn: false }).gp, 0);
   assert.equal(rewardFor({ ...base, size: 'Medium' }, { xpToNext: 1000 }).tokens, 1);
-  assert.deepEqual(rewardFor({ ...base, size: 'Large', extra: { kind: 'tokens', qty: 2 } }, { xpToNext: 1000 }), { gp: 1750, xp: 2000, tokens: 2, items: [], gems: 0 });
+  assert.deepEqual(rewardFor({ ...base, size: 'Large', extra: { kind: 'tokens', qty: 2 } }, { xpToNext: 1000 }), { gp: 1750, xp: 400, tokens: 2, items: [], gems: 0 });
   assert.deepEqual(rewardFor({ ...base, size: 'Large', extra: { kind: 'item', itemId: 'Boot', qty: 40 } }, { xpToNext: 10 }).items, [{ itemId: 'Boot', qty: 40 }]);
   assert.equal(rewardFor({ ...base, size: 'Large', extra: { kind: 'gems', qty: 7 } }, { xpToNext: 10 }).gems, 7);
 });

@@ -41,7 +41,9 @@ export const SEVERANCE_HALF_LEVEL = 45;
 export const SEVERANCE_NONE_LEVEL = 90;
 export const MARKS_LEVEL = 50;
 export const CREW_CAP_LEVEL = 99;
-export const DEFAULT_XP_SHARE = 5;
+/** Hiring XP for each hour a Folk works, by tier, at the default rate setting (100%). Per time worked, like wages. */
+export const HIRING_XP_PER_HOUR = { Newbie: 60, Junior: 140, Middle: 220, Senior: 380, Expert: 600 };
+export const DEFAULT_XP_RATE = 100;
 
 /** Reserve capacity steps, [Hiring level, hours]; the Tips popup draws them as a table (build .112). */
 export const RESERVE_STEPS = [[95, 720], [65, 168], [35, 72], [5, 24]];
@@ -90,7 +92,7 @@ export function autoRestartUnlocked(level) {
   return level >= AUTO_RESTART_LEVEL;
 }
 
-/** Overtime wage multiplier: 2× until level 85, 1.5× after. */
+/** Overtime wage multiplier: ×2 until level 85, ×1.5 after. */
 export function overtimeWageFactor(level) {
   return level >= OVERTIME_LEVEL ? 1.5 : 2;
 }
@@ -135,11 +137,12 @@ export function crewBonusMax(level) {
   return level >= CREW_CAP_LEVEL ? 20 : 15;
 }
 
-/** Hiring XP earned from a Folk's skill XP at the configured share (percent). */
-export function hiringXPFor(folkXP, sharePercent = DEFAULT_XP_SHARE) {
-  const share = Number(sharePercent);
-  if (!(folkXP > 0) || !Number.isFinite(share) || share <= 0) return 0;
-  return folkXP * Math.min(100, share) / 100;
+/** Hiring XP for one Folk action: the tier's hourly rate for the action's time, at the rate setting (percent). */
+export function hiringXPForWork(tier, intervalMs, ratePercent = DEFAULT_XP_RATE) {
+  const perHour = HIRING_XP_PER_HOUR[tier];
+  const rate = Number(ratePercent);
+  if (perHour === undefined || !(intervalMs > 0) || !Number.isFinite(rate) || rate <= 0) return 0;
+  return perHour * (intervalMs / 3600000) * rate / 100;
 }
 
 /**

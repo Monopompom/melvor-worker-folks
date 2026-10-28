@@ -107,7 +107,7 @@ export function severance(nextHirePrice) {
   return Math.ceil(nextHirePrice * SEVERANCE_RATE);
 }
 
-/** Settlement = owed wages + severance; apology adds 2 more severances (3× in total) and skips the cooldown. */
+/** Settlement = owed wages + severance; apology adds 2 more severances (×3 in total) and skips the cooldown. */
 export function settlement(debt, nextHirePrice, { apology = false } = {}) {
   const sev = severance(nextHirePrice);
   return { debt, severance: sev, total: debt + (apology ? sev * APOLOGY_MULTIPLIER : sev) };

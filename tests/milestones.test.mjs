@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   MILESTONES, visibleMilestones, milestoneState, reserveCapacityHours, promotionsUnlocked, apologyUnlocked,
-  autoRestartUnlocked, overtimeWageFactor, freeShiftSlots, levelWageDiscount, promotionCostRate, hiringXPFor, xpToastSplit,
+  autoRestartUnlocked, overtimeWageFactor, freeShiftSlots, levelWageDiscount, promotionCostRate, hiringXPForWork, xpToastSplit,
   reserveRoom, capIncreaseModifications, capacityText, RESERVE_STEPS, firingSeveranceRate, firingSeverance, folkMarkShare,
   crewBonusMax,
 } from '../src/milestones.mjs';
@@ -83,11 +83,14 @@ test('xpToastSplit carries fractions until a whole XP can be shown', () => {
   assert.deepEqual(xpToastSplit(3, 0), { extra: 0, carry: 0 });
 });
 
-test('hiring XP share', () => {
-  assert.equal(hiringXPFor(200, 5), 10);
-  assert.equal(hiringXPFor(200, 0), 0);
-  assert.equal(hiringXPFor(200, 150), 200);
-  assert.equal(hiringXPFor(0, 5), 0);
+test('Hiring XP is the tier rate for the time worked', () => {
+  assert.equal(hiringXPForWork('Newbie', 3600000), 60);
+  assert.equal(hiringXPForWork('Expert', 3600000), 600);
+  assert.ok(Math.abs(hiringXPForWork('Middle', 3000) - 220 / 1200) < 1e-12, 'a 3 s action is 1/1200 of an hour');
+  assert.equal(hiringXPForWork('Senior', 3600000, 200), 760, 'the rate setting scales it');
+  assert.equal(hiringXPForWork('Junior', 3600000, 0), 0);
+  assert.equal(hiringXPForWork('Junior', 0), 0);
+  assert.equal(hiringXPForWork('Nobody', 3600000), 0);
 });
 
 test('reserve room', () => {

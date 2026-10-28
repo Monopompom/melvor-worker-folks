@@ -152,8 +152,10 @@ skip the cooldown.
 
 ## Hiring levels
 
-Hiring gains 5% of every skill XP drop your Folks earn (the share is a setting) and shows it
-as a "+N Hiring XP" notification like any other skill; delivered Work Orders pay more. Open
+Hiring gains XP for every hour your Folks work, by tier: Trainee 60, Apprentice 140,
+Journeyman 220, Master 380, Foreman 600 (failed actions count, as they do for wages; the rate
+is a setting). It shows as a "+N Hiring XP" notification like any other skill; delivered Work
+Orders pay more. Open
 **View Milestones** on the Hiring page for the full list. The levels unlock management
 features: the Payroll Reserve at 5 (24 h of the whole crew's wages, growing to 72 h at 35,
 7 days at 65 and 30 days at 95), the Work Orders board at 8 (more orders at 30 and 70, the
@@ -177,11 +179,11 @@ realm for now).
 
 A delivered order pays at once:
 
-- **GP**: a share of the wages its own work cost you, rolled per order from 0.5× to 3× and
+- **GP**: a share of the wages its own work cost you, rolled per order from ×0.5 to ×3 and
   shown on its card. A failed action's wage counts toward the order the Folk is filling. With
   wages off (No sweat) orders pay no GP.
-- **Hiring XP**: half a level's worth (Small), one level's (Medium) or two (Large), at your
-  Hiring level when it's delivered.
+- **Hiring XP**: a tenth of a level's worth (Small), a fifth (Medium) or two fifths (Large), at
+  your Hiring level when it's delivered.
 - **Items**: a Medium order adds a Hiring mastery token. A Large one adds one extra shown on
   its card: 1–2 tokens, a diploma (an item your highest Licence's promotion asks for), a stack
   of fishing junk or a handful of random gems.
@@ -236,7 +238,7 @@ Mod Settings → Worker Folks: wage difficulty, a preset from **No sweat** (free
 strikes; a strike or unpaid wages from before are only on hold and come back if you switch to a paid
 difficulty) through Easy (¼), Relaxed (½), **Standard** (full wages, the default), Tense (×1.5),
 Hard (×2), Brutal (×3) to **Evil hardcore** (×5); Abyssal
-Pieces wages on/off, Hiring XP share of Folk skill XP (default 5%), and **Hide Folks' gain popups**
+Pieces wages on/off, Hiring XP rate (default 100%), and **Hide Folks' gain popups**
 (off by default: when on, the XP, item, currency and mastery popups from your Folks' work stay hidden;
 level-ups, warnings and your own popups still show).
 

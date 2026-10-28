@@ -3,9 +3,9 @@
 export const HIRE_GROWTH = 1.2;
 
 export const HIRE_BASE_PRICE = {
-  Newbie: 500000,
-  Junior: 2500000,
-  Middle: 10000000,
+  Newbie: 1000000,
+  Junior: 5000000,
+  Middle: 15000000,
   Senior: 40000000,
   Expert: 120000000,
 };

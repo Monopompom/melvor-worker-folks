@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-10-28.146';
+export const BUILD = '2026-10-28.147';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -142,7 +142,13 @@ export async function setup(ctx) {
   await ctx.gameData.addPackage('data/hiring.json');
   // 3b. The API other mods read as mod.api.worker_folks (Voyage, phase 6): Folks, places, events, guards.
   ctx.api(apiModule.createApi({ getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'), model: folkModel, pricing,
-    rules: { promotion: { level: milestones.PROMOTION_LEVEL, mastery: promotion.MASTERY_GATE, costRate: promotion.PROMOTION_COST_RATE }, slotCaps: pricing.SHIFT_SLOT_CAP } }));
+    rules: { promotion: { level: milestones.PROMOTION_LEVEL, mastery: promotion.MASTERY_GATE, costRate: promotion.PROMOTION_COST_RATE }, slotCaps: pricing.SHIFT_SLOT_CAP,
+      tiers: { hireBase: pricing.HIRE_BASE_PRICE, wages: wages.WAGE_PER_HOUR, produceRates: produceRate.RATE_BY_TIER,
+        hiringXPPerHour: milestones.HIRING_XP_PER_HOUR, qualification: qualificationRules.QUALIFICATION_LEVELS },
+      levels: { workOrders: workOrderRules.BOARD_LEVEL, marks: milestones.MARKS_LEVEL, marksShare: milestones.folkMarkShare(milestones.MARKS_LEVEL),
+        crewBonus: { per: produceRate.CREW_BONUS_PER_EXPERT, max: produceRate.CREW_BONUS_MAX, topLevel: milestones.CREW_CAP_LEVEL, topMax: milestones.crewBonusMax(milestones.CREW_CAP_LEVEL) },
+        severance: [[1, milestones.firingSeveranceRate(1)], [milestones.SEVERANCE_HALF_LEVEL, milestones.firingSeveranceRate(milestones.SEVERANCE_HALF_LEVEL)], [milestones.SEVERANCE_NONE_LEVEL, milestones.firingSeveranceRate(milestones.SEVERANCE_NONE_LEVEL)]],
+        qualificationLowering: qualificationRules.LOWERING_MASTERY } } }));
   // Shop purchases depend on which expansions are loaded (game data is registered
   // before the Mod Manager starts, so namespace presence is reliable here).
   const expansions = {

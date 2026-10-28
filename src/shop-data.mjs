@@ -15,7 +15,7 @@ const base = {
 export const TIER_ORDER = ['Newbie', 'Junior', 'Middle', 'Senior', 'Expert'];
 export const ROLE = { Newbie: 'Trainee', Junior: 'Apprentice', Middle: 'Journeyman', Senior: 'Master', Expert: 'Foreman' };
 export const RATE = { Newbie: 60, Junior: 80, Middle: 100, Senior: 120, Expert: 140 };
-export const HIRE_BASE = { Newbie: 500000, Junior: 2500000, Middle: 10000000, Senior: 40000000, Expert: 120000000 };
+export const HIRE_BASE = { Newbie: 1000000, Junior: 5000000, Middle: 15000000, Senior: 40000000, Expert: 120000000 };
 export const LICENCE_LEVEL = { Newbie: 1, Junior: 20, Middle: 40, Senior: 60, Expert: 80 };
 
 export const LICENCE_GP = { Newbie: 2500000, Junior: 25000000, Middle: 100000000, Senior: 400000000, Expert: 1000000000 };

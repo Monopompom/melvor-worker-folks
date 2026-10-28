@@ -7,6 +7,23 @@ export const API_VERSION = 7;
 /** The least of the hire price an outside hire pays (v7): a bargain, never a free Folk. */
 export const HIRE_SHARE_MIN = 0.25;
 
+const byTier = (o) => Object.freeze(Object.values(o ?? {}));
+/** The per-tier numbers (build .147): first hire price, wage an hour at mastery 99 (Standard), produce rate, Hiring XP
+ * an hour of work and the skill level each tier asks of you, as arrays Newbie first. */
+const tierRules = (t) => (t === undefined ? {} : {
+  hireBase: byTier(t.hireBase), wages: byTier(t.wages), produceRates: byTier(t.produceRates),
+  hiringXPPerHour: byTier(t.hiringXPPerHour), qualification: byTier(t.qualification),
+});
+/** The Hiring level steps (build .147): the Work Orders board, Summoning marks (level, share of your chance), the
+ * Foreman crew bonus, the firing severance. */
+const levelRules = (l) => (l === undefined ? {} : {
+  workOrdersLevel: l.workOrders,
+  marksLevel: l.marks,
+  marksShare: l.marksShare,
+  crewBonus: Object.freeze({ ...l.crewBonus }),
+  firingSeverance: Object.freeze((l.severance ?? []).map((step) => Object.freeze([...step]))),
+  qualificationLowering: l.qualificationLowering,
+});
 const placeCopy = (place) => (place === null || place === undefined ? null : Object.freeze({ q: place.q, r: place.r }));
 
 /**
@@ -59,6 +76,10 @@ function viewPayload(payload, view) {
  * The numbers other mods write about (v7, build .136; Voyage's journal typed them): promotion's Hiring level, the
  * mastery each rank asks, the share of the next hire price a promotion costs, the Shift Slot caps by licence.
  * `rules` is { promotion: { level, mastery: { Junior... }, costRate }, slotCaps: { Newbie... } } from the rule modules.
+ * Build .147 adds `tiers` ({ hireBase, wages, produceRates, hiringXPPerHour, qualification }, each by tier, Newbie
+ * first) and `levels` ({ workOrders, marks, marksShare, crewBonus: { per, max, topLevel, topMax }, severance: [[level, rate], ...],
+ * qualificationLowering }); rules() hands them on only when given, so a caller tells an older Worker Folks by their
+ * absence.
  */
 export function createApi({ getHiring, model, pricing, rules, version = API_VERSION }) {
   const { normalizePlace, TRAVEL } = model;
@@ -93,6 +114,8 @@ export function createApi({ getHiring, model, pricing, rules, version = API_VERS
       masteryGates: Object.freeze(Object.values(rules?.promotion?.mastery ?? {})),
       promotionCostRate: rules?.promotion?.costRate,
       slotCaps: Object.freeze(Object.values(rules?.slotCaps ?? {}).filter((n) => Number.isFinite(n))),
+      ...tierRules(rules?.tiers),
+      ...levelRules(rules?.levels),
     }),
     folks: () => hiring().crew.all.map(view),
     folkById: (id) => {
