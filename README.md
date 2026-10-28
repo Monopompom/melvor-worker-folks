@@ -236,10 +236,11 @@ Multitasking mod by Corgan.
 
 MIT. The source is included in the zip; see `LICENSE`.
 
-The MIT License covers the mod's code and its own art. Seven icons are built from Melvor Idle's
+The MIT License covers the mod's code and its own art. Nine icons are built from Melvor Idle's
 own sprites, recoloured or reassembled with the Hiring badge, and stay the property of Games by
-Malcs: `assets/skillcape.webp`, `assets/skillcape_superior.webp`, `assets/lesser_relic.webp` and
+Malcs: `assets/skillcape.webp`, `assets/skillcape_superior.webp`, `assets/lesser_relic.webp`,
 the Overseers Outfit pieces `assets/town_helmet.webp`, `assets/town_body.webp`,
-`assets/town_legs.webp`, `assets/town_boots.webp`. They are not under the MIT License and are
+`assets/town_legs.webp`, `assets/town_boots.webp`, and the Steward tablet and mark
+`assets/steward.webp`, `assets/mark_steward.webp`. They are not under the MIT License and are
 included only so the mod looks at home in the game. Melvor Idle is a trademark of Games by Malcs;
 this mod is not affiliated with or endorsed by them.
