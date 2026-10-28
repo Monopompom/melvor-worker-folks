@@ -1,7 +1,7 @@
 // Folk record model, validation and save-root migrations. Pure: no game globals.
 
 export const TIERS = ['Newbie', 'Junior', 'Middle', 'Senior', 'Expert'];
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 /**
  * A Folk's travel state: 'idle' stays on its place, 'with' goes along with the player, 'walking' is on its way somewhere
  * alone (Voyage, phase 6). Only 'idle' works.
@@ -19,7 +19,7 @@ export function tierIndex(tier) {
 }
 
 /** Builds a fresh Folk record. Only id, slot, tier and name are required. */
-export function createFolk({ id, slot, tier, name, hiredAt = 0 }) {
+export function createFolk({ id, slot, tier, name, hiredAt = 0, paid = null }) {
   if (typeof id !== 'string' || id.length === 0) throw new Error('Folk id required');
   if (!Number.isInteger(slot) || slot < 0) throw new Error('Folk slot must be a non-negative integer');
   if (!isTier(tier)) throw new Error(`Unknown tier: ${tier}`);
@@ -49,6 +49,8 @@ export function createFolk({ id, slot, tier, name, hiredAt = 0 }) {
     hiredAt,
     /** Earned traits: held, waiting for a free slot, and the counts toward each (src/traits-model.mjs). */
     traitState: { traits: [], waiting: [], counts: {} },
+    /** GP the Folk cost you, its hire and its promotions; the firing severance is a share of it. null = not known. */
+    paid: typeof paid === 'number' && Number.isFinite(paid) && paid >= 0 ? paid : null,
   };
 }
 
@@ -110,6 +112,7 @@ export function normalizeFolk(raw) {
   folk.place = normalizePlace(raw.place);
   folk.travel = TRAVEL.includes(raw.travel) ? raw.travel : 'idle';
   folk.traitState = normalizeTraitState(raw.traitState);
+  folk.paid = typeof raw.paid === 'number' && Number.isFinite(raw.paid) && raw.paid >= 0 ? raw.paid : null;
   return folk;
 }
 
@@ -187,6 +190,13 @@ export const MIGRATIONS = {
     ...root,
     v: 5,
     folks: (Array.isArray(root.folks) ? root.folks : []).map((f) => ({ ...f, traitState: { traits: [], waiting: [], counts: {} } })),
+  }),
+  // v6: what each Folk cost (the firing severance). Unknown for a Folk hired before: the game fills in its tier's
+  // first-hire price once at load.
+  5: (root) => ({
+    ...root,
+    v: 6,
+    folks: (Array.isArray(root.folks) ? root.folks : []).map((f) => ({ ...f, paid: null })),
   }),
 };
 

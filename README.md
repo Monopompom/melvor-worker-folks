@@ -41,7 +41,7 @@ while you fight, raid or train something else.
 | Apprentice | 80 | Never Finds Pets | 300,000 GP |
 | Journeyman | 100 | — | 1,000,000 GP |
 | Master | 120 | -5% action time, +10% Preservation | 3,000,000 GP |
-| Foreman | 140 | -10% action time, +20% Preservation, +3% XP To Other Working Folks (Max +15%) | 8,000,000 GP |
+| Foreman | 140 | -10% action time, +20% Preservation, +3% XP To Other Working Folks (Max +15%, +20% from Hiring 99) | 8,000,000 GP |
 
 **Produce Rate** below 100 is the chance an action succeeds; a failed action gives nothing
 (crafting inputs are still used). Above 100, the excess is the chance of a second full
@@ -52,6 +52,17 @@ the equipment you wear.
 Higher Licences need the previous Licence, a Hiring level (20 / 40 / 60 / 80) and items
 from harder content. The Foreman Licence asks for different items depending on the
 expansions you own.
+
+## Qualification
+
+A Folk works a skill only once your own level in it is high enough for its tier: 10 for a
+Trainee, 30 for an Apprentice, 50 for a Journeyman, 70 for a Master and 90 for a Foreman
+(Alt. Magic uses your Magic level). From the Folk's mastery 50 the level of the tier below
+is enough. In the Worker box a Folk you don't qualify for is greyed out with the level it
+needs; one that already holds the skill waits, and its card and the Worker box say why. A
+Folk that stops qualifying while it works (after a promotion, say) stops, keeps its skill
+and starts again once you reach the level. The **Qualification** setting (Hiring section,
+on by default) turns the rule off.
 
 ## Gear
 
@@ -75,7 +86,8 @@ the Summoning XP for every tablet a Folk uses. Items in the Consumable slot are 
 action the same way. Charge gloves draw on the same charge pool you see in the shop and
 stop working at zero; buying charges turns them back on. When a stack runs out the slot
 empties and a notification names the Folk. Your own equipped tablets, consumables and
-charges are never spent by a Folk's work. Folks do not discover Summoning marks.
+charges are never spent by a Folk's work. From Hiring 50 Folks find Summoning marks at half
+your chance; before that they find none.
 
 ## Folk health
 
@@ -95,8 +107,12 @@ needs the target tier's Licence, the Folk's mastery (20 / 40 / 60 / 80 for Appre
 Journeyman / Master / Foreman), a diploma item (Amulet of Torture, Amulet of Fury,
 Infernal Core, Elder Crown or FrostSpark Amulet with Throne of the Herald) and a fee of
 60% of that tier's next hire price. The Folk keeps its skill, mastery and anything it
-carries, and keeps working. Firing asks for confirmation, returns carried items to the
-bank, clears the slot's mastery and refunds nothing.
+carries, and keeps working if you still qualify it for its skill (the popup warns when the
+new tier needs more of your level). Firing asks for confirmation, returns carried items to
+the bank, clears the slot's mastery and refunds nothing. It also costs a **severance**: 10%
+of what the Folk cost you (its hire price and its promotion fees), 5% from Hiring 45 and
+nothing from Hiring 90. A Folk hired before this rule counts as having cost its tier's
+first-hire price. Fire stays disabled while you can't pay the severance.
 
 ## Traits
 
@@ -141,8 +157,10 @@ as a "+N Hiring XP" notification like any other skill. Open
 **View Milestones** on the Hiring page for the full list. The levels unlock management
 features: the Payroll Reserve at 5 (24 h of the whole crew's wages, growing to 72 h at 35,
 7 days at 65 and 30 days at 95), promotions at 10, forgetting a trait at 15, Licences at 20 / 40 / 60 / 80, the
-apology bonus at 25, automatic restart of a Folk's skill after a settlement at 55, cheaper
-Overtime (×1.5 wages) at 85, a free Shift Slot at 99 and, with Throne of the Herald, -10%
+apology bonus at 25, half the firing severance at 45, Summoning marks for Folks at 50,
+automatic restart of a Folk's skill after a settlement at 55, cheaper Overtime (×1.5 wages)
+at 85, no firing severance at 90, a free Shift Slot and a +20% Foreman crew bonus cap at 99
+and, with Throne of the Herald, -10%
 wages at 100, a second free Shift Slot at 110 and 50% promotion fees at 120. Locked
 buttons show the level they need. In Ancient Relics the milestones above your level cap
 are marked "raise level cap", and Hiring can appear among the random cap increases.

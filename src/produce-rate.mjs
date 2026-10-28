@@ -45,9 +45,9 @@ export function tierModifiers(tier, { preservationDisabled = false } = {}) {
   return out;
 }
 
-/** +3% skill XP per OTHER working Expert, capped at +15%. */
-export function crewBonus(workingExpertsExcludingSelf) {
-  return Math.min(CREW_BONUS_MAX, CREW_BONUS_PER_EXPERT * Math.max(0, workingExpertsExcludingSelf));
+/** +3% skill XP per OTHER working Expert, capped at +15% (`max`: +20% from Hiring 99). */
+export function crewBonus(workingExpertsExcludingSelf, max = CREW_BONUS_MAX) {
+  return Math.min(max, CREW_BONUS_PER_EXPERT * Math.max(0, workingExpertsExcludingSelf));
 }
 
 export function rollsPets(tier) {

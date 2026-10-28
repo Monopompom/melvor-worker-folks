@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import {
   MILESTONES, visibleMilestones, milestoneState, reserveCapacityHours, promotionsUnlocked, apologyUnlocked,
   autoRestartUnlocked, overtimeWageFactor, freeShiftSlots, levelWageDiscount, promotionCostRate, hiringXPFor, xpToastSplit,
-  reserveRoom, capIncreaseModifications, capacityText, RESERVE_STEPS,
+  reserveRoom, capIncreaseModifications, capacityText, RESERVE_STEPS, firingSeveranceRate, firingSeverance, folkMarkShare,
+  crewBonusMax,
 } from '../src/milestones.mjs';
 
 const lang = JSON.parse(readFileSync(new URL('../languages/en.json', import.meta.url), 'utf8'));
@@ -14,9 +15,10 @@ const t = (key, vars) => lang[key].replace(/\$\{(\w+)\}/g, (_, k) => vars[k]);
 test('milestones are sorted by level and match the design table', () => {
   const levels = MILESTONES.map((m) => m.level);
   assert.deepEqual(levels, [...levels].sort((a, b) => a - b));
-  assert.deepEqual(levels, [5, 10, 15, 20, 25, 35, 40, 55, 60, 65, 80, 85, 95, 99, 100, 110, 120]);
-  assert.equal(visibleMilestones(99).length, 14);
-  assert.equal(visibleMilestones(120).length, 17);
+  assert.deepEqual(levels, [5, 10, 15, 20, 25, 35, 40, 45, 50, 55, 60, 65, 80, 85, 90, 95, 99, 99, 100, 110, 120]);
+  assert.equal(visibleMilestones(99).length, 18);
+  assert.equal(visibleMilestones(120).length, 21);
+  MILESTONES.forEach((m) => assert.equal(typeof lang[`MOD_WF_MILESTONE_${m.key}`], 'string', m.key));
 });
 
 test('milestone state respects the level cap', () => {
@@ -55,6 +57,18 @@ test('feature gates by level', () => {
   assert.deepEqual([freeShiftSlots(98), freeShiftSlots(99), freeShiftSlots(110)], [0, 1, 2]);
   assert.deepEqual([levelWageDiscount(99), levelWageDiscount(100)], [0, 10]);
   assert.deepEqual([promotionCostRate(119), promotionCostRate(120)], [0.6, 0.5]);
+  assert.deepEqual([folkMarkShare(49), folkMarkShare(50)], [0, 0.5]);
+  assert.deepEqual([crewBonusMax(98), crewBonusMax(99)], [15, 20]);
+});
+
+test('firing severance: 10% of what the Folk cost, 5% from Hiring 45, nothing from 90, rounded up', () => {
+  assert.deepEqual([firingSeveranceRate(1), firingSeveranceRate(44), firingSeveranceRate(45), firingSeveranceRate(89), firingSeveranceRate(90)], [0.1, 0.1, 0.05, 0.05, 0]);
+  assert.equal(firingSeverance(10000, 1), 1000);
+  assert.equal(firingSeverance(10001, 1), 1001);
+  assert.equal(firingSeverance(10000, 45), 500);
+  assert.equal(firingSeverance(10000, 90), 0);
+  assert.equal(firingSeverance(null, 1), 0);
+  assert.equal(firingSeverance(-50, 1), 0);
 });
 
 test('xpToastSplit carries fractions until a whole XP can be shown', () => {

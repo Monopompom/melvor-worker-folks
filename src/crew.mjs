@@ -70,8 +70,8 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
       this.frozenSlots().forEach((until) => { if (min === undefined || until < min) min = until; });
       return min;
     },
-    /** Adds a Folk of `tier` in the lowest free slot. Returns the record or null when full. */
-    hire(tier, { name, source = 'shop', limit } = {}) {
+    /** Adds a Folk of `tier` in the lowest free slot (`paid`: the GP it cost). Returns the record or null when full. */
+    hire(tier, { name, source = 'shop', limit, paid } = {}) {
       const slot = this.freeSlot({ limit });
       if (slot < 0) return null;
       const folk = createFolk({
@@ -80,6 +80,7 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
         tier,
         name: name ?? pickName(folks.map((f) => f.name), rng),
         hiredAt: now(),
+        paid,
       });
       folks.push(folk);
       folks.sort((a, b) => a.slot - b.slot);
@@ -95,12 +96,13 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
       emitChange();
       return true;
     },
-    /** Raises a Folk one tier; everything else (skill, mastery slot, loadout) stays. */
-    promote(id, toTier) {
+    /** Raises a Folk one tier; everything else (skill, mastery slot, loadout) stays. `paid`: the fee, added to its cost. */
+    promote(id, toTier, { paid = 0 } = {}) {
       const folk = this.byId(id);
       if (folk === undefined) return false;
       const from = folk.tier;
       folk.tier = toTier;
+      if (paid > 0 && folk.paid !== null) folk.paid += paid;
       bus.emit('folkPromoted', { folk, from, to: toTier });
       emitChange();
       return true;

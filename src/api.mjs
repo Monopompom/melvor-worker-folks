@@ -239,7 +239,7 @@ export function createApi({ getHiring, model, pricing, rules, version = API_VERS
       if (!can.ok || !TRAVEL.includes(travel)) return Object.freeze({ refused: !can.ok ? can.refused : 'tier' });
       const price = can.price;
       const gp = h.game?.gp;
-      const folk = h.crew.hire(tier, { name: typeof name === 'string' && name !== '' ? name : undefined, source, limit: h.folkCap });
+      const folk = h.crew.hire(tier, { name: typeof name === 'string' && name !== '' ? name : undefined, source, limit: h.folkCap, paid: price });
       if (folk === null) return Object.freeze({ refused: 'full' });
       gp.remove(price);
       if (travel !== 'idle') {

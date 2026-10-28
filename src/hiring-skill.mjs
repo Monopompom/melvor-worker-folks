@@ -120,6 +120,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       if (report.corrupt) console.warn('[Worker Folks] crew data was unreadable; starting with an empty crew');
       if (report.applied.length > 0) log(`migrated crew save from v${report.applied[0]} to v${folkModel.SAVE_VERSION}`);
       if (report.dropped > 0) console.warn(`[Worker Folks] dropped ${report.dropped} invalid Folk record(s)`);
+      // A Folk hired before its cost was kept is taken to have cost its tier's first-hire price, set once here.
+      this.crew.all.forEach((folk) => { if (folk.paid === null) folk.paid = pricing.hirePrice(folk.tier, 0); });
     }
 
     // ---- presentation --------------------------------------------------------
@@ -1037,7 +1039,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         }
         this.game.gp.remove(fresh.cost);
         this.game.bank.removeItemQuantity(fresh.diploma, 1, true);
-        this.crew.promote(folk.id, fresh.nextTier);
+        this.crew.promote(folk.id, fresh.nextTier, { paid: fresh.cost });
         this.game.notifications.createSuccessNotification(
           'worker_folks:promoted',
           templateLangString('MOD_WF_PROMOTED', { name: folk.name, role: this.roleName(fresh.nextTier), aRole: getLangString(`MOD_WF_A_ROLE_${fresh.nextTier}`) }),
@@ -1070,13 +1072,31 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       this.loadout?.returnAll(folk);
     }
 
-    /** Confirms, returns the loadout, then fires. */
+    /** GP this Folk cost you (hire and promotions); its tier's first-hire price when that was never kept. */
+    costOf(folk) {
+      return folk.paid ?? pricing.hirePrice(folk.tier, 0);
+    }
+
+    /** The GP firing this Folk costs now (0 from Hiring 90). */
+    severanceOf(folk) {
+      return this.levels?.firingSeverance(this.costOf(folk)) ?? 0;
+    }
+
+    /** Confirms (the severance shown, Fire disabled while you can't pay it), returns the loadout, then fires. */
     fire(folk) {
       if (this.refused('staff', { action: 'fire', folk })) return;
+      const severance = this.severanceOf(folk);
+      const short = severance > this.game.gp.amount;
+      // The severance on a grey band like the promotion fee: amber, red with ✗ when you can't pay it.
+      const fee = `<img class="skill-icon-xs mr-1" src="${this.game.gp.media}" alt="GP"><span class="font-w600 ${short ? 'text-danger' : 'text-warning'}">${numberWithCommas(severance)}</span>`;
+      const severanceBand = severance > 0
+        ? `<div class="wf-band text-left mt-2"><span class="${short ? 'text-danger' : 'text-success'}">${short ? '✗' : '✓'}</span> ${templateLangString('MOD_WF_FIRE_SEVERANCE', { cost: fee, percent: `${Math.round((this.levels?.firingSeveranceRate() ?? 0) * 100)}`, paid: numberWithCommas(this.costOf(folk)) })}</div>`
+          + (short ? `<div class="text-danger mt-2">${templateLangString('MOD_WF_FIRE_SHORT', { cost: numberWithCommas(severance) })}</div>` : '')
+        : '';
       SwalLocale.fire({
         didRender: popupDidRender,
         title: templateLangString('MOD_WF_FIRE_TITLE', { name: titleName(folk.name) }),
-        html: `<div class="text-center text-warning">${getLangString('MOD_WF_FIRE_TEXT')}</div>`,
+        html: `<div class="text-center text-warning">${getLangString('MOD_WF_FIRE_TEXT')}</div>${severanceBand}`,
         imageUrl: this.portrait(folk.tier),
         imageWidth: 64,
         imageHeight: 64,
@@ -1084,9 +1104,18 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         // Firing loses the Folk for good: red confirm, blue-outline cancel; the portrait alone, no second icon.
         customClass: swalClass({ popup: 'wf-ui wf-pic', confirmButton: 'btn btn-danger m-1' }),
         showCancelButton: true,
+        focusCancel: short,
         confirmButtonText: getLangString('MOD_WF_BUTTON_FIRE'),
+        didOpen: () => { if (short) { const b = Swal.getConfirmButton(); if (b) b.disabled = true; } },
       }).then((result) => {
         if (!result.isConfirmed) return;
+        // Asked again: the GP may have gone while the popup was open.
+        const due = this.severanceOf(folk);
+        if (due > this.game.gp.amount) {
+          this.game.notifications.createErrorNotification('worker_folks:fire', templateLangString('MOD_WF_FIRE_SHORT', { cost: numberWithCommas(due) }));
+          return;
+        }
+        if (due > 0) this.game.gp.remove(due);
         this.returnLoadout?.(folk);
         this.crew.fire(folk.id, { reason: 'fired' });
       });
@@ -1132,7 +1161,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       if (mods.skillPreservationChance !== 0) out.push(piece('MOD_WF_EFFECT_PRESERVATION', pct(mods.skillPreservationChance), mods.skillPreservationChance > 0 ? 'good' : 'bad'));
       if (mods.skillXP !== 0) out.push(piece('MOD_WF_EFFECT_XP', pct(mods.skillXP), mods.skillXP > 0 ? 'good' : 'bad'));
       if (!produceRate.rollsPets(tier)) out.push({ before: '', value: getLangString('MOD_WF_EFFECT_NO_PETS'), after: '', tone: 'bad' });
-      if (tier === 'Expert') out.push(piece('MOD_WF_EFFECT_CREW_BONUS', pct(3), 'good', { max: pct(15) }));
+      if (tier === 'Expert') out.push(piece('MOD_WF_EFFECT_CREW_BONUS', pct(3), 'good', { max: pct(this.levels?.crewBonusMax() ?? 15) }));
       return out;
     }
 

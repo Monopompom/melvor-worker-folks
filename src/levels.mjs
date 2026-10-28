@@ -37,6 +37,10 @@ export function install(ctx, { getHiring, rules, log }) {
     freeShiftSlots: () => rules.freeShiftSlots(hiring.level),
     wageDiscount: () => rules.levelWageDiscount(hiring.level),
     promotionCostRate: () => rules.promotionCostRate(hiring.level),
+    firingSeverance: (cost) => rules.firingSeverance(cost, hiring.level),
+    firingSeveranceRate: () => rules.firingSeveranceRate(hiring.level),
+    folkMarkShare: () => rules.folkMarkShare(hiring.level),
+    crewBonusMax: () => rules.crewBonusMax(hiring.level),
     reserveLevel: 5,
     /** "Hiring N" label for a locked control. */
     lockText: (level) => templateLangString('MOD_WF_LOCKED_LEVEL', { level: `${level}` }),

@@ -129,12 +129,15 @@ export function install(ctx, { getHiring, rules, log }) {
   };
   ['consumeItemQuantities', 'consumeItemCharges', 'consumeSynergyTablets', 'consumeBankItem'].forEach(guard);
 
-  // Folks do not discover Summoning marks (v1). Hiring's own mark (the Steward, rolled for the
-  // player after a Folk action) goes through: that roll is the player's, not the Folk's.
+  // Folks find no Summoning marks until Hiring 50, then at half the player's chance: the chance is linear in the
+  // interval, so the roll gets that share of it. Hiring's own mark (the Steward, rolled for the player after a Folk
+  // action) goes through whole: that roll is the player's, not the Folk's.
   if (typeof Summoning !== 'undefined') {
-    ctx.patch(Summoning, 'rollMarksForSkill').replace(function (original, ...args) {
-      if (acting() !== undefined && args[0] !== hiring) return undefined;
-      return original(...args);
+    ctx.patch(Summoning, 'rollMarksForSkill').replace(function (original, skill, interval, ...rest) {
+      if (acting() === undefined || skill === hiring) return original(skill, interval, ...rest);
+      const share = hiring.levels?.folkMarkShare() ?? 0;
+      if (!(share > 0)) return undefined;
+      return original(skill, interval * share, ...rest);
     });
   }
 

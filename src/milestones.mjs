@@ -10,13 +10,17 @@ export const MILESTONES = [
   { level: 25, key: 'APOLOGY', icon: 'hiring' },
   { level: 35, key: 'RESERVE_72', icon: 'reserve' },
   { level: 40, key: 'LICENCE_MIDDLE', icon: 'Middle' },
+  { level: 45, key: 'SEVERANCE_HALF', icon: 'hiring' },
+  { level: 50, key: 'MARKS', icon: 'hiring' },
   { level: 55, key: 'AUTO_RESTART', icon: 'hiring' },
   { level: 60, key: 'LICENCE_SENIOR', icon: 'Senior' },
   { level: 65, key: 'RESERVE_7D', icon: 'reserve' },
   { level: 80, key: 'LICENCE_EXPERT', icon: 'Expert' },
   { level: 85, key: 'OVERTIME', icon: 'hiring' },
+  { level: 90, key: 'SEVERANCE_NONE', icon: 'hiring' },
   { level: 95, key: 'RESERVE_30D', icon: 'reserve' },
   { level: 99, key: 'FREE_SLOT_1', icon: 'hiring' },
+  { level: 99, key: 'CREW_CAP', icon: 'Expert' },
   { level: 100, key: 'WAGES_10', icon: 'hiring' },
   { level: 110, key: 'FREE_SLOT_2', icon: 'hiring' },
   { level: 120, key: 'PROMO_COST', icon: 'hiring' },
@@ -29,6 +33,10 @@ export const AUTO_RESTART_LEVEL = 55;
 export const OVERTIME_LEVEL = 85;
 export const WAGE_DISCOUNT_LEVEL = 100;
 export const PROMO_COST_LEVEL = 120;
+export const SEVERANCE_HALF_LEVEL = 45;
+export const SEVERANCE_NONE_LEVEL = 90;
+export const MARKS_LEVEL = 50;
+export const CREW_CAP_LEVEL = 99;
 export const DEFAULT_XP_SHARE = 5;
 
 /** Reserve capacity steps, [Hiring level, hours]; the Tips popup draws them as a table (build .112). */
@@ -97,6 +105,30 @@ export function levelWageDiscount(level) {
 
 export function promotionCostRate(level) {
   return level >= PROMO_COST_LEVEL ? 0.5 : 0.6;
+}
+
+/**
+ * Firing costs a severance, a share of what the Folk cost you (its hire and its promotions): 10% until Hiring 45,
+ * 5% from 45, nothing from 90. Firing is never free early on, so a crew is planned, not churned.
+ */
+export function firingSeveranceRate(level) {
+  if (level >= SEVERANCE_NONE_LEVEL) return 0;
+  return level >= SEVERANCE_HALF_LEVEL ? 0.05 : 0.1;
+}
+
+/** The severance in GP for a Folk that cost `cost`, rounded up like the promotion fee. */
+export function firingSeverance(cost, level) {
+  return Math.ceil(Math.max(0, Number(cost) || 0) * firingSeveranceRate(level));
+}
+
+/** Share of the player's Summoning mark chance a Folk action rolls with: none until Hiring 50, half from it. */
+export function folkMarkShare(level) {
+  return level >= MARKS_LEVEL ? 0.5 : 0;
+}
+
+/** Cap on the Foreman crew bonus (skill XP, percent): 15 until Hiring 99, 20 from it. */
+export function crewBonusMax(level) {
+  return level >= CREW_CAP_LEVEL ? 20 : 15;
 }
 
 /** Hiring XP earned from a Folk's skill XP at the configured share (percent). */

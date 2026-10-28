@@ -63,8 +63,9 @@ test('serialize/load round-trip, slot cap on load and crewChanged emission', () 
 test('load migrates a pre-version root', () => {
   const { crew } = make(4);
   const report = crew.load({ folks: [{ id: 'old', slot: 1, tier: 'Junior', name: 'Old' }] });
-  assert.deepEqual(report.applied, [0, 1, 2, 3, 4]);
+  assert.deepEqual(report.applied, [0, 1, 2, 3, 4, 5]);
   assert.equal(crew.bySlot(1).strikes, 0);
+  assert.equal(crew.bySlot(1).paid, null);
 });
 
 test('reserve survives serialize/load and never goes negative', () => {
@@ -87,6 +88,21 @@ test('promote changes the tier and emits folkPromoted', () => {
   assert.equal(folk.tier, 'Junior');
   assert.deepEqual(seen, [['Newbie', 'Junior']]);
   assert.equal(crew.countByTier('Junior'), 1);
+});
+
+test('paid: a hire keeps its price and a promotion adds its fee; an unknown cost stays unknown', () => {
+  const { crew } = make();
+  const known = crew.hire('Newbie', { paid: 1000 });
+  assert.equal(known.paid, 1000);
+  crew.promote(known.id, 'Junior', { paid: 4000 });
+  assert.equal(known.paid, 5000);
+  const unknown = crew.hire('Newbie');
+  assert.equal(unknown.paid, null);
+  crew.promote(unknown.id, 'Junior', { paid: 4000 });
+  assert.equal(unknown.paid, null);
+  const { crew: other } = make();
+  other.load(crew.serialize());
+  assert.equal(other.byId(known.id).paid, 5000);
 });
 
 test('frozen slots are skipped by hire, expire with the clock and survive a round-trip', () => {

@@ -49,6 +49,8 @@ test('crew bonus and pets', () => {
   assert.equal(crewBonus(0), 0);
   assert.equal(crewBonus(2), 6);
   assert.equal(crewBonus(9), 15);
+  assert.equal(crewBonus(9, 20), 20);
+  assert.equal(crewBonus(6, 20), 18);
   assert.equal(rollsPets('Newbie'), false);
   assert.equal(rollsPets('Junior'), false);
   assert.equal(rollsPets('Middle'), true);

@@ -3,7 +3,7 @@
 // Game-facing.
 
 export function install(ctx, { getHiring, pricing, licencePurchase, hirePurchase, shiftSlotPurchase, log }) {
-  const { hirePriceForQuantity, shiftSlotPrice, shiftSlotCap } = pricing;
+  const { hirePrice, hirePriceForQuantity, shiftSlotPrice, shiftSlotCap } = pricing;
   let hiring;
   /** cost object (as the shop passes it to getCurrencyCost) → tier */
   const hireCostTier = new WeakMap();
@@ -135,7 +135,9 @@ export function install(ctx, { getHiring, pricing, licencePurchase, hirePurchase
         const tier = hireTier.get(e.purchase);
         if (tier !== undefined) {
           for (let i = 0; i < e.quantity; i += 1) {
-            if (hiring.crew.hire(tier, { source: 'shop', limit: hiring.folkCap }) === null) console.error('[Worker Folks] hire paid but no free slot');
+            // Each one at the price it was bought for: the count of that tier before it joins.
+            const paid = hirePrice(tier, hiring.crew.countByTier(tier));
+            if (hiring.crew.hire(tier, { source: 'shop', limit: hiring.folkCap, paid }) === null) console.error('[Worker Folks] hire paid but no free slot');
           }
           return;
         }

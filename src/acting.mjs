@@ -40,7 +40,7 @@ export function install(ctx, { getHiring, rate, log }) {
     const trait = hiring.traits?.effectsOf(folk, skill.id) ?? { interval: 0, xp: 0, preservation: 0, doubling: 0 };
     // The Steward (worn by the player, src/steward.mjs) gives every Folk a share more skill XP.
     const stewardXP = hiring.playerModifier?.('folkSkillXP') ?? 0;
-    const bonusXP = tier.skillXP + rate.crewBonus(workingExperts(folk)) + perk.skillXP + trait.xp + stewardXP;
+    const bonusXP = tier.skillXP + rate.crewBonus(workingExperts(folk), hiring.levels?.crewBonusMax()) + perk.skillXP + trait.xp + stewardXP;
     const interval = tier.skillInterval + perk.intervalPercent + trait.interval;
     const preservation = tier.skillPreservationChance + trait.preservation;
     const data = {};
