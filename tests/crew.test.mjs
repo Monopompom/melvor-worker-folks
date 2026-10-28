@@ -68,6 +68,19 @@ test('load migrates a pre-version root', () => {
   assert.equal(crew.bySlot(1).paid, null);
 });
 
+test('the Work Orders board rides in the save as it is, and clear() drops it', () => {
+  const { crew } = make();
+  assert.equal(crew.board, null);
+  crew.board = { orders: [{ id: 'o1', qty: 5 }], ticks: 40 };
+  const { crew: other } = make();
+  other.load(crew.serialize());
+  assert.deepEqual(other.board, { orders: [{ id: 'o1', qty: 5 }], ticks: 40 });
+  other.load({ v: 6, folks: [], board: [1, 2] });
+  assert.equal(other.board, null, 'not an object: no board');
+  crew.clear();
+  assert.equal(crew.board, null);
+});
+
 test('reserve survives serialize/load and never goes negative', () => {
   const { crew } = make();
   assert.equal(crew.adjustReserve('gp', 500), 500);

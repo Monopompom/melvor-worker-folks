@@ -229,9 +229,22 @@ export function install({ hiring, log, tiers }) {
       if (set !== undefined && game.currentGamemode.allowAncientRelicDrops) hiring.unlockRelicDrops(set, count);
       return set === undefined ? [] : Array.from(set.foundRelics.keys(), (r) => r.id);
     },
+    /** The Work Orders board as a table (null before Hiring 8). */
+    orders() {
+      const board = hiring.workOrders?.board ?? null;
+      if (board === null) return null;
+      const rows = board.orders.map((o) => ({ id: o.id, size: o.size, skill: o.skillId, item: o.itemId, done: `${o.delivered}/${o.qty}`, state: o.state, aged: o.aged, gpRate: o.gpRate, wages: Math.floor(o.wages), extra: o.extra === null ? '-' : JSON.stringify(o.extra) }));
+      console.table(rows);
+      return rows;
+    },
+    /** Moves the board's clock by `hours` of game time (a refresh when it reaches 24 h). */
+    orderClock(hours = 24) {
+      hiring.workOrders?.advance(Math.round(hours * 72000));
+      return hiring.workOrders?.board?.ticks;
+    },
     tiers: tiers.slice(),
   };
   globalThis.workerFolksDev = api;
-  log('dev commands (a Folk = its row in list(), its name or its id): workerFolksDev.spawn(tier, name?) | fire(id) | assign(id, skillId) | strike(id, debt?) | debt(id, gp?) | cooldown(id, ticks) | reset(id) | hp(id, hp) | kill(id) | thaw(slot?) | loadout(id) | gear(id, skillId?, {replace, qty}) | reserve() | mastery(id, level) | poolXP(xp) | list() | clear() | dump() | load(root) | shiftSlots(n) | delegated() | pet() | relics(n)');
+  log('dev commands (a Folk = its row in list(), its name or its id): workerFolksDev.spawn(tier, name?) | fire(id) | assign(id, skillId) | strike(id, debt?) | debt(id, gp?) | cooldown(id, ticks) | reset(id) | hp(id, hp) | kill(id) | thaw(slot?) | loadout(id) | gear(id, skillId?, {replace, qty}) | reserve() | mastery(id, level) | poolXP(xp) | list() | clear() | dump() | load(root) | shiftSlots(n) | delegated() | pet() | relics(n) | orders() | orderClock(hours)');
   return api;
 }

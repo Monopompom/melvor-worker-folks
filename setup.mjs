@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-10-28.143';
+export const BUILD = '2026-10-28.145';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -115,6 +115,8 @@ export async function setup(ctx) {
   const traits = await ctx.loadModule('src/traits.mjs');
   const qualificationRules = await ctx.loadModule('src/qualification-model.mjs');
   const qualification = await ctx.loadModule('src/qualification.mjs');
+  const workOrderRules = await ctx.loadModule('src/work-orders-model.mjs');
+  const workOrders = await ctx.loadModule('src/work-orders.mjs');
 
   // 1. Language strings were installed in step 0 (needed before any skill/page name is read).
 
@@ -317,6 +319,15 @@ export async function setup(ctx) {
     log,
   });
 
+  // 10. Work Orders: the board on the Hiring page, after payroll (an order's wages are the ones its actions paid).
+  workOrders.install(ctx, {
+    getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+    model: workOrderRules,
+    time,
+    tips,
+    popupDidRender,
+    log,
+  });
 
   ctx.onCharacterLoaded(() => {
     if (state.disabled) return;

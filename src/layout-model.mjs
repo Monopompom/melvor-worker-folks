@@ -12,7 +12,7 @@
 
 export const STORAGE_KEY = 'worker_folks:layout';
 export const COLUMNS = ['wide'];
-export const DEFAULT_COLS = { wide: ['dashboard', 'crew'] };
+export const DEFAULT_COLS = { wide: ['dashboard', 'orders', 'crew'] };
 /** Blocks without a title row: they never fold. */
 export const FIXED = ['crew'];
 /** Most Folk ids kept (the mod's 24 slots, with room for ids of Folks since fired). */

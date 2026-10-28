@@ -142,7 +142,7 @@ export function normalizeFrozen(raw, now = 0) {
 }
 
 export function createEmptyRoot() {
-  return { v: SAVE_VERSION, folks: [], reserve: createEmptyReserve(), frozen: {} };
+  return { v: SAVE_VERSION, folks: [], reserve: createEmptyReserve(), frozen: {}, board: null };
 }
 
 /**
@@ -257,9 +257,12 @@ export function parseRoot(input) {
   folks.sort((a, b) => a.slot - b.slot);
   const reserve = normalizeReserve(migrated.root.reserve);
   const frozen = normalizeFrozen(migrated.root.frozen);
-  return { root: { v: SAVE_VERSION, folks, reserve, frozen }, applied: migrated.applied, dropped, corrupt: false };
+  // The Work Orders board, kept as saved: its own model checks it when the game loads (no board yet: null).
+  const saved = migrated.root.board;
+  const board = saved !== null && typeof saved === 'object' && !Array.isArray(saved) ? saved : null;
+  return { root: { v: SAVE_VERSION, folks, reserve, frozen, board }, applied: migrated.applied, dropped, corrupt: false };
 }
 
-export function serializeRoot(folks, reserve = {}, frozen = {}) {
-  return JSON.stringify({ v: SAVE_VERSION, folks, reserve, frozen });
+export function serializeRoot(folks, reserve = {}, frozen = {}, board = null) {
+  return JSON.stringify({ v: SAVE_VERSION, folks, reserve, frozen, board });
 }

@@ -422,6 +422,22 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
   .wf-fold { min-width: 40px; min-height: 40px; }
 }
 
+/* Work Orders (the user, 28 Oct 2026): a block like the Overview, the orders as bands in a grid that wraps to one
+   column on a phone. A card: size icon and name, the skill under it, a state badge; what it asks, the progress bar and
+   count; then one reward a line. A delivered one dims under its green badge. */
+#worker-folks-orders > .wf-dash-content { padding: 16px !important; }
+.wf-orders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 12px; }
+.wf-orders-clock { font-size: 0.9rem; white-space: nowrap; }
+.wf-order { display: flex; flex-direction: column; min-width: 0; }
+.wf-order-head { gap: 4px; }
+.wf-order-icon { width: 32px; height: 32px; flex: none; }
+.wf-order-state { flex: none; align-self: flex-start; }
+.wf-order-bar { height: 8px; }
+.wf-order-reward { margin-top: 4px; font-size: 0.9rem; }
+.wf-order-reward .skill-icon-xs, .wf-order .skill-icon-xs { flex: none; }
+.wf-order-done .wf-order-rewards, .wf-order-done .wf-order-bar + small { opacity: 0.7; }
+.wf-order-empty { justify-content: center; text-align: center; min-height: 6rem; }
+
 /* Overview (src/dashboard.mjs, build .95; merged with the Payroll Reserve in .98, the user 18 Oct 2026). One fixed
    height that holds a full crew: three bands side by side (At work, Payroll, Made this session), each scrolling inside.
    On a phone they stack, Payroll first, each with its own cap. The title row carries the Next unlock pill and, while

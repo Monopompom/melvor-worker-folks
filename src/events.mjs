@@ -21,6 +21,9 @@ export const EVENT_NAMES = [
   'folkTrait',
   // A wage left the reserve or the bank for an action: { folk, skill, currencyId, amount, offline } (build .136).
   'folkPaid',
+  // A Work Order was delivered and paid: { order, reward, text, offline }; one in progress ran out: { order, offline }.
+  'orderDelivered',
+  'orderExpired',
 ];
 
 export function createEventBus(names = EVENT_NAMES, { onError } = {}) {

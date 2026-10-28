@@ -550,6 +550,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       if (!this.renderQueue.folks) return;
       this.wireHelp();
       dashboard?.wire(); // before the layout: it finds the Overview block by id
+      this.workOrders?.wire(); // the Work Orders block, likewise
       layout?.wire({ rerender: () => { this.renderQueue.folks = true; } });
       this.renderReserve();
       layout?.refresh();
@@ -715,6 +716,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       super.render();
       this.renderFolks();
       dashboard?.render();
+      this.workOrders?.render();
     }
 
     /**

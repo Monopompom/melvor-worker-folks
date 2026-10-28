@@ -10,6 +10,8 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
   let reserve = {};
   let frozen = {};
   let folks = [];
+  /** The Work Orders board (work-orders.mjs owns its shape); null until it opens. */
+  let board = null;
 
   const emitChange = () => bus.emit('crewChanged', { folks: crew.all });
 
@@ -142,8 +144,14 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
       emitChange();
       return next;
     },
+    get board() {
+      return board;
+    },
+    set board(value) {
+      board = value !== null && typeof value === 'object' ? value : null;
+    },
     serialize() {
-      return serializeRoot(folks, reserve, frozen);
+      return serializeRoot(folks, reserve, frozen, board);
     },
     /** Replaces the crew from a serialised root. Returns the parse report. */
     load(input) {
@@ -151,6 +159,7 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
       folks = report.root.folks.filter((f) => f.slot < this.maxSlots);
       reserve = normalizeReserve(report.root.reserve);
       frozen = normalizeFrozen(report.root.frozen, now());
+      board = report.root.board ?? null;
       report.dropped += report.root.folks.length - folks.length;
       emitChange();
       return report;
@@ -159,6 +168,7 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
       folks = [];
       reserve = {};
       frozen = {};
+      board = null;
       emitChange();
     },
     /** Announces an in-place change to Folk fields (debt, cooldown...). */

@@ -6,9 +6,9 @@
 export function install(ctx, { getHiring, time, log }) {
   let hiring;
   /** Per offline session: actions completed and skills released, by skill id; wages paid, by currency id. */
-  let tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], traits: [], wages: new Map(), active: false };
+  let tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], traits: [], wages: new Map(), orders: [], active: false };
   const reset = () => {
-    tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], traits: [], wages: new Map(), active: true };
+    tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], traits: [], wages: new Map(), orders: [], active: true };
   };
 
   ctx.onModsLoaded(() => {
@@ -50,7 +50,7 @@ export function install(ctx, { getHiring, time, log }) {
     const ticks = Math.floor(ms / TICK_INTERVAL);
     tracker.active = false;
     hiring.events.emit('offlineTicks', { ticks, ms });
-    if (info.offlineProgress === undefined || (tracker.actions.size === 0 && tracker.released.size === 0 && tracker.died.length === 0 && tracker.debts.length === 0 && tracker.struck.length === 0 && tracker.traits.length === 0 && tracker.wages.size === 0)) return;
+    if (info.offlineProgress === undefined || (tracker.actions.size === 0 && tracker.released.size === 0 && tracker.died.length === 0 && tracker.debts.length === 0 && tracker.struck.length === 0 && tracker.traits.length === 0 && tracker.wages.size === 0 && tracker.orders.length === 0)) return;
     const container = info.offlineProgress.messageContainer;
     if (container === undefined) return;
     // Welcome Back lines in the game's own style (scan C-08, C-09, C-10, build .112):
@@ -85,6 +85,13 @@ export function install(ctx, { getHiring, time, log }) {
       const currency = this.currencies.getObjectByID(currencyId);
       const paid = numberWithCommas(Math.floor(amount));
       lines.push({ media: currency?.media, html: templateLangString('MOD_WF_OFFLINE_WAGES', { amount: currency?.media ? icon(currency.media, paid) : esc(paid), currency: esc(currency?.name ?? currencyId), hours }) });
+    });
+    // Work Orders: a delivered one green with what it paid, one gone undelivered red; the order's size icon first.
+    tracker.orders.forEach(({ order, text, delivered }) => {
+      const media = hiring.getMediaURL(`assets/work_order_${order.size.toLowerCase()}.webp`);
+      const what = templateLangString('MOD_WF_ORDER_ASK', { qty: numberWithCommas(order.qty), item: this.items.getObjectByID(order.itemId)?.name ?? order.itemId });
+      const line = delivered ? text : templateLangString('MOD_WF_ORDER_EXPIRED', { what });
+      lines.push({ media, html: `<span class="text-nowrap"><img class="skill-icon-xs" src="${media}" alt=""></span> <span class="${delivered ? 'text-success' : 'text-danger'}">${esc(line)}</span>` });
     });
     // A skill a strike or a death released already has its own line: no "stopped: restock" line for it (C-10).
     const explained = new Set([...tracker.struck.map((t) => t.skillId), ...tracker.died.map((t) => t.skillId)]);
@@ -162,6 +169,13 @@ export function install(ctx, { getHiring, time, log }) {
     hiring.events.on('folkPaid', ({ currencyId, amount }) => {
       if (!tracker.active) return;
       tracker.wages.set(currencyId, (tracker.wages.get(currencyId) ?? 0) + amount);
+    });
+    // Work Orders delivered (green) or gone undelivered (red) while you were away.
+    hiring.events.on('orderDelivered', ({ order, text }) => {
+      if (tracker.active) tracker.orders.push({ order, text, delivered: true });
+    });
+    hiring.events.on('orderExpired', ({ order }) => {
+      if (tracker.active) tracker.orders.push({ order, delivered: false });
     });
   });
 }

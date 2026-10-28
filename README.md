@@ -153,10 +153,11 @@ skip the cooldown.
 ## Hiring levels
 
 Hiring gains 5% of every skill XP drop your Folks earn (the share is a setting) and shows it
-as a "+N Hiring XP" notification like any other skill. Open
+as a "+N Hiring XP" notification like any other skill; delivered Work Orders pay more. Open
 **View Milestones** on the Hiring page for the full list. The levels unlock management
 features: the Payroll Reserve at 5 (24 h of the whole crew's wages, growing to 72 h at 35,
-7 days at 65 and 30 days at 95), promotions at 10, forgetting a trait at 15, Licences at 20 / 40 / 60 / 80, the
+7 days at 65 and 30 days at 95), the Work Orders board at 8 (more orders at 30 and 70, the
+reroll at 50), promotions at 10, forgetting a trait at 15, Licences at 20 / 40 / 60 / 80, the
 apology bonus at 25, half the firing severance at 45, Summoning marks for Folks at 50,
 automatic restart of a Folk's skill after a settlement at 55, cheaper Overtime (×1.5 wages)
 at 85, no firing severance at 90, a free Shift Slot and a +20% Foreman crew bonus cap at 99
@@ -164,6 +165,33 @@ and, with Throne of the Herald, -10%
 wages at 100, a second free Shift Slot at 110 and 50% promotion fees at 120. Locked
 buttons show the level they need. In Ancient Relics the milestones above your level cap
 are marked "raise level cap", and Hiring can appear among the random cap increases.
+
+## Work Orders
+
+From Hiring 8 the Hiring page has a **Work Orders** board: orders for items your Folks make.
+Only what a Folk's work puts in your bank counts, from the moment the order appears; what you
+make yourself doesn't, and selling or using the items later changes nothing. An order asks for
+about 2 (Small), 6 (Medium) or 16 (Large) hours of one Folk's work on a recipe you have
+unlocked, picked from the newest recipes of the skills a Folk can work (none from the Abyssal
+realm for now).
+
+A delivered order pays at once:
+
+- **GP**: a share of the wages its own work cost you, rolled per order from 0.5× to 3× and
+  shown on its card. A failed action's wage counts toward the order the Folk is filling. With
+  wages off (No sweat) orders pay no GP.
+- **Hiring XP**: half a level's worth (Small), one level's (Medium) or two (Large), at your
+  Hiring level when it's delivered.
+- **Items**: a Medium order adds a Hiring mastery token. A Large one adds one extra shown on
+  its card: 1–2 tokens, a diploma (an item your highest Licence's promotion asks for), a stack
+  of fishing junk or a handful of random gems.
+
+Every 24 hours of game time, offline included, the board refreshes: delivered orders and ones
+nobody started go, and an order in progress gets one more day before it goes undelivered. A
+delivered order's place stays empty until the refresh. Hiring 8 gives 2 Small orders, 30 three
+with Medium ones, 70 four with Large ones; from 50 a **Reroll** (1,000,000 GP) replaces every
+order nobody has started. Delivered and expired orders while you were away show in the Welcome
+Back summary. The board is a block on the Hiring page you can move and fold like the Overview.
 
 ## Gear, pet and relics
 

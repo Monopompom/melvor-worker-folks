@@ -44,7 +44,8 @@ test('topEntries: most first, ties by id, the rest counted', () => {
 
 test('nextMilestone: the first above the level, capped above the cap, null at the end', () => {
   assert.deepEqual(nextMilestone(MILESTONES, { level: 1, levelCap: 99 }), { level: 5, key: 'RESERVE_24', capped: false });
-  assert.deepEqual(nextMilestone(MILESTONES, { level: 5, levelCap: 99 }), { level: 10, key: 'PROMOTIONS', capped: false });
+  assert.deepEqual(nextMilestone(MILESTONES, { level: 5, levelCap: 99 }), { level: 8, key: 'ORDERS_BOARD', capped: false });
+  assert.deepEqual(nextMilestone(MILESTONES, { level: 8, levelCap: 99 }), { level: 10, key: 'PROMOTIONS', capped: false });
   assert.deepEqual(nextMilestone(MILESTONES, { level: 99, levelCap: 99 }), { level: 100, key: 'WAGES_10', capped: true });
   assert.equal(nextMilestone(MILESTONES, { level: 120, levelCap: 120 }), null);
   for (const m of MILESTONES) assert.ok(lang[`MOD_WF_MILESTONE_${m.key}`], m.key);

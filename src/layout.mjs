@@ -170,6 +170,10 @@ export function install(ctx, { log, tips, model }) {
     column.dataset.wfCol = 'wide';
     cols.wide = column;
     dress('dashboard', overview, overviewHead);
+    // The Work Orders block (work-orders.mjs), dressed the same way when it is there.
+    const orders = document.getElementById('worker-folks-orders');
+    const ordersHead = orders?.querySelector('.wf-dash-content > .wf-dash-title');
+    if (orders && ordersHead) dress('orders', orders, ordersHead);
     // The cards' grid: a place in the column the Overview moves around, with no title row to drag or fold it by.
     list.classList.add('wf-layout-block');
     list.dataset.wfBlock = 'crew';

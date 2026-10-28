@@ -15,9 +15,9 @@ const t = (key, vars) => lang[key].replace(/\$\{(\w+)\}/g, (_, k) => vars[k]);
 test('milestones are sorted by level and match the design table', () => {
   const levels = MILESTONES.map((m) => m.level);
   assert.deepEqual(levels, [...levels].sort((a, b) => a - b));
-  assert.deepEqual(levels, [5, 10, 15, 20, 25, 35, 40, 45, 50, 55, 60, 65, 80, 85, 90, 95, 99, 99, 100, 110, 120]);
-  assert.equal(visibleMilestones(99).length, 18);
-  assert.equal(visibleMilestones(120).length, 21);
+  assert.deepEqual(levels, [5, 8, 10, 15, 20, 25, 30, 35, 40, 45, 50, 50, 55, 60, 65, 70, 80, 85, 90, 95, 99, 99, 100, 110, 120]);
+  assert.equal(visibleMilestones(99).length, 22);
+  assert.equal(visibleMilestones(120).length, 25);
   MILESTONES.forEach((m) => assert.equal(typeof lang[`MOD_WF_MILESTONE_${m.key}`], 'string', m.key));
 });
 
