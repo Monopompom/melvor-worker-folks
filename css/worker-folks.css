@@ -427,6 +427,8 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
    count; then one reward a line. A delivered one dims under its green badge. */
 #worker-folks-orders > .wf-dash-content { padding: 16px !important; }
 .wf-orders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 12px; }
+/* A band with only text in it (the board before Hiring 8) takes the whole row, not one card's width. */
+.wf-orders-locked { grid-column: 1 / -1; }
 .wf-orders-clock { font-size: 0.9rem; white-space: nowrap; }
 .wf-order { display: flex; flex-direction: column; min-width: 0; }
 .wf-order-head { gap: 4px; }
