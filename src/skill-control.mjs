@@ -252,6 +252,10 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
       // "Cooling down" in blue with the time left, as the card and the popup tile (scan B-02, C-17, build .112).
       status = templateLangString('MOD_WF_CTRL_RESTING', { name: holder.name, time: hiring.cooldownLeft(holder) });
       tone = 'wf-text-cooldown font-w600';
+    } else if (!working && hiring.workRefusal(holder, skill) !== '') {
+      // Not qualified yet, or refused where it stands (Voyage): idle with the reason, in amber, never "start any action".
+      status = templateLangString('MOD_WF_CTRL_REFUSED', { name: holder.name, reason: hiring.workRefusal(holder, skill) });
+      tone = 'text-warning font-w600';
     } else if (!working) {
       // Ready to work is news, not a footnote: normal text, not muted (build .55); "idle" like the card (B-38).
       status = templateLangString('MOD_WF_CTRL_READY', { name: holder.name });

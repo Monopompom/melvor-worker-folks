@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-10-23.139';
+export const BUILD = '2026-10-28.142';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -113,6 +113,8 @@ export async function setup(ctx) {
   const steward = await ctx.loadModule('src/steward.mjs');
   const traitRules = await ctx.loadModule('src/traits-model.mjs');
   const traits = await ctx.loadModule('src/traits.mjs');
+  const qualificationRules = await ctx.loadModule('src/qualification-model.mjs');
+  const qualification = await ctx.loadModule('src/qualification.mjs');
 
   // 1. Language strings were installed in step 0 (needed before any skill/page name is read).
 
@@ -259,6 +261,13 @@ export async function setup(ctx) {
   quietPopups.install(ctx, {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     rules: popupRules,
+    log,
+  });
+
+  // 5d3. Qualification: a Folk works a skill once your level in it reaches its tier's (setting in the Hiring section).
+  qualification.install(ctx, {
+    getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+    model: qualificationRules,
     log,
   });
 

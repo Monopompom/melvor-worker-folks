@@ -49,6 +49,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       this.events = createEventBus();
       /** What other mods refuse (src/guards.mjs, through the API): none registered = everything as before. */
       this.guards = createGuards({ onError: (err, kind) => console.error(`[Worker Folks] a ${kind} guard failed; allowed`, err) });
+      /** This mod's own rules in the same shape (qualification.mjs), asked first; they see the Folk record itself. */
+      this.ownGuards = createGuards({ onError: (err, kind) => console.error(`[Worker Folks] a built-in ${kind} guard failed; allowed`, err) });
       /** Every hired Folk. Persisted inside this skill's save region (see encode). */
       this.crew = createCrew({
         bus: this.events,
@@ -157,8 +159,13 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       return status !== 'cooldown' && status !== 'strike';
     }
 
-    /** Why another mod (Voyage) refuses this, or '' when nothing does. Guards see a read-only view of the Folk. */
+    /**
+     * Why this mod's own rules (qualification) or another mod (Voyage) refuse this, or '' when nothing does. Another
+     * mod's guards see a read-only view of the Folk.
+     */
     refusal(kind, request = {}) {
+      const own = this.ownGuards.check(kind, request)?.reason;
+      if (own !== undefined) return own;
       if (this.guards.count(kind) === 0) return '';
       const { folk } = request;
       return this.guards.check(kind, folk === undefined ? request : { ...request, folk: folkView(folk, this.statusOf(folk)) })?.reason ?? '';
@@ -573,10 +580,18 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
             // Not "ready" while striking (build .81); the strike band says the rest. A cooling-down Folk never gets
             // here: the card prints the cooldown line (with its time left) in place of this text (build .136).
             if (this.struck(folk)) return templateLangString('MOD_WF_CARD_STOPPED_STRIKE', { skill: this.skillName(skill) });
+            // Not qualified yet, or refused where it stands (Voyage): the reason, not "ready".
+            const why = this.workRefusal(folk, skill);
+            if (why !== '') return why;
             return templateLangString('MOD_WF_CARD_READY', { skill: this.skillName(skill) });
           }
           const action = this.currentActionName(skill);
           return action === null ? getLangString('MOD_WF_CARD_WORKING') : templateLangString('MOD_WF_CARD_WORKING_ON', { action });
+        },
+        /** True when the detail line is a refusal (amber): the Folk may not start its skill. */
+        workRefused: (folk) => {
+          const skill = this.skillOf(folk);
+          return skill !== undefined && !this.delegated.has(skill) && !this.struck(folk) && this.workRefusal(folk, skill) !== '';
         },
         onStop: (folk) => this.stopFolk(folk),
         stopText: () => getLangString('MOD_WF_BUTTON_STOP'),
@@ -968,6 +983,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       const diplomaText = plan.diploma === undefined ? '?' : `<img class="skill-icon-xs mr-1" src="${plan.diploma.media}" alt="">${plan.diploma.name}`;
       const gpShort = plan.blockers.includes('gp');
       const fee = `<img class="skill-icon-xs mr-1" src="${this.game.gp.media}" alt="GP"><span class="font-w600 ${gpShort ? 'text-danger' : 'text-warning'}">${numberWithCommas(plan.cost)}</span>`;
+      // A higher tier may need more of your level on the Folk's skill: said before the click, never a blocker.
+      const qualifyAfter = this.qualification?.afterPromotion(folk, plan.nextTier) ?? '';
       const feeRow = `<div data-wf-req="gp" tabindex="0"><span class="${gpShort ? 'text-danger' : 'text-success'}">${gpShort ? '✗' : '✓'}</span> ${templateLangString('MOD_WF_PROMO_COST', { cost: fee, percent: `${Math.round((this.levels?.promotionCostRate() ?? promotion.PROMOTION_COST_RATE) * 100)}` })}</div>`;
       const html = `
         <div>
@@ -979,7 +996,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
           ${feeRow}
           </div>
           ${plan.ok ? '' : `<div class="text-warning mt-2">${this.promotionNeedsLines(folk, plan).map((l) => `<div>${l}</div>`).join('')}</div>`}
-          <div class="mt-2">${getLangString('MOD_WF_PROMO_KEEPS')}</div>
+          <div class="mt-2">${getLangString(qualifyAfter === '' ? 'MOD_WF_PROMO_KEEPS' : 'MOD_WF_PROMO_KEEPS_STOPS')}</div>
+          ${qualifyAfter === '' ? '' : `<div class="text-warning mt-2">${templateLangString('MOD_WF_PROMO_QUALIFY', { name: folk.name, aRole: getLangString(`MOD_WF_A_ROLE_${plan.nextTier}`), reason: qualifyAfter })}</div>`}
         </div>`;
       SwalLocale.fire({
         didRender: popupDidRender,
@@ -1090,6 +1108,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       const wageOnly = new Set(['grace', 'cooldown60', 'cooldown90', 'trusted']);
       perks.LEVEL_MILESTONES.forEach(([at, key]) => {
         if (!paid && wageOnly.has(key)) return;
+        // A Newbie has no tier below; with Qualification switched off the perk is moot.
+        if (key === 'qualify' && (folk.tier === 'Newbie' || this.qualification?.enabled() !== true)) return;
         lines.push({ met: level >= at, text: `${at}: ${getLangString(`MOD_WF_PERK_${key}`)}` });
       });
       return lines;

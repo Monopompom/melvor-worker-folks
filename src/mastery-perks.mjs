@@ -119,6 +119,8 @@ export function combinedPerks(level, bonuses, { overtimeOn = false, overtimeWage
 export const LEVEL_MILESTONES = [
   [25, 'grace'],
   [30, 'overtime'],
+  // Qualification: the tier below's level is enough (qualification-model.mjs LOWERING_MASTERY).
+  [50, 'qualify'],
   [60, 'cooldown60'],
   [75, 'skillXP'],
   [90, 'cooldown90'],

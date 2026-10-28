@@ -202,6 +202,7 @@ function fillCard(col, folk, view) {
   set('detail', (el) => {
     const cooldown = view.cooldownText(folk);
     setText(el, cooldown !== '' ? cooldown : view.detailText(folk));
+    el.classList.toggle('text-warning', cooldown === '' && view.workRefused?.(folk) === true);
   });
   set('where', (el) => {
     const text = view.whereText?.(folk) ?? '';
