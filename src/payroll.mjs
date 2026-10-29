@@ -267,7 +267,7 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     const cur = currency(id);
     game.notifications.createInfoNotification(
       'worker_folks:reserve-low',
-      templateLangString('MOD_WF_RESERVE_LOW', { hours: (Math.floor(hours * 10) / 10).toFixed(1), amount: numberWithCommas(reserve), currency: cur?.name ?? id }),
+      templateLangString('MOD_WF_RESERVE_LOW', { hours: formatFixed(Math.floor(hours * 10) / 10, 1), amount: numberWithCommas(reserve), currency: cur?.name ?? id }),
       hiring.getMediaURL('assets/payroll_reserve.webp'),
     );
   };

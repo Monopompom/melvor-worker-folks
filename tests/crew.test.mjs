@@ -63,7 +63,7 @@ test('serialize/load round-trip, slot cap on load and crewChanged emission', () 
 test('load migrates a pre-version root', () => {
   const { crew } = make(4);
   const report = crew.load({ folks: [{ id: 'old', slot: 1, tier: 'Junior', name: 'Old' }] });
-  assert.deepEqual(report.applied, [0, 1, 2, 3, 4, 5]);
+  assert.deepEqual(report.applied, [0, 1, 2, 3, 4, 5, 6]);
   assert.equal(crew.bySlot(1).strikes, 0);
   assert.equal(crew.bySlot(1).paid, null);
 });
@@ -135,6 +135,25 @@ test('frozen slots are skipped by hire, expire with the clock and survive a roun
   assert.equal(crew.frozenSlots().size, 0);
   assert.equal(crew.freeSlot({ limit: 1 }), -1);
   assert.ok(a);
+});
+
+test('a dead Folk’s lost items stay with its frozen slot, through a save, until it thaws', () => {
+  let t = 1000;
+  const build = () => createCrew({ bus: createEventBus(), model, pickName, maxSlots: 3, now: () => t, makeId: () => `f${t}`, rng: () => 0 });
+  const crew = build();
+  crew.setLost(0, [{ id: 'melvorD:Oak_Logs', qty: 5 }]);
+  assert.deepEqual(crew.lostAt(0), [], 'not frozen: nothing kept');
+  crew.freeze(0, 5000);
+  crew.setLost(0, [{ id: 'melvorD:Oak_Logs', qty: 5 }, { id: 'bad', qty: 0 }]);
+  assert.deepEqual(crew.lostAt(0), [{ id: 'melvorD:Oak_Logs', qty: 5 }]);
+  const copy = build();
+  copy.load(crew.serialize());
+  assert.deepEqual(copy.lostAt(0), [{ id: 'melvorD:Oak_Logs', qty: 5 }]);
+  crew.freeze(0, 6000);
+  assert.deepEqual(crew.lostAt(0), [], 'a new death starts clean');
+  t = 7000;
+  copy.frozenSlots();
+  assert.deepEqual(copy.lostAt(0), [], 'gone with the thaw');
 });
 
 test('a Folk going along with the player stops going along when given a skill', () => {

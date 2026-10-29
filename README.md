@@ -73,7 +73,8 @@ Summon slots; Foremen add the Gem (Atlas of Discovery) and Enhancement slots (In
 Abyss). Click a slot to pick an item from your bank. For a Folk that already has a skill the
 list shows only items that help that skill; a Folk without one sees every skilling item; tick
 "Show all" for everything that fits, combat gear included. Items move out of your bank while equipped and come back when unequipped
-or when the Folk is fired. Equip requirements use your own levels.
+or when the Folk is fired or dies, as far as your bank has space: an item with no free bank slot (and none of its
+kind in the bank) is lost with the Folk. Equip requirements use your own levels.
 
 A Folk works with **its own gear only**: your equipped items never count for a Folk, and
 the Folk's items never count for you. Item synergies between the Folk's own items apply,
@@ -99,7 +100,8 @@ Thieving page shows the Folk's own success rate under yours. Like you, a Folk st
 Thieving after being stunned" is on.
 Below 60% health the Folk eats **your selected food** (the food slot you use in combat)
 until it is back to full, so keep food equipped while a Folk thieves. Folks regenerate 1% of their max HP every ten
-seconds. A Folk that drops to zero dies: its gear returns to your bank, it leaves the crew,
+seconds. A Folk that drops to zero dies: its gear returns to your bank as far as there is space (the rest is lost, and the
+frozen slot says what), it leaves the crew,
 and its slot stays frozen for 24 hours of real time before a new hire can take it.
 Abyssal NPCs hit Folks at a tenth of their listed damage.
 
@@ -111,8 +113,8 @@ Journeyman / Master / Foreman), a diploma item (Amulet of Torture, Amulet of Fur
 Infernal Core, Elder Crown or FrostSpark Amulet with Throne of the Herald) and a fee of
 60% of that tier's next hire price. The Folk keeps its skill, mastery and anything it
 carries, and keeps working if you still qualify it for its skill (the popup warns when the
-new tier needs more of your level). Firing asks for confirmation, returns carried items to
-the bank, clears the slot's mastery and refunds nothing. It also costs a **severance**: 10%
+new tier needs more of your level). Firing asks for confirmation (listing what goes back to your
+bank and, in red, what a full bank can't take and would be lost), returns carried items to the bank, clears the slot's mastery and refunds nothing. It also costs a **severance**: 10%
 of what the Folk cost you (its hire price and its promotion fees), 5% from Hiring 45 and
 nothing from Hiring 90. A Folk hired before this rule counts as having cost its tier's
 first-hire price. Fire stays disabled while you can't pay the severance.
@@ -275,7 +277,7 @@ Payroll Reserve and anything Worker Folks added to your bank. Turning the mod ba
 starts Hiring from scratch.
 
 Before removing it: open each Folk's **Gear** and take its items back (or Fire the Folk,
-which returns them), and stop every Folk. A skill a Folk was working when you saved may
+which returns them while your bank has space), and stop every Folk. A skill a Folk was working when you saved may
 otherwise look busy without progressing until you click its action once.
 
 ## Credits

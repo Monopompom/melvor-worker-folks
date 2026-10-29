@@ -242,9 +242,23 @@ export function install({ hiring, log, tiers }) {
       hiring.workOrders?.advance(Math.round(hours * 72000));
       return hiring.workOrders?.board?.ticks;
     },
+    /** What a Folk holds in its room: one row a stack, its work in minutes. */
+    room(id) {
+      const folk = hiring.crew.byId(ref(id));
+      if (folk === undefined) return null;
+      const rows = Object.entries(folk.room?.haul ?? {}).map(([item, e]) => ({ item, qty: e.qty, minutes: Math.round((e.ms / 60000) * 100) / 100 }));
+      console.table(rows);
+      return rows;
+    },
+    /** bankFull(true): the bank reads as having no free slot (nothing is moved); bankFull(false) puts it back. */
+    bankFull(on = true) {
+      if (on) Object.defineProperty(game.bank, 'maximumSlots', { get: () => game.bank.occupiedSlots, configurable: true });
+      else delete game.bank.maximumSlots;
+      return { occupied: game.bank.occupiedSlots, maximum: game.bank.maximumSlots };
+    },
     tiers: tiers.slice(),
   };
   globalThis.workerFolksDev = api;
-  log('dev commands (a Folk = its row in list(), its name or its id): workerFolksDev.spawn(tier, name?) | fire(id) | assign(id, skillId) | strike(id, debt?) | debt(id, gp?) | cooldown(id, ticks) | reset(id) | hp(id, hp) | kill(id) | thaw(slot?) | loadout(id) | gear(id, skillId?, {replace, qty}) | reserve() | mastery(id, level) | poolXP(xp) | list() | clear() | dump() | load(root) | shiftSlots(n) | delegated() | pet() | relics(n) | orders() | orderClock(hours)');
+  log('dev commands (a Folk = its row in list(), its name or its id): workerFolksDev.spawn(tier, name?) | fire(id) | assign(id, skillId) | strike(id, debt?) | debt(id, gp?) | cooldown(id, ticks) | reset(id) | hp(id, hp) | kill(id) | thaw(slot?) | loadout(id) | gear(id, skillId?, {replace, qty}) | reserve() | mastery(id, level) | poolXP(xp) | list() | clear() | dump() | load(root) | shiftSlots(n) | delegated() | pet() | relics(n) | orders() | orderClock(hours) | room(id) | bankFull(on)');
   return api;
 }

@@ -6,9 +6,11 @@
 const defaultId = () => (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
 
 export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.now(), makeId = defaultId, rng = Math.random }) {
-  const { createFolk, serializeRoot, parseRoot, normalizeReserve, normalizeFrozen } = model;
+  const { createFolk, serializeRoot, parseRoot, normalizeReserve, normalizeFrozen, normalizeLost } = model;
   let reserve = {};
   let frozen = {};
+  /** What a dead Folk's room lost, by its frozen slot (folk.mjs normalizeLost). */
+  let lost = {};
   let folks = [];
   /** The Work Orders board (work-orders.mjs owns its shape); null until it opens. */
   let board = null;
@@ -52,18 +54,39 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
       const out = new Map();
       for (const [slot, until] of Object.entries(frozen)) {
         if (until > t) out.set(Number(slot), until);
-        else delete frozen[slot];
+        else {
+          delete frozen[slot];
+          delete lost[slot];
+        }
       }
       return out;
     },
     /** Blocks a slot until `until` (ms). */
     freeze(slot, until) {
       frozen[slot] = until;
+      delete lost[slot];
       emitChange();
     },
     thaw(slot) {
-      if (slot === undefined) frozen = {};
-      else delete frozen[slot];
+      if (slot === undefined) {
+        frozen = {};
+        lost = {};
+      } else {
+        delete frozen[slot];
+        delete lost[slot];
+      }
+      emitChange();
+    },
+    /** Items a Folk's room lost when it died in this frozen slot: [{ id, qty }], [] for none. */
+    lostAt(slot) {
+      return (lost[slot] ?? []).map((e) => ({ ...e }));
+    },
+    /** Notes what the room of the Folk that died in a frozen slot lost; ignored for a slot that isn't frozen. */
+    setLost(slot, items) {
+      if (frozen[slot] === undefined) return;
+      const list = normalizeLost({ [slot]: items }, frozen)[slot];
+      if (list === undefined) delete lost[slot];
+      else lost[slot] = list;
       emitChange();
     },
     /** Earliest moment a frozen slot opens, or undefined. */
@@ -90,11 +113,12 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
       emitChange();
       return folk;
     },
-    fire(id, { reason = 'fired' } = {}) {
+    /** `lost`: what the Folk's gear lost on the way to a full bank, for the room's own count (room.mjs). */
+    fire(id, { reason = 'fired', lost = [] } = {}) {
       const folk = this.byId(id);
       if (folk === undefined) return false;
       folks = folks.filter((f) => f !== folk);
-      bus.emit('folkFired', { folk, reason });
+      bus.emit('folkFired', { folk, reason, lost });
       emitChange();
       return true;
     },
@@ -151,7 +175,7 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
       board = value !== null && typeof value === 'object' ? value : null;
     },
     serialize() {
-      return serializeRoot(folks, reserve, frozen, board);
+      return serializeRoot(folks, reserve, frozen, board, lost);
     },
     /** Replaces the crew from a serialised root. Returns the parse report. */
     load(input) {
@@ -159,6 +183,7 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
       folks = report.root.folks.filter((f) => f.slot < this.maxSlots);
       reserve = normalizeReserve(report.root.reserve);
       frozen = normalizeFrozen(report.root.frozen, now());
+      lost = normalizeLost(report.root.lost, frozen);
       board = report.root.board ?? null;
       report.dropped += report.root.folks.length - folks.length;
       emitChange();
@@ -168,6 +193,7 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
       folks = [];
       reserve = {};
       frozen = {};
+      lost = {};
       board = null;
       emitChange();
     },

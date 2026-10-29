@@ -65,6 +65,13 @@ export function renderFolkCards(folks, view) {
       if (help !== null && help.getAttribute('aria-label') !== label) help.setAttribute('aria-label', label);
       const text = col.querySelector('[data-wf="text"]');
       if (text !== null && text.textContent !== f.text) text.textContent = f.text;
+      const lost = col.querySelector('[data-wf="lost"]');
+      if (lost !== null && lost.dataset.html !== (f.lostHtml ?? '')) {
+        lost.dataset.html = f.lostHtml ?? '';
+        lost.innerHTML = f.lostHtml ?? '';
+        lost.classList.toggle('d-none', !f.lostHtml);
+        view.tipItems?.(lost);
+      }
     });
   }
 
@@ -178,8 +185,11 @@ function fillCard(col, folk, view) {
   set('skill', (el) => {
     const media = view.skillMedia(folk);
     const text = folk.skillId === null ? (view.unassignedText?.() ?? '') : view.assignmentText(folk);
-    const className = `font-w700 wf-card-skill ${view.isWorking(folk) ? 'text-success' : ''}`.trim();
+    const working = view.isWorking(folk);
+    const className = `font-w700 wf-card-skill ${working ? 'text-success' : ''}`.trim();
     if (el.className !== className) el.className = className;
+    // While Stop shows, the skill sits in an outline joined to it: one control (the user, 29 Oct 2026).
+    el.parentElement?.classList.toggle('wf-skill-joined', working);
     let img = el.querySelector('img');
     if (media === undefined) {
       if (img !== null) img.remove();
@@ -232,11 +242,42 @@ function fillCard(col, folk, view) {
       foodAlert = hp.food.state === 'none';
     }
   });
+  // The room: shown only while it holds something or bank and room are both full (src/room.mjs).
+  set('room', (el) => {
+    const room = view.room?.(folk);
+    el.classList.toggle('d-none', room === undefined);
+    if (room === undefined) { view.tip(el, []); return; }
+    const bar = el.querySelector('[data-wf="room-bar"]');
+    if (bar !== null) {
+      bar.style.width = `${room.percent}%`;
+      const className = `progress-bar ${room.full ? 'bg-danger' : 'bg-info'}`;
+      if (bar.className !== className) bar.className = className;
+    }
+    const text = el.querySelector('[data-wf="room-text"]');
+    if (text !== null) setText(text, room.text);
+    const status = el.querySelector('[data-wf="room-status"]');
+    if (status !== null) {
+      setText(status, room.status);
+      status.classList.toggle('d-none', room.status === '');
+    }
+    view.tip(el, room.tip);
+  });
   set('mastery', (el) => {
     const slot = view.masterySlot(folk);
     if (slot === undefined) return;
     if (typeof el.setMastery !== 'function') customElements.upgrade(el);
     if (typeof el.setMastery !== 'function') return;
+    if (el.wfShortValues !== true && typeof view.shortNumber === 'function') {
+      // The game redraws this display on its own (each mastery gain), in full numbers: this card's copy writes the
+      // XP short ("511K / 547K").
+      const draw = el.updateValues;
+      el.updateValues = function (progress) {
+        draw.call(this, progress);
+        const xp = view.shortNumber(Math.floor(progress.xp));
+        this.xpProgress.textContent = progress.level >= 99 ? xp : `${xp} / ${view.shortNumber(progress.nextLevelXP)}`;
+      };
+      el.wfShortValues = true;
+    }
     if (el.dataset.wfMasterySlot !== slot.id) {
       el.setMastery(view.skill, slot);
       el.dataset.wfMasterySlot = slot.id;

@@ -14,8 +14,16 @@ export function shortTime(ms) {
   return `${s}s`;
 }
 
-/** Hours covered as the Payroll band writes them: one decimal under 100, whole from 100. */
+/**
+ * Hours covered as the Payroll band writes them: rounded down, one decimal under 100, whole from 100. In the game
+ * through its own formatters (the player's number setting: separators, decimal mark); plain where they are missing.
+ */
 export function hoursText(h) {
   if (!Number.isFinite(h)) return '∞';
-  return h >= 100 ? `${Math.floor(h)}` : (Math.floor(h * 10) / 10).toFixed(1);
+  if (h >= 100) {
+    const whole = Math.floor(h);
+    return typeof numberWithCommas === 'function' ? numberWithCommas(whole) : `${whole}`;
+  }
+  const tenth = Math.floor(h * 10) / 10;
+  return typeof formatFixed === 'function' ? formatFixed(tenth, 1) : tenth.toFixed(1);
 }

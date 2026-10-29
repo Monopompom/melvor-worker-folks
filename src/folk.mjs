@@ -1,7 +1,7 @@
 // Folk record model, validation and save-root migrations. Pure: no game globals.
 
 export const TIERS = ['Newbie', 'Junior', 'Middle', 'Senior', 'Expert'];
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 /**
  * A Folk's travel state: 'idle' stays on its place, 'with' goes along with the player, 'walking' is on its way somewhere
  * alone (Voyage, phase 6). Only 'idle' works.
@@ -51,6 +51,8 @@ export function createFolk({ id, slot, tier, name, hiredAt = 0, paid = null }) {
     traitState: { traits: [], waiting: [], counts: {} },
     /** GP the Folk cost you, its hire and its promotions; the firing severance is a share of it. null = not known. */
     paid: typeof paid === 'number' && Number.isFinite(paid) && paid >= 0 ? paid : null,
+    /** What the Folk holds for you, in hours of work (src/room-model.mjs). */
+    room: createRoom(),
   };
 }
 
@@ -113,7 +115,26 @@ export function normalizeFolk(raw) {
   folk.travel = TRAVEL.includes(raw.travel) ? raw.travel : 'idle';
   folk.traitState = normalizeTraitState(raw.traitState);
   folk.paid = typeof raw.paid === 'number' && Number.isFinite(raw.paid) && raw.paid >= 0 ? raw.paid : null;
+  folk.room = normalizeRoom(raw.room);
   return folk;
+}
+
+/** A Folk's room (src/room-model.mjs): { haul: { itemId: { qty, ms } } }, ms the work that made the stack. */
+export function createRoom() {
+  return { haul: {} };
+}
+
+/** A clean room from whatever the save holds: stacks with whole positive quantities and a time of 0 or more. */
+export function normalizeRoom(raw) {
+  const room = createRoom();
+  const haul = raw?.haul;
+  if (haul === null || typeof haul !== 'object' || Array.isArray(haul)) return room;
+  for (const [id, entry] of Object.entries(haul)) {
+    if (id === '' || entry === null || typeof entry !== 'object') continue;
+    if (!Number.isInteger(entry.qty) || entry.qty <= 0) continue;
+    room.haul[id] = { qty: entry.qty, ms: Number.isFinite(entry.ms) && entry.ms > 0 ? entry.ms : 0 };
+  }
+  return room;
 }
 
 export function createEmptyReserve() {
@@ -141,8 +162,24 @@ export function normalizeFrozen(raw, now = 0) {
   return frozen;
 }
 
+/**
+ * What a Folk's room lost when it died with the bank full, by its frozen slot: { slotIndex: [{ id, qty }] }, shown
+ * on that slot's card while it stays frozen. Kept only for slots in `frozen`.
+ */
+export function normalizeLost(raw, frozen = {}) {
+  const lost = {};
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return lost;
+  for (const [slot, list] of Object.entries(raw)) {
+    if (frozen[slot] === undefined || !Array.isArray(list)) continue;
+    const items = list.filter((e) => e !== null && typeof e === 'object' && typeof e.id === 'string' && Number.isInteger(e.qty) && e.qty > 0)
+      .map(({ id, qty }) => ({ id, qty }));
+    if (items.length > 0) lost[slot] = items;
+  }
+  return lost;
+}
+
 export function createEmptyRoot() {
-  return { v: SAVE_VERSION, folks: [], reserve: createEmptyReserve(), frozen: {}, board: null };
+  return { v: SAVE_VERSION, folks: [], reserve: createEmptyReserve(), frozen: {}, board: null, lost: {} };
 }
 
 /**
@@ -197,6 +234,12 @@ export const MIGRATIONS = {
     ...root,
     v: 6,
     folks: (Array.isArray(root.folks) ? root.folks : []).map((f) => ({ ...f, paid: null })),
+  }),
+  // v7: a room for what each Folk holds (a full bank's buffer), every one empty.
+  6: (root) => ({
+    ...root,
+    v: 7,
+    folks: (Array.isArray(root.folks) ? root.folks : []).map((f) => ({ ...f, room: { haul: {} } })),
   }),
 };
 
@@ -257,12 +300,13 @@ export function parseRoot(input) {
   folks.sort((a, b) => a.slot - b.slot);
   const reserve = normalizeReserve(migrated.root.reserve);
   const frozen = normalizeFrozen(migrated.root.frozen);
+  const lost = normalizeLost(migrated.root.lost, frozen);
   // The Work Orders board, kept as saved: its own model checks it when the game loads (no board yet: null).
   const saved = migrated.root.board;
   const board = saved !== null && typeof saved === 'object' && !Array.isArray(saved) ? saved : null;
-  return { root: { v: SAVE_VERSION, folks, reserve, frozen, board }, applied: migrated.applied, dropped, corrupt: false };
+  return { root: { v: SAVE_VERSION, folks, reserve, frozen, board, lost }, applied: migrated.applied, dropped, corrupt: false };
 }
 
-export function serializeRoot(folks, reserve = {}, frozen = {}, board = null) {
-  return JSON.stringify({ v: SAVE_VERSION, folks, reserve, frozen, board });
+export function serializeRoot(folks, reserve = {}, frozen = {}, board = null, lost = {}) {
+  return JSON.stringify({ v: SAVE_VERSION, folks, reserve, frozen, board, lost });
 }

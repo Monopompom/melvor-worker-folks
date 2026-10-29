@@ -57,15 +57,15 @@ export function install(ctx, { getHiring, rules, time, log }) {
       if (eat && rules.shouldEat(result.hp, api.maxHpOf(folk))) api.eat(folk);
       return false;
     },
-    /** Death: the skill stops, gear returns to the bank, the Folk leaves and its slot freezes for 24 h. */
+    /** Death: the skill stops, gear returns to the bank as far as it has space, the Folk leaves and its slot freezes for 24 h. */
     kill(folk, { skill, cause } = {}) {
       const working = skill ?? hiring.skillOf(folk);
       const offline = !game._isInOnlineLoop;
       hiring.forceStop(working); // also clears a Thieving stun so the skill really ends
-      hiring.returnLoadout?.(folk);
+      const lost = hiring.returnLoadout?.(folk) ?? [];
       const until = rules.freezeUntil(Date.now());
       hiring.crew.freeze(folk.slot, until);
-      hiring.crew.fire(folk.id, { reason: 'died' });
+      hiring.crew.fire(folk.id, { reason: 'died', lost });
       hiring.events.emit('folkDied', { folk, skill: working, offline, cause });
       // The death names its cause (hunger on the road) or the skill it died at; a Folk with neither just died.
       const vars = { name: folk.name, skill: working === undefined ? '' : hiring.skillName(working), slot: `${folk.slot + 1}` };
@@ -111,7 +111,14 @@ export function install(ctx, { getHiring, rules, time, log }) {
       const now = Date.now();
       const out = [];
       hiring.crew.frozenSlots().forEach((until, slot) => {
-        out.push({ slot, text: templateLangString('MOD_WF_SLOT_FROZEN', { slot: `${slot + 1}`, time: time.shortTime(rules.freezeRemaining(until, now)) }) }); // never "23h 59m 60s" (scan C-26, .112)
+        // What the dead Folk's room lost to a full bank, under the countdown while the slot stays frozen (build .151).
+        const lost = hiring.crew.lostAt(slot);
+        out.push({
+          slot,
+          text: templateLangString('MOD_WF_SLOT_FROZEN', { slot: `${slot + 1}`, time: time.shortTime(rules.freezeRemaining(until, now)) }), // never "23h 59m 60s" (scan C-26, .112)
+          // HTML: each item with its own icon.
+          lostHtml: lost.length === 0 || hiring.room === undefined ? '' : `<div>${getLangString('MOD_WF_SLOT_FROZEN_LOST')}</div>${hiring.room.itemTiles(lost, { lost: true, small: true })}`,
+        });
       });
       return out;
     },

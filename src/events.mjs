@@ -24,6 +24,8 @@ export const EVENT_NAMES = [
   // A Work Order was delivered and paid: { order, reward, text, offline }; one in progress ran out: { order, offline }.
   'orderDelivered',
   'orderExpired',
+  // A Folk's action made an item, into the bank or held in its room: { folk, skill, item, quantity, held } (build .150).
+  'folkMade',
 ];
 
 export function createEventBus(names = EVENT_NAMES, { onError } = {}) {

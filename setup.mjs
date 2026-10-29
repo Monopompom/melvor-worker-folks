@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-10-29.149';
+export const BUILD = '2026-10-29.151';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -68,6 +68,8 @@ export async function setup(ctx) {
   const { renderReservePanel } = await ctx.loadModule('src/reserve-panel.mjs');
   // One way to write a time left (build .112, scan A-12 / C-26).
   const time = await ctx.loadModule('src/time-format.mjs');
+  // A big number in a short form ("2.5M") where the full one is too long to read at a glance.
+  const numbers = await ctx.loadModule('src/number-format.mjs');
   const wages = await ctx.loadModule('src/wages.mjs');
   const perks = await ctx.loadModule('src/mastery-perks.mjs');
   const promotion = await ctx.loadModule('src/promotion.mjs');
@@ -106,6 +108,8 @@ export async function setup(ctx) {
   const produceRate = await ctx.loadModule('src/produce-rate.mjs');
   const acting = await ctx.loadModule('src/acting.mjs');
   const thievingRate = await ctx.loadModule('src/thieving-rate.mjs');
+  const roomRules = await ctx.loadModule('src/room-model.mjs');
+  const room = await ctx.loadModule('src/room.mjs');
   const shopData = await ctx.loadModule('src/shop-data.mjs');
   const gearData = await ctx.loadModule('src/gear-data.mjs');
   const discoveryRules = await ctx.loadModule('src/discovery-model.mjs');
@@ -127,7 +131,7 @@ export async function setup(ctx) {
 
   // 3. Register the skill class first, then the data package that references it.
   const { Hiring } = createHiringClass({
-    popupDidRender, titleName, time,
+    popupDidRender, titleName, time, numbers,
     selectDelegable, log, createCrew, createEventBus, createGuards, folkView: apiModule.folkView, folkModel, pickName, renderFolkCards, renderReservePanel, produceRate,
     rules: delegationRules,
     perks,
@@ -310,6 +314,15 @@ export async function setup(ctx) {
     log,
   });
 
+  // 7c. The Folk's room: output a full bank can't take waits there; every item a Folk makes is counted here (folkMade).
+  room.install(ctx, {
+    getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+    model: roomRules,
+    time,
+    tips,
+    log,
+  });
+
   // 8. Finds: the pet Bruno (every Folk action) and the Ancient Relics set (that gamemode only).
   discoveries.install(ctx, {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
@@ -339,6 +352,7 @@ export async function setup(ctx) {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     model: workOrderRules,
     time,
+    numbers,
     tips,
     popupDidRender,
     log,

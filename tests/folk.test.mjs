@@ -1,11 +1,11 @@
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
-import { createFolk, normalizeFolk, migrateRoot, parseRoot, serializeRoot, SAVE_VERSION, TIERS } from '../src/folk.mjs';
+import { createFolk, normalizeFolk, migrateRoot, parseRoot, serializeRoot, normalizeLost, SAVE_VERSION, TIERS } from '../src/folk.mjs';
 
 test('createFolk fills defaults and rejects bad input', () => {
   const f = createFolk({ id: 'a', slot: 0, tier: 'Newbie', name: 'Ada' });
-  assert.deepEqual(f, { id: 'a', slot: 0, tier: 'Newbie', name: 'Ada', skillId: null, loadout: {}, debt: 0, debtCurrency: null, debtMs: 0, onStrike: false, cooldownTicks: 0, wageCarry: 0, overtime: false, strikes: 0, restartWhenReady: false, hp: null, place: null, travel: 'idle', hiredAt: 0, traitState: { traits: [], waiting: [], counts: {} }, paid: null });
+  assert.deepEqual(f, { id: 'a', slot: 0, tier: 'Newbie', name: 'Ada', skillId: null, loadout: {}, debt: 0, debtCurrency: null, debtMs: 0, onStrike: false, cooldownTicks: 0, wageCarry: 0, overtime: false, strikes: 0, restartWhenReady: false, hp: null, place: null, travel: 'idle', hiredAt: 0, traitState: { traits: [], waiting: [], counts: {} }, paid: null, room: { haul: {} } });
   assert.equal(createFolk({ id: 'a', slot: 0, tier: 'Newbie', name: 'Ada', paid: 4200 }).paid, 4200);
   assert.throws(() => createFolk({ id: 'a', slot: -1, tier: 'Newbie', name: 'Ada' }));
   assert.throws(() => createFolk({ id: 'a', slot: 0, tier: 'Boss', name: 'Ada' }));
@@ -26,7 +26,7 @@ test('normalizeFolk repairs optional fields and rejects impossible records', () 
 test('migrateRoot upgrades a pre-version root (v0) to the current version', () => {
   const legacy = { folks: [{ id: 'a', slot: 0, tier: 'Junior', name: 'Cora' }] };
   const { root, applied } = migrateRoot(legacy);
-  assert.deepEqual(applied, [0, 1, 2, 3, 4, 5]);
+  assert.deepEqual(applied, [0, 1, 2, 3, 4, 5, 6]);
   assert.equal(root.v, SAVE_VERSION);
   assert.equal(root.folks[0].strikes, 0);
   assert.equal(root.folks[0].cooldownTicks, 0);
@@ -107,17 +107,18 @@ test('serializeRoot / parseRoot round-trip preserves every field', () => {
 // A real save: slot 3 (FolksScanB) in the browser, Worker Folks 1.2.0, read from the game save on 20 Oct 2026.
 const realV3 = readFileSync(new URL('./fixtures/save-v3-folksscanb.json', import.meta.url), 'utf8').trim();
 
-test('a real v3 save migrates to v6: every Folk kept as it was, with no place, not travelling, no traits and no known cost', () => {
+test('a real v3 save migrates to v7: every Folk kept as it was, with no place, not travelling, no traits, no known cost and an empty room', () => {
   const before = JSON.parse(realV3);
   const r = parseRoot(realV3);
-  assert.deepEqual(r.applied, [3, 4, 5]);
+  assert.deepEqual(r.applied, [3, 4, 5, 6]);
   assert.equal(r.corrupt, false);
   assert.equal(r.dropped, 0);
-  assert.equal(r.root.v, 6);
+  assert.equal(r.root.v, 7);
   assert.equal(r.root.folks.length, before.folks.length);
   r.root.folks.forEach((folk, i) => {
-    const { place, travel, traitState, paid, ...rest } = folk;
+    const { place, travel, traitState, paid, room, ...rest } = folk;
     assert.equal(paid, null);
+    assert.deepEqual(room, { haul: {} });
     assert.equal(place, null);
     assert.equal(travel, 'idle');
     assert.deepEqual(traitState, { traits: [], waiting: [], counts: {} });
@@ -137,4 +138,20 @@ test('place and travel: only plain integer hexes and known states survive', () =
   assert.equal(normalizeFolk({ ...base, travel: 'flying' }).travel, 'idle');
   assert.equal(normalizeFolk({ ...base, travel: 'walking' }).travel, 'walking');
   assert.equal(normalizeFolk({ ...base, travel: 'with' }).travel, 'with');
+});
+
+test('a room rides in the save and reads back as it was', () => {
+  const folk = createFolk({ id: 'r', slot: 0, tier: 'Junior', name: 'Rook' });
+  folk.room.haul['melvorD:Bird_Nest'] = { qty: 4, ms: 12_000 };
+  const back = parseRoot(serializeRoot([folk]));
+  assert.deepEqual(back.root.folks[0].room, { haul: { 'melvorD:Bird_Nest': { qty: 4, ms: 12_000 } } });
+  assert.deepEqual(normalizeFolk({ ...folk, room: 'full' }).room, { haul: {} });
+});
+
+test('normalizeLost keeps whole stacks of frozen slots only', () => {
+  const frozen = { 1: 9000 };
+  assert.deepEqual(normalizeLost(undefined, frozen), {});
+  assert.deepEqual(normalizeLost({ 1: [{ id: 'a', qty: 2, x: 1 }, { id: 'b', qty: 1.5 }, null], 2: [{ id: 'c', qty: 1 }], 3: 'x' }, frozen), { 1: [{ id: 'a', qty: 2 }] });
+  const back = parseRoot(serializeRoot([], {}, frozen, null, { 1: [{ id: 'a', qty: 2 }] }));
+  assert.deepEqual(back.root.lost, { 1: [{ id: 'a', qty: 2 }] });
 });

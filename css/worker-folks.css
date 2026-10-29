@@ -255,6 +255,24 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 .wf-picker-foot.wf-picker-foot-solo .wf-picker-equip { grid-column: 2; grid-row: 1; justify-self: stretch; width: auto; }
 .wf-picker-foot.wf-picker-foot-solo .wf-picker-back { grid-row: 1; }
 .wf-mastery { display: block; }
+/* The card's mastery on one row (the user, 29 Oct 2026): level, then a taller bar with the XP centred inside it.
+   Only the card's copy; the game's own displays keep their look. */
+.wf-mastery .media { flex-wrap: nowrap; }
+.wf-mastery .media-body { display: grid; align-items: center; min-width: 0; }
+.wf-mastery .media-body > * { grid-area: 1 / 1; }
+.wf-mastery .media-body > .text-center { position: relative; z-index: 1; pointer-events: none; white-space: nowrap; }
+.wf-mastery .media-body h5 { margin: 0 !important; line-height: 1; color: #fff; }
+.wf-mastery .media-body h5 small { font-size: 0.85rem; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45); }
+.wf-mastery .media-body > .font-size-sm { margin: 0 !important; }
+.wf-mastery .progress { height: 1.6rem; margin: 0 !important; border-radius: 6px; }
+/* Skill and Stop as one control: the skill in an outline of Stop's own colour and corners (the game's btn-danger,
+   btn-sm: rgb(229, 103, 103), 3.2px), the shared edge square, no gap between them. */
+.wf-skill-stop.wf-skill-joined { gap: 0; flex-wrap: nowrap; }
+.wf-skill-stop.wf-skill-joined > [data-wf="skill"] {
+  display: inline-flex; align-items: center; align-self: stretch; min-width: 0;
+  padding: 0 0.65rem; border: 1px solid rgb(229, 103, 103); border-right: 0; border-radius: 3.2px 0 0 3.2px;
+}
+.wf-skill-stop.wf-skill-joined > [data-wf="stop"] { border-top-left-radius: 0; border-bottom-left-radius: 0; }
 .wf-details { border-top: 1px solid var(--wf-line-soft); padding-top: 0.5rem; }
 /* Card layout: full-width sections under the portrait row, a button row with even gaps. */
 .wf-min0 { min-width: 0; }
@@ -287,7 +305,9 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 .wf-ui .custom-control-label { display: inline-flex; align-items: center; min-height: 1.5rem; }
 .wf-ui .custom-control-label::before, .wf-ui .custom-control-label::after { top: 50% !important; transform: translateY(-50%); }
 .wf-hp-bar { height: 6px; margin-bottom: 2px; }
-.wf-frozen { opacity: 0.75; }
+.wf-room-bar { height: 6px; margin-bottom: 2px; }
+/* Dimmed: the portrait, title and countdown; the lost items' tiles stay at full strength, as in the bank. */
+.wf-frozen [data-wf="title"], .wf-frozen [data-wf="text"] { opacity: 0.75; }
 .wf-frozen-portrait { filter: grayscale(1) brightness(0.6); }
 /* Phones and tablets: main buttons are at least 40px tall to tap. */
 @media (pointer: coarse) {
@@ -488,9 +508,18 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-dash-xp-chip { display: inline-flex; align-items: center; gap: 2px; padding: 2px 8px; border-radius: 6px; background: var(--wf-well); font-size: 0.9rem; }
 /* An even grid: equal cells that stretch to fill each row, so no ragged gap at the right (the user, build .98). */
 .wf-dash-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); grid-auto-rows: min-content; align-content: start; gap: 8px; margin-top: 10px; min-height: 76px; padding-right: 4px; }
-.wf-dash-item { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; padding: 8px 4px 6px; border-radius: 8px; background: var(--wf-well); }
-.wf-dash-item-icon { width: 32px; height: 32px; object-fit: contain; }
-.wf-dash-item-count { font-size: 0.8rem; font-weight: 600; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wf-dash-item, .wf-item-tile { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; padding: 8px 4px 6px; border-radius: 8px; background: var(--wf-well); }
+.wf-dash-item-icon, .wf-item-tile-icon { width: 32px; height: 32px; object-fit: contain; }
+.wf-dash-item-count, .wf-item-tile-count { font-size: 0.8rem; font-weight: 600; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A leaving Folk's items (Fire popup, frozen card): the same tiles as Made this session, in a grid of their own;
+   what a full bank can't take framed and counted red. */
+.wf-item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 6px; margin: 6px 0 2px; }
+.wf-item-tile-lost { box-shadow: inset 0 0 0 1px var(--wf-strike); }
+.wf-item-tile-lost .wf-item-tile-count { color: var(--wf-strike); }
+.wf-item-grid-sm { grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 4px; }
+.wf-item-grid-sm .wf-item-tile { padding: 4px 2px 3px; border-radius: 6px; }
+.wf-item-grid-sm .wf-item-tile-icon { width: 24px; height: 24px; }
+.wf-item-grid-sm .wf-item-tile-count { font-size: 0.7rem; }
 .wf-dash-more { grid-column: 1 / -1; }
 /* The bands follow the Overview's own width, not the window's (scan A-10, build .112): three across from
    900px of block; under it At work and Payroll side by side with Made this session under them; under 600px one
@@ -522,11 +551,13 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
   .wf-dash-title .wf-dash-next .wf-dash-next-text { flex: 1 1 100%; }
   .wf-dash-title .wf-dash-next .wf-dash-bar { flex: 1 1 auto; width: auto; }
 }
-/* Folk cards by the grid's own width (A-10, A-11): three from 1140px, two from 720px, else one. */
+/* Folk cards by the grid's own width (A-10, A-11): three from 1260px, two from 840px, else one. A card's button row
+   gets its column's width less 68px, and Details, Gear, Traits and Fire need about 340px on one line: at the old 1140
+   and 720 Fire wrapped onto a line of its own (the user, 29 Oct 2026). */
 #worker-folks-folks { container-type: inline-size; container-name: wf-crew; }
 #worker-folks-folks > .wf-card-col, #worker-folks-folks > [data-wf-folk] { flex: 0 0 100%; max-width: 100%; }
-@container wf-crew (min-width: 720px) { #worker-folks-folks > [data-wf-folk] { flex: 0 0 50%; max-width: 50%; } }
-@container wf-crew (min-width: 1140px) { #worker-folks-folks > [data-wf-folk] { flex: 0 0 33.3333%; max-width: 33.3333%; } }
+@container wf-crew (min-width: 840px) { #worker-folks-folks > [data-wf-folk] { flex: 0 0 50%; max-width: 50%; } }
+@container wf-crew (min-width: 1260px) { #worker-folks-folks > [data-wf-folk] { flex: 0 0 33.3333%; max-width: 33.3333%; } }
 /* While nobody is hired the empty card comes first: the one thing to do is on the first screen (A-23, .112). */
 .wf-layout-wide { display: flex; flex-direction: column; }
 .wf-layout-wide > .wf-crew-empty { order: -1; }

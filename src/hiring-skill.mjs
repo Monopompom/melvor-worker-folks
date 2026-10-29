@@ -20,7 +20,7 @@ const swalClass = (extra = {}) => {
   return typeof createSwalCustomClass === 'function' ? createSwalCustomClass(cls) : cls;
 };
 
-export function createHiringClass({ popupDidRender, titleName = (s) => s, time, selectDelegable, log, createCrew, createEventBus, createGuards, folkView, folkModel, pickName, renderFolkCards, renderReservePanel, produceRate, rules, perks, promotion, pricing, tips, layout, dashboard }) {
+export function createHiringClass({ popupDidRender, titleName = (s) => s, time, numbers, selectDelegable, log, createCrew, createEventBus, createGuards, folkView, folkModel, pickName, renderFolkCards, renderReservePanel, produceRate, rules, perks, promotion, pricing, tips, layout, dashboard }) {
   class FolkSlotAction extends MasteryAction {
     constructor(namespace, data, game, skill) {
       super(namespace, data, game);
@@ -583,6 +583,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
             // Not "ready" while striking (build .81); the strike band says the rest. A cooling-down Folk never gets
             // here: the card prints the cooldown line (with its time left) in place of this text (build .136).
             if (this.struck(folk)) return templateLangString('MOD_WF_CARD_STOPPED_STRIKE', { skill: this.skillName(skill) });
+            // Nor while its bank and room are full: the room band says so, this line says what to do.
+            if (this.room?.isFull(folk)) return templateLangString('MOD_WF_CARD_STOPPED_ROOM', { skill: this.skillName(skill) });
             // Not qualified yet, or refused where it stands (Voyage): the reason, not "ready".
             const why = this.workRefusal(folk, skill);
             if (why !== '') return why;
@@ -649,6 +651,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         },
         masterySlot: (folk) => this.slotOf(folk),
         masteryProgress: (folk) => this.masteryProgressOf(folk),
+        shortNumber: (value) => numbers.shortNumber(value),
         skill: this,
         isExpanded: (folk) => this.expanded.has(folk.id),
         onToggleExpand: (folk) => {
@@ -701,7 +704,9 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         traits: (folk) => this.traits?.cardView(folk),
         onTraits: (folk) => this.traits?.openTraits(folk),
         hp: (folk) => this.health?.hpView(folk),
+        room: (folk) => this.room?.cardView(folk),
         frozenSlots: () => this.health?.frozenSlotsView() ?? [],
+        tipItems: (root) => this.room?.tipTiles(root),
         frozenTitle: () => getLangString('MOD_WF_SLOT_FROZEN_TITLE'),
         frozenReason: () => this.health?.freezeReason() ?? '',
         whereText: (folk) => this.whereText(folk),
@@ -1070,8 +1075,9 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       return [templateLangString('MOD_WF_PROMO_BLOCKED', { name: folk.name }), templateLangString('MOD_WF_PROMO_STILL_NEEDED', { needs: needs.join(', ') })];
     }
 
+    /** The Folk's gear back to the bank as far as it has space; returns what was lost, [{ id, qty }]. */
     returnLoadout(folk) {
-      this.loadout?.returnAll(folk);
+      return this.loadout?.returnAll(folk) ?? [];
     }
 
     /** GP this Folk cost you (hire and promotions); its tier's first-hire price when that was never kept. */
@@ -1090,15 +1096,24 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       const severance = this.severanceOf(folk);
       const short = severance > this.game.gp.amount;
       // The severance on a grey band like the promotion fee: amber, red with ✗ when you can't pay it.
-      const fee = `<img class="skill-icon-xs mr-1" src="${this.game.gp.media}" alt="GP"><span class="font-w600 ${short ? 'text-danger' : 'text-warning'}">${numberWithCommas(severance)}</span>`;
+      const fee = `<img class="skill-icon-xs mr-1" src="${this.game.gp.media}" alt="GP"><span class="font-w600 ${short ? 'text-danger' : 'text-warning'}">${numbers.shortNumber(severance)}</span>`;
       const severanceBand = severance > 0
-        ? `<div class="wf-band text-left mt-2"><span class="${short ? 'text-danger' : 'text-success'}">${short ? '✗' : '✓'}</span> ${templateLangString('MOD_WF_FIRE_SEVERANCE', { cost: fee, percent: `${Math.round((this.levels?.firingSeveranceRate() ?? 0) * 100)}`, paid: numberWithCommas(this.costOf(folk)) })}</div>`
+        ? `<div class="wf-band text-left mt-2"><span class="${short ? 'text-danger' : 'text-success'}">${short ? '✗' : '✓'}</span> ${templateLangString('MOD_WF_FIRE_SEVERANCE', { cost: fee, percent: `${Math.round((this.levels?.firingSeveranceRate() ?? 0) * 100)}`, paid: numbers.shortNumber(this.costOf(folk)) })}</div>`
           + (short ? `<div class="text-danger mt-2">${templateLangString('MOD_WF_FIRE_SHORT', { cost: numberWithCommas(severance) })}</div>` : '')
         : '';
+      // Its gear and room on the same grey band (build .151): what reaches the bank, and in red what its free slots
+      // can't take, each item with its own icon.
+      const split = this.room?.leaveSplit(folk) ?? { kept: [], lost: [] };
+      const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+      // As tiles, the look of the bank (the user: a line of names was pale), each with its item tooltip.
+      const roomBand = split.kept.length + split.lost.length === 0 ? '' : '<div class="wf-band text-left mt-2">'
+        + (split.kept.length > 0 ? `<div class="font-w600"><span class="text-success">✓</span> ${esc(getLangString('MOD_WF_FIRE_ITEMS'))}</div>${this.room.itemTiles(split.kept)}` : '')
+        + (split.lost.length > 0 ? `<div class="text-danger font-w600${split.kept.length > 0 ? ' mt-2' : ''}"><span>✗</span> ${esc(templateLangString('MOD_WF_FIRE_ITEMS_LOST', { name: folk.name }))}</div>${this.room.itemTiles(split.lost, { lost: true })}` : '')
+        + '</div>';
       SwalLocale.fire({
         didRender: popupDidRender,
         title: templateLangString('MOD_WF_FIRE_TITLE', { name: titleName(folk.name) }),
-        html: `<div class="text-center text-warning">${getLangString('MOD_WF_FIRE_TEXT')}</div>${severanceBand}`,
+        html: `<div class="text-center text-warning">${getLangString('MOD_WF_FIRE_TEXT')}</div>${severanceBand}${roomBand}`,
         imageUrl: this.portrait(folk.tier),
         imageWidth: 64,
         imageHeight: 64,
@@ -1108,7 +1123,12 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         showCancelButton: true,
         focusCancel: short,
         confirmButtonText: getLangString('MOD_WF_BUTTON_FIRE'),
-        didOpen: () => { if (short) { const b = Swal.getConfirmButton(); if (b) b.disabled = true; } },
+        didOpen: () => {
+          this.room?.tipTiles(Swal.getHtmlContainer());
+          if (short) { const b = Swal.getConfirmButton(); if (b) b.disabled = true; }
+        },
+        // A tile's tooltip shown as the popup closes would stay on screen once its tile is gone.
+        willClose: () => Swal.getHtmlContainer()?.querySelectorAll('[data-wf-item]').forEach((el) => tips?.clear(el)),
       }).then((result) => {
         if (!result.isConfirmed) return;
         // Asked again: the GP may have gone while the popup was open.
@@ -1118,8 +1138,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
           return;
         }
         if (due > 0) this.game.gp.remove(due);
-        this.returnLoadout?.(folk);
-        this.crew.fire(folk.id, { reason: 'fired' });
+        const lost = this.returnLoadout(folk);
+        this.crew.fire(folk.id, { reason: 'fired', lost });
       });
     }
 
@@ -1131,10 +1151,11 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       const paid = this.payroll?.enabled !== false;
       if (paid) {
         // The wage is a fact, not a bonus: body ink; the cut green only once one applies (scan A-16).
-        lines.push({ tone: 'info', text: templateLangString('MOD_WF_PERK_WAGE', { value: (this.wageRaise(folk) * 100).toFixed(0) }) });
+        // Numbers through the game's own formatters, so they follow the player's number setting.
+        lines.push({ tone: 'info', text: templateLangString('MOD_WF_PERK_WAGE', { value: numberWithCommas(Math.round(this.wageRaise(folk) * 100)) }) });
         // No cut yet read "−0.0%" (regression pass, build .83).
-        const relief = (this.wageDiscount(folk) * 100).toFixed(1);
-        lines.push(relief === '0.0' ? { tone: 'info', text: getLangString('MOD_WF_PERK_RELIEF_NONE') } : { met: true, text: templateLangString('MOD_WF_PERK_RELIEF', { value: relief }) });
+        const relief = Math.round(this.wageDiscount(folk) * 1000) / 10;
+        lines.push(relief === 0 ? { tone: 'info', text: getLangString('MOD_WF_PERK_RELIEF_NONE') } : { met: true, text: templateLangString('MOD_WF_PERK_RELIEF', { value: formatFixed(relief, 1) }) });
       }
       const wageOnly = new Set(['grace', 'cooldown60', 'cooldown90', 'trusted']);
       perks.LEVEL_MILESTONES.forEach(([at, key]) => {

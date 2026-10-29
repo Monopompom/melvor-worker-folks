@@ -1,8 +1,8 @@
 // Work Orders on the Hiring page: the board's clock, counting what Folks make, paying delivered orders and the board's
 // block. Game-facing; the rules are in work-orders-model.mjs, passed in from setup.mjs.
 //
-// Counting: an item counts when a Folk's action puts it in the bank (Bank.addItem while `hiring.acting` is set), so
-// what you make yourself never does, and selling or using it later changes nothing. Wages: payroll pays each action
+// Counting: an item counts when a Folk's action makes it (`folkMade`, sent by room.mjs while `hiring.acting` is set,
+// whether the item goes to the bank or waits in the Folk's room), so what you make yourself never does, and selling or using it later changes nothing. Wages: payroll pays each action
 // right after it (`folkPaid` inside `folkActionDone`); that wage goes to the order the action delivered to. A failed
 // action brings nothing but costs its wage: it goes to the order the same Folk delivered to last, until one of its
 // actions brings something else (a Folk switched to another recipe stops paying into the order).
@@ -13,7 +13,7 @@ const CONTAINER_ID = 'worker-folks-container';
 export const BLOCK_ID = 'worker-folks-orders';
 const GP_ID = 'melvorD:GP';
 
-export function install(ctx, { getHiring, model, time, tips, popupDidRender, log }) {
+export function install(ctx, { getHiring, model, time, numbers, tips, popupDidRender, log }) {
   let hiring;
   let board = null;
   let seenLevel = -1;
@@ -184,24 +184,21 @@ export function install(ctx, { getHiring, model, time, tips, popupDidRender, log
 
   // ---- counting ------------------------------------------------------------------------------------------------------
 
-  ctx.patch(Bank, 'addItem').replace(function (original, item, quantity, ...rest) {
-    const added = original(item, quantity, ...rest);
-    const acting = hiring?.acting;
-    if (!added || paying || acting === undefined || board === null || item === undefined) return added;
-    const folkId = acting.folk.id;
+  const onMade = ({ folk, item, quantity }) => {
+    if (paying || folk === undefined || board === null || item === undefined) return;
+    const folkId = folk.id;
     let a = actions.get(folkId);
     if (a === undefined) { a = { matched: new Set(), added: false }; actions.set(folkId, a); }
     a.added = true;
     const order = model.orderFor(board, item.id);
-    if (order === undefined) return added;
+    if (order === undefined) return;
     const { added: counted, done } = model.deliver(order, quantity);
     if (counted > 0) {
       a.matched.add(order.id);
       markDirty();
     }
     if (done) due.push(order);
-    return added;
-  });
+  };
 
   const onPaid = ({ folk, currencyId, amount }) => {
     if (board === null || currencyId !== GP_ID || !(amount > 0) || folk === undefined) return;
@@ -384,8 +381,8 @@ export function install(ctx, { getHiring, model, time, tips, popupDidRender, log
       row.append(img(icon, 'skill-icon-xs mr-1'), el('span', '', text));
       list.append(row);
     };
-    if (done && order.paid !== null) line(game.gp.media, templateLangString('MOD_WF_ORDER_GP_PAID', { rate: `${order.gpRate}`, gp: n(order.paid.gp) }));
-    else if (wagesOn()) line(game.gp.media, templateLangString('MOD_WF_ORDER_GP', { rate: `${order.gpRate}`, gp: n(order.wages * order.gpRate) }));
+    if (done && order.paid !== null) line(game.gp.media, templateLangString('MOD_WF_ORDER_GP_PAID', { rate: numberWithCommas(order.gpRate), gp: numbers.shortNumber(order.paid.gp) }));
+    else if (wagesOn()) line(game.gp.media, templateLangString('MOD_WF_ORDER_GP', { rate: numberWithCommas(order.gpRate), gp: numbers.shortNumber(order.wages * order.gpRate) }));
     line(hiring.media, templateLangString('MOD_WF_ORDER_REWARD_XP', { xp: n(r.xp) }));
     const token = hiring.masteryTokens?.get(game.defaultRealm)?.[0];
     if (r.tokens > 0) line(token?.media, r.tokens === 1 ? getLangString('MOD_WF_ORDER_REWARD_TOKEN') : templateLangString('MOD_WF_ORDER_REWARD_TOKENS', { count: `${r.tokens}` }));
@@ -469,6 +466,7 @@ export function install(ctx, { getHiring, model, time, tips, popupDidRender, log
     // After payroll's: the wage of the action that just ran is in by then.
     hiring.events.on('folkPaid', onPaid);
     hiring.events.on('folkActionDone', onActionDone);
+    hiring.events.on('folkMade', onMade);
     hiring.events.on('folkFired', ({ folk }) => { sticky.delete(folk.id); actions.delete(folk.id); });
     hiring.events.on('folkAssigned', ({ folk }) => sticky.delete(folk.id));
     ['crewChanged', 'folkPromoted'].forEach((name) => hiring.events.on(name, markDirty));

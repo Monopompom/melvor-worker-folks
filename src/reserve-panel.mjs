@@ -85,8 +85,8 @@ export function renderReservePanel(model) {
   const state = band.wfPayroll ?? (band.wfPayroll = { key: '', refs: new Map(), latest: new Map(), owed: null });
   model.currencies.forEach((c) => state.latest.set(c.id, c));
   const n = (v) => numberWithCommas(Math.floor(v));
-  // As src/time-format.mjs hoursText: rounded down, so "Covers 1.0 h" is never 0.96 h.
-  const hoursText = (h) => (h >= 100 ? `${Math.floor(h)}` : (Math.floor(h * 10) / 10).toFixed(1));
+  // As time-format.mjs hoursText: rounded down, so "Covers 1.0 h" is never 0.96 h; the game's own formatters.
+  const hoursText = (h) => (h >= 100 ? numberWithCommas(Math.floor(h)) : formatFixed(Math.floor(h * 10) / 10, 1));
   const roomOf = (c) => (c.room === undefined ? Infinity : c.room);
   const mostOf = (c) => Math.max(0, Math.floor(Math.min(c.bank, roomOf(c))));
   // No crew: the capacity is 0 because there are no wages to hold, not because it is full (scan A-04, build .112).

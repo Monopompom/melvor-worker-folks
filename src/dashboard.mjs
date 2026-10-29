@@ -5,7 +5,7 @@
 // currencies, item chips that scroll). Game-facing; the pure parts are in dashboard-model.mjs, passed in from setup.mjs.
 //
 // "Made this session" counts what arrives while a Folk acts (acting.mjs sets `hiring.acting`): the acting skill's XP,
-// items into the bank and currencies. Kept in memory only: a reload starts it again, nothing goes in the save.
+// the items it makes (`folkMade`, from room.mjs: into the bank or held in the Folk's room) and currencies. Kept in memory only: a reload starts it again, nothing goes in the save.
 //
 // wire() builds the block at the top of the page's column of blocks (before layout.mjs wires the page); render()
 // redraws At work, Made and the pill when something changed and the page is shown; markDirty() asks for that.
@@ -33,6 +33,7 @@ export function install(ctx, { getHiring, model, milestones, tips, popupDidRende
     for (const name of ['folkActionDone', 'crewChanged', 'folkStruck', 'folkInDebt', 'folkReleased', 'folkStarted', 'folkDied']) {
       try { hiring.events.on(name, mark); } catch (err) { log('overview listener failed', name, err); }
     }
+    hiring.events.on('folkMade', ({ item, quantity }) => { if (tally.addItem(item?.id, quantity)) dirty = true; });
   });
 
   // What a Folk's action brings in. Only while that Folk acts, never the player's own actions.
@@ -43,11 +44,6 @@ export function install(ctx, { getHiring, model, milestones, tips, popupDidRende
     const result = original(amount, action);
     if (tally.addXP(this.id, this._xp - before)) dirty = true;
     return result;
-  });
-  ctx.patch(Bank, 'addItem').replace(function (original, item, quantity, ...rest) {
-    const added = original(item, quantity, ...rest);
-    if (added && hiring?.acting !== undefined && tally.addItem(item?.id, quantity)) dirty = true;
-    return added;
   });
   ctx.patch(Currency, 'add').before(function (amount) {
     if (hiring?.acting !== undefined && tally.addCurrency(this.id, amount)) dirty = true;

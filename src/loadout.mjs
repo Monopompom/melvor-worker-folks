@@ -128,9 +128,20 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
       hiring.crew.touch();
       hiring.events.emit('loadoutChanged', { folk });
     },
-    /** Firing: everything goes back, bank space or not. */
+    /**
+     * Leaving the crew (fired, died): each item goes back while the bank has room for it (its kind there, or a free
+     * slot); the rest is lost with the Folk (the user, 29 Oct 2026). Returns what was lost, [{ id, qty }].
+     */
     returnAll(folk) {
-      Object.keys(folk.loadout).forEach((slotId) => api.unequip(folk, slotId, { force: true }));
+      const lost = [];
+      Object.keys(folk.loadout).forEach((slotId) => {
+        const e = api.entry(folk, slotId);
+        const fits = e !== undefined && (game.bank.items.has(e.item) || game.bank.occupiedSlots < game.bank.maximumSlots);
+        if (e !== undefined && !(fits && game.bank.addItem(e.item, e.qty, false, true, false, true, SOURCE))) lost.push({ id: e.item.id, qty: e.qty });
+        delete folk.loadout[slotId];
+      });
+      api.changed(folk);
+      return lost;
     },
     /** After load: items from removed mods are dropped; slots the tier cannot use and Hiring gear are returned. */
     reconcile() {
@@ -265,7 +276,12 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
         root.replaceChildren();
         const head = document.createElement('small');
         head.className = 'wf-subtle d-block text-center wf-gear-head';
-        head.textContent = `${hiring.roleName(folk.tier)} · ${skill === undefined ? getLangString('MOD_WF_UNASSIGNED') : hiring.skillName(skill)} · ${getLangString('MOD_WF_GEAR_HINT')}`;
+        // Who and what on the first line, the hint on its own line under it (the user, 29 Oct 2026).
+        head.textContent = `${hiring.roleName(folk.tier)} · ${skill === undefined ? getLangString('MOD_WF_UNASSIGNED') : hiring.skillName(skill)}`;
+        const hint = document.createElement('span');
+        hint.className = 'd-block';
+        hint.textContent = getLangString('MOD_WF_GEAR_HINT');
+        head.append(hint);
         root.append(head);
         // Laid out like the character's equipment (build .65, user request): every slot at the game's own grid
         // position; slots this tier hasn't opened yet greyed out in place, a tap saying which tier opens them.
@@ -302,16 +318,17 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
           const slot = tiles.get(l.id);
           b.className = `btn btn-sm wf-slot${slot.empty ? ' btn-outline-info' : ' btn-info'}`;
           img.src = slot.media;
-          b.setAttribute('aria-label', slot.empty ? templateLangString('MOD_WF_SLOT_EMPTY', { slot: slot.name }) : `${slot.name}${slot.qty > 0 ? ` ×${slot.qty}` : ''}`); // "Consumable: empty" (C-34)
+          b.setAttribute('aria-label', slot.empty ? templateLangString('MOD_WF_SLOT_EMPTY', { slot: slot.name }) : `${slot.name}${slot.qty > 0 ? ` ×${numberWithCommas(slot.qty)}` : ''}`); // "Consumable: empty" (C-34)
           if (slot.charges !== undefined) {
             const q = document.createElement('span');
             q.className = `wf-slot-qty${slot.charges === 0 ? ' text-danger' : ''}`;
-            q.textContent = slot.charges > 9999 ? `${Math.floor(slot.charges / 1000)}k` : `${slot.charges}`;
+            // The game's short form, as its bank writes a count (999K, 100M), never our own "12k".
+            q.textContent = formatNumber(slot.charges);
             b.append(q);
           } else if (slot.qty > 0) {
             const q = document.createElement('small');
             q.className = 'wf-slot-qty';
-            q.textContent = slot.qty > 9999 ? `${Math.floor(slot.qty / 1000)}k` : `${slot.qty}`;
+            q.textContent = formatNumber(slot.qty);
             b.append(q);
           }
           const e = api.entry(folk, slot.id);
