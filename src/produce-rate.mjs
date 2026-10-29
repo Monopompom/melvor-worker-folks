@@ -50,6 +50,14 @@ export function crewBonus(workingExpertsExcludingSelf, max = CREW_BONUS_MAX) {
   return Math.min(max, CREW_BONUS_PER_EXPERT * Math.max(0, workingExpertsExcludingSelf));
 }
 
+/**
+ * A Folk's chance to pick a pocket, in %: its own roll (a miss counts as caught) and then the NPC's rate. From
+ * Journeyman up the own roll never misses, so the NPC's rate is the whole of it.
+ */
+export function folkSuccessRate(tier, npcRate) {
+  return (Math.min(100, produceRate(tier)) * npcRate) / 100;
+}
+
 export function rollsPets(tier) {
   return !NO_PET_TIERS.has(tier);
 }

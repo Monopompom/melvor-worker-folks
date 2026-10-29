@@ -240,6 +240,19 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
     // A tree a refused start left selected was saved with the game (before build .146): it would block the next click.
     const wc = this.woodcutting;
     if (wc?.activeTrees instanceof Set && wc.activeTrees.size > 0 && !wc.isActive && !hiring.delegated.has(wc)) wc.activeTrees.clear();
+    // The game resets an active Thieving that isn't the main action (its fix for a stun that never ended): a Folk's
+    // Thieving is always that, so every load stopped it. Its stun ticks with the Folk, so that one reset is skipped.
+    const th = this.thieving;
+    if (th !== undefined && hiring.delegated.has(th)) {
+      th.resetActionState = function () {
+        delete this.resetActionState;
+        log('load: kept the Folk on Thieving');
+      };
+    }
+  });
+  ctx.patch(Game, 'onLoad').after(function () {
+    const th = this.thieving;
+    if (th !== undefined && Object.prototype.hasOwnProperty.call(th, 'resetActionState')) delete th.resetActionState;
   });
 
   ctx.onCharacterLoaded(() => {

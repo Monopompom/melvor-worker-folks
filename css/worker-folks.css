@@ -530,3 +530,7 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 /* While nobody is hired the empty card comes first: the one thing to do is on the first screen (A-23, .112). */
 .wf-layout-wide { display: flex; flex-direction: column; }
 .wf-layout-wide > .wf-crew-empty { order: -1; }
+
+/* The Folk's success rate under a Thieving NPC's own line. */
+.wf-thieving-rate { white-space: nowrap; }
+.wf-thieving-rate-icon { width: 1.25em; height: 1.25em; margin-right: 0.25em; border-radius: 3px; object-fit: contain; vertical-align: -0.3em; }

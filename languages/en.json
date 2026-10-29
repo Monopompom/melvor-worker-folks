@@ -470,5 +470,7 @@
   "MOD_WF_ORDER_REWARD_ITEM": "+${qty} ${item}",
   "MOD_WF_ORDER_REWARD_GEMS": "+${count} random gems",
   "MOD_WF_ORDER_DELIVERED": "Work Order delivered: ${what} (${rewards})",
-  "MOD_WF_ORDER_EXPIRED": "Work Order gone undelivered: ${what}"
+  "MOD_WF_ORDER_EXPIRED": "Work Order gone undelivered: ${what}",
+  "MOD_WF_THIEVING_FOLK_RATE": "${portrait}${name}: ${value}",
+  "MOD_WF_THIEVING_FOLK_RATE_TIP": "${name}'s success rate: with their own gear, not yours. A Trainee or Apprentice also misses on their own (40% or 20% of tries), and a miss counts as caught."
 }

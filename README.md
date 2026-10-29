@@ -94,6 +94,9 @@ your chance; before that they find none.
 Folks have hitpoints by tier (Trainee 300, Apprentice 500, Journeyman 700, Master 900,
 Foreman 1,200), shown as a bar on the card. A Folk caught while Thieving is stunned like
 you would be and takes the NPC's hit itself; you never take damage from a Folk's work.
+A failed Produce Rate roll counts as caught, and the Folk's stealth comes from its own gear, so each NPC on the
+Thieving page shows the Folk's own success rate under yours. Like you, a Folk stops after a stun unless "Continue
+Thieving after being stunned" is on.
 Below 60% health the Folk eats **your selected food** (the food slot you use in combat)
 until it is back to full, so keep food equipped while a Folk thieves. Folks regenerate 1% of their max HP every ten
 seconds. A Folk that drops to zero dies: its gear returns to your bank, it leaves the crew,

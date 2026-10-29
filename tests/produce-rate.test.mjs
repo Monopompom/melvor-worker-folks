@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { produceRate, rollOutcome, tierModifiers, crewBonus, rollsPets } from '../src/produce-rate.mjs';
+import { produceRate, rollOutcome, tierModifiers, crewBonus, rollsPets, folkSuccessRate } from '../src/produce-rate.mjs';
 
 function lcg(seed) {
   let s = seed >>> 0;
@@ -54,4 +54,12 @@ test('crew bonus and pets', () => {
   assert.equal(rollsPets('Newbie'), false);
   assert.equal(rollsPets('Junior'), false);
   assert.equal(rollsPets('Middle'), true);
+});
+
+test('folkSuccessRate: Trainee and Apprentice scale the NPC rate, Journeyman and up take it whole', () => {
+  assert.equal(folkSuccessRate('Newbie', 50), 30);
+  assert.equal(folkSuccessRate('Junior', 50), 40);
+  assert.equal(folkSuccessRate('Middle', 57.5), 57.5);
+  assert.equal(folkSuccessRate('Expert', 100), 100);
+  assert.equal(folkSuccessRate('Senior', 0), 0);
 });

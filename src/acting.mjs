@@ -101,6 +101,16 @@ export function install(ctx, { getHiring, rate, log }) {
     hiring.invalidateFolkTables = invalidateAll;
     /** Dev diagnostics: a fresh table for the Folk on a skill (not cached). */
     hiring.debugTable = (folk, skill) => buildTable(folk, skill);
+    /** Runs fn with the Folk's modifiers in game.modifiers, no action and no roll: what the Folk would get. */
+    hiring.asFolk = (folk, skill, fn) => {
+      if (hiring.acting !== undefined) return fn();
+      hiring.acting = { folk, skill, table: tableFor(folk, skill), outcome: 'ok', consumed: new Set() };
+      try {
+        return fn();
+      } finally {
+        hiring.acting = undefined;
+      }
+    };
   });
 
   // 1. The swap: skills read this.game.modifiers everywhere.
