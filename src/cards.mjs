@@ -80,6 +80,7 @@ export function renderFolkCards(folks, view) {
   const current = Array.from(list.querySelectorAll(':scope > [data-wf-folk]'));
   const sameOrder = current.length === ordered.length && current.every((el, i) => el === ordered[i]);
   if (!sameOrder) ordered.forEach((col) => list.append(col));
+  dreamSpare = view.dreamSpare ?? Infinity;
   scheduleEqualize(list);
   return true;
 }
@@ -107,10 +108,12 @@ export function effectsFragment(effects) {
   return frag;
 }
 
-export function equalizeCards(list) {
+export function equalizeCards(list, minSpare = Infinity) {
   const cols = Array.from(list.querySelectorAll(':scope > [data-wf-folk]')).filter((col) => col.offsetParent !== null);
   const cards = cols.map((col) => col.querySelector('.block'));
-  cards.forEach((card) => { if (card) card.style.minHeight = ''; });
+  // Measured without their daydreams: a daydream only fills height another card in the row already gives (build .155).
+  const dreamOf = (card) => card?.querySelector('[data-wf="dream"]') ?? null;
+  cards.forEach((card) => { if (card) card.style.minHeight = ''; dreamOf(card)?.classList.add('d-none'); });
   const rows = new Map();
   cols.forEach((col, i) => {
     const card = cards[i];
@@ -124,11 +127,18 @@ export function equalizeCards(list) {
   });
   rows.forEach((row) => {
     const base = Math.max(...row.map((c) => c.base));
-    row.forEach((c) => { c.card.style.minHeight = `${base + c.extra}px`; });
+    row.forEach((c) => {
+      c.card.style.minHeight = `${base + c.extra}px`;
+      const dream = dreamOf(c.card);
+      const alert = c.card.querySelector('[data-wf="alert"]');
+      const quiet = alert === null || alert.classList.contains('d-none');
+      if (dream !== null && dream.dataset.wfReady === '1' && quiet && base - c.base >= minSpare) dream.classList.remove('d-none');
+    });
   });
 }
 
 let pending = false;
+let dreamSpare = Infinity; // the spare height a daydream needs, from the view (no daydreams without one)
 /** Once per frame at most; again whenever the list's width changes (a resize, the page shown, the menu opened). */
 function scheduleEqualize(list) {
   if (!list.dataset.wfEqualize && typeof ResizeObserver === 'function') {
@@ -138,7 +148,32 @@ function scheduleEqualize(list) {
   }
   if (pending) return;
   pending = true;
-  requestAnimationFrame(() => { pending = false; try { equalizeCards(list); } catch {} });
+  requestAnimationFrame(() => { pending = false; try { equalizeCards(list, dreamSpare); } catch {} });
+}
+
+/** A one-line text that slides to its end and back while it is longer than its box (build .154). */
+function fitMarquee(el) {
+  const text = el.firstElementChild;
+  if (text === null) return;
+  const shift = Math.ceil(text.offsetWidth - el.clientWidth);
+  const run = el.clientWidth > 0 && shift > 1;
+  el.classList.toggle('wf-marquee-run', run);
+  if (!run) return;
+  el.style.setProperty('--wf-marquee-shift', `${-shift}px`);
+  el.style.setProperty('--wf-marquee-time', `${Math.max(4, Math.round(shift / 30) + 3)}s`);
+}
+
+/** Writes the text and measures it again whenever it or the box's width changes (shown, resized). */
+function setMarquee(el, value) {
+  const text = el.firstElementChild;
+  if (text === null) return;
+  if (el.wfMarquee !== true && typeof ResizeObserver === 'function') {
+    el.wfMarquee = true;
+    new ResizeObserver(() => fitMarquee(el)).observe(el);
+  }
+  if (text.textContent === value) return;
+  text.textContent = value;
+  requestAnimationFrame(() => fitMarquee(el));
 }
 
 function fillCard(col, folk, view) {
@@ -237,30 +272,146 @@ function fillCard(col, folk, view) {
     if (food !== null && hp.food !== undefined) {
       setText(food, hp.food.text);
       const tone = { off: 'wf-subtle', ok: '', low: 'text-warning', none: 'text-danger font-w600' }[hp.food.state] ?? '';
-      const className = `d-block ${tone}`.trim();
+      const className = `wf-hp-food ${tone}`.trim();
       if (food.className !== className) food.className = className;
       foodAlert = hp.food.state === 'none';
     }
   });
-  // The room: shown only while it holds something or bank and room are both full (src/room.mjs).
+  // The room: shown while it holds something, bank and room are both full, or the Folk works from its own stock
+  // (src/room.mjs). Its list is the tooltip of the bar and its line; Restock has its own. A meter in the work band
+  // (build .153); while bank and room are full or the stock is out, the alert band says so and holds Restock.
+  const room = view.room?.(folk);
+  /**
+   * Restock as a split button (build .153): the word fills the free room, the caret opens a panel with a slider from
+   * what the room holds to full, what that takes from the bank, and its own Restock. The panel's open state and the
+   * slider's value live in the DOM, so a re-render (every action) keeps them; `preview` is the room bar's second
+   * segment, the part the slider would add.
+   */
+  const restockControl = (group, panel, { show, solid, preview }) => {
+    if (group === null || panel === null) return;
+    const fill = group.querySelector('.wf-restock-fill');
+    const more = group.querySelector('.wf-restock-more');
+    group.classList.toggle('d-none', !show);
+    const rv = show ? view.restockView?.(folk) : undefined;
+    const canPick = rv !== undefined && rv.space > 1;
+    if (!canPick) panel.classList.add('d-none');
+    const open = !panel.classList.contains('d-none');
+    if (preview) preview.style.width = open ? `${rv.percentAt(Number(panel.querySelector('.wf-restock-range').value))}%` : '0%';
+    if (!show) { view.tip(fill, []); return; }
+    const tone = solid ? 'btn-info' : 'btn-outline-info';
+    for (const [b, cls] of [[fill, 'wf-restock-fill'], [more, 'wf-restock-more']]) {
+      const className = `btn btn-sm ${tone} ${cls}${b === more && !canPick ? ' d-none' : ''}`;
+      if (b.className !== className) b.className = className;
+    }
+    setText(fill, room.restock.text);
+    view.tip(fill, room.restock.tip);
+    fill.onclick = () => view.onRestock(folk);
+    setAttr(more, 'aria-label', view.text('MOD_WF_RESTOCK_AMOUNT'));
+    setAttr(more, 'aria-expanded', `${open}`);
+    if (!canPick) return;
+    panel.wfRestock = rv;
+    const range = panel.querySelector('.wf-restock-range');
+    const go = panel.querySelector('.wf-restock-go');
+    const refresh = () => {
+      const v = panel.wfRestock;
+      setAttr(range, 'max', `${v.space}`);
+      setAttr(range, 'aria-label', view.text('MOD_WF_RESTOCK_UP_TO'));
+      const n = Math.min(v.space, Math.max(1, Math.round(Number(range.value) || 1)));
+      if (Number(range.value) !== n) range.value = `${n}`;
+      const full = n >= v.space;
+      const put = (sel, text) => { const e = panel.querySelector(sel); if (e !== null) setText(e, text); };
+      put('.wf-restock-up-to', view.text('MOD_WF_RESTOCK_UP_TO'));
+      put('.wf-restock-value', `${v.hoursAt(n)}\u00a0h`);
+      put('.wf-restock-now', view.text('MOD_WF_RESTOCK_NOW', { hours: v.nowText }));
+      put('.wf-restock-full', view.text('MOD_WF_RESTOCK_FULL', { hours: v.fullText }));
+      put('.wf-restock-cost', v.costText(n));
+      const bank = panel.querySelector('.wf-restock-bank');
+      if (bank !== null) { setText(bank, v.bankText); bank.classList.toggle('d-none', v.bankText === '' || n <= v.bank); }
+      setText(go, full ? view.text('MOD_WF_RESTOCK_FILL') : view.text('MOD_WF_RESTOCK_TO', { hours: v.hoursAt(n) }));
+      if (preview) preview.style.width = `${v.percentAt(n)}%`;
+    };
+    range.oninput = refresh;
+    go.onclick = () => {
+      panel.classList.add('d-none');
+      view.onRestock(folk, Math.round(Number(range.value)));
+    };
+    more.onclick = () => {
+      const opening = panel.classList.contains('d-none');
+      panel.classList.toggle('d-none', !opening);
+      setAttr(more, 'aria-expanded', `${opening}`);
+      // Opens halfway between what it holds and what the bank covers (or full, whichever is less).
+      if (opening) {
+        setAttr(range, 'max', `${panel.wfRestock.space}`);
+        range.value = `${Math.max(1, Math.round(Math.min(panel.wfRestock.space, panel.wfRestock.bank || panel.wfRestock.space) / 2))}`;
+      }
+      if (opening) refresh();
+      else if (preview) preview.style.width = '0%';
+      if (col.parentElement !== null) scheduleEqualize(col.parentElement);
+    };
+    if (open) refresh();
+  };
   set('room', (el) => {
-    const room = view.room?.(folk);
     el.classList.toggle('d-none', room === undefined);
-    if (room === undefined) { view.tip(el, []); return; }
     const bar = el.querySelector('[data-wf="room-bar"]');
+    const text = el.querySelector('[data-wf="room-text"]');
+    // Here as an outline while nothing waits for it; the alert row's solid one while the Folk does.
+    restockControl(el.querySelector('[data-wf="restock"]'), el.querySelector('[data-wf="restock-panel"]'), {
+      show: room !== undefined && room.restock !== undefined && !room.restock.attention,
+      solid: false,
+      preview: el.querySelector('[data-wf="room-preview"]'),
+    });
+    if (room === undefined) {
+      [bar?.parentElement, text].forEach((t) => { if (t) view.tip(t, []); });
+      return;
+    }
     if (bar !== null) {
       bar.style.width = `${room.percent}%`;
-      const className = `progress-bar ${room.full ? 'bg-danger' : 'bg-info'}`;
+      const className = `progress-bar ${room.full ? 'bg-danger' : room.out ? 'bg-warning' : 'bg-info'}`;
       if (bar.className !== className) bar.className = className;
+      view.tip(bar.parentElement, room.tip);
     }
-    const text = el.querySelector('[data-wf="room-text"]');
-    if (text !== null) setText(text, room.text);
-    const status = el.querySelector('[data-wf="room-status"]');
-    if (status !== null) {
-      setText(status, room.status);
-      status.classList.toggle('d-none', room.status === '');
+    if (text !== null) {
+      setText(text, room.text);
+      view.tip(text, room.tip);
     }
-    view.tip(el, room.tip);
+  });
+  // The switches under the work, always in sight (build .153; they were in Details): Overtime once unlocked, Own stock.
+  const ot = view.overtime(folk);
+  set('overtime', (el) => {
+    el.classList.toggle('d-none', !ot.unlocked);
+    el.classList.toggle('wf-switch-on', ot.on);
+    el.classList.add('wf-switch-warn');
+    setAttr(el, 'aria-checked', `${ot.on}`);
+    const label = el.querySelector('[data-wf="overtime-label"]');
+    if (label !== null) setText(label, ot.text);
+    const sub = el.querySelector('[data-wf="overtime-sub"]');
+    if (sub !== null) {
+      setText(sub, ot.sub ?? '');
+      // Gold while on, like Own stock's note: the switch changes what the Folk costs.
+      sub.classList.toggle('text-warning', ot.on);
+      sub.classList.toggle('wf-subtle', !ot.on);
+    }
+    el.onclick = () => view.onToggleOvertime(folk);
+  });
+  const stock = view.ownStock?.(folk);
+  set('own-stock', (el) => {
+    el.classList.toggle('d-none', stock === undefined);
+    if (stock === undefined) return;
+    el.classList.toggle('wf-switch-on', stock.on);
+    setAttr(el, 'aria-checked', `${stock.on}`);
+    el.disabled = stock.disabled === true;
+    const label = el.querySelector('[data-wf="own-stock-label"]');
+    if (label !== null) setText(label, stock.text);
+    view.tip(el, stock.tip);
+    el.onclick = () => view.onToggleOwnStock(folk);
+    const note = el.querySelector('[data-wf="own-stock-note"]');
+    if (note !== null) {
+      setText(note, stock.note);
+      note.classList.toggle('d-none', stock.note === '');
+      note.classList.toggle('text-danger', stock.on && stock.noteLost);
+      note.classList.toggle('text-warning', stock.on && !stock.noteLost);
+      note.classList.toggle('wf-subtle', !stock.on);
+    }
   });
   set('mastery', (el) => {
     const slot = view.masterySlot(folk);
@@ -356,7 +507,7 @@ function fillCard(col, folk, view) {
   set('staff-why', (el) => {
     const promotable = view.canPromote(folk);
     const text = [...new Set([promotable ? refusals.promote : '', refusals.gear, refusals.fire].filter((r) => r !== ''))].join(' ');
-    setText(el, text);
+    setMarquee(el, text);
     el.classList.toggle('d-none', text === '');
   });
   set('details', (el) => {
@@ -380,28 +531,17 @@ function fillCard(col, folk, view) {
         setText(li, line.text);
       });
     }
-    const ot = view.overtime(folk);
-    const otButton = el.querySelector('[data-wf="overtime"]');
-    if (otButton !== null) {
-      setText(otButton, ot.text);
-      const className = `btn btn-sm ${ot.on ? 'btn-warning' : 'btn-outline-warning'} mr-2`;
-      if (otButton.className !== className) otButton.className = className;
-      otButton.classList.toggle('d-none', !ot.unlocked);
-      setAttr(otButton, 'aria-pressed', `${ot.on}`);
-      otButton.onclick = () => view.onToggleOvertime(folk);
-    }
   });
   set('wage', (el) => {
     const text = view.wageText(folk);
     setText(el, text);
     el.classList.toggle('d-none', text === '');
   });
+  const info = view.strikeInfo(folk);
   set('strike', (el) => {
-    const info = view.strikeInfo(folk);
     el.classList.toggle('d-none', info === null);
     if (info === null) return;
     const debtOnly = info.debtOnly === true;
-    el.classList.toggle('wf-debt-block', debtOnly);
     const owed = el.querySelector('[data-wf="strike-owed"]');
     if (owed !== null) {
       setText(owed, info.owedText);
@@ -421,21 +561,32 @@ function fillCard(col, folk, view) {
     if (settle !== null) {
       settle.classList.toggle('d-none', debtOnly);
       if (!debtOnly) {
-        setText(settle, info.settleText);
-        settle.disabled = !info.canSettle;
-        settle.onclick = info.onSettle;
+        const label = settle.querySelector('[data-wf="settle-label"]');
+        if (label !== null) setText(label, info.settleLabel);
+        const amount = settle.querySelector('[data-wf="settle-amount"]');
+        if (amount !== null) setText(amount, info.settleAmount);
+        // Grey but still hoverable (aria-disabled, not disabled), so its tooltip can say what is missing.
+        settle.classList.toggle('disabled', !info.canSettle);
+        setAttr(settle, 'aria-disabled', `${!info.canSettle}`);
+        view.tip(settle, info.settleWhy ?? '');
+        settle.onclick = () => { if (info.canSettle) info.onSettle(); };
       }
     }
     const apology = el.querySelector('[data-wf="apologise"]');
     if (apology !== null) {
       apology.classList.toggle('d-none', debtOnly);
       if (!debtOnly) {
-        setText(apology, info.apologyText);
-        apology.disabled = !info.canApologise;
-        apology.onclick = info.onApologise;
+        const label = apology.querySelector('[data-wf="apologise-label"]');
+        if (label !== null) setText(label, info.apologyLabel);
+        const amount = apology.querySelector('[data-wf="apologise-amount"]');
+        if (amount !== null) setText(amount, info.apologyAmount);
+        apology.classList.toggle('disabled', !info.canApologise);
+        setAttr(apology, 'aria-disabled', `${!info.canApologise}`);
+        view.tip(apology, info.apologyTip ?? info.apologyWhy ?? '');
+        apology.onclick = () => { if (info.canApologise) info.onApologise(); };
       }
     }
-    // A disabled Settle / Apologise says why (grey only with the reason next to it).
+    // Another mod's refusal greys both buttons and is said under them; what is missing is in each button's tooltip.
     const why = el.querySelector('[data-wf="strike-why"]');
     if (why !== null) {
       // The away reason is said once, under the buttons (build .136): the strike line keeps only its own.
@@ -444,6 +595,37 @@ function fillCard(col, folk, view) {
       setText(why, reason);
       why.classList.toggle('d-none', reason === '');
     }
+  });
+  // Bank and room full, or the stock out: what it is, what to do, and the solid Restock while the Folk waits for it.
+  const roomAlert = room !== undefined && (room.full || room.out);
+  set('room-alert', (el) => {
+    el.classList.toggle('d-none', !roomAlert);
+    restockControl(el.querySelector('[data-wf="alert-restock"]'), el.querySelector('[data-wf="alert-restock-panel"]'), {
+      show: roomAlert && room.restock?.attention === true,
+      solid: true,
+      preview: null,
+    });
+    if (!roomAlert) return;
+    const status = el.querySelector('[data-wf="room-status"]');
+    if (status !== null) {
+      setText(status, room.status);
+      status.classList.toggle('text-danger', room.full);
+      status.classList.toggle('text-warning', !room.full);
+    }
+    const why = el.querySelector('[data-wf="room-why"]');
+    if (why !== null) { setText(why, room.why ?? ''); view.tip(why, room.tip); }
+  });
+  // A strike stops everything and comes first; a debt is paid by work, so it follows the room's row.
+  // The daydream's picture and line; equalizeCards decides whether there is room to show it.
+  set('dream', (el) => view.dream?.(el, folk));
+  set('alert', (el) => {
+    const strike = el.querySelector('[data-wf="strike"]');
+    const roomRow = el.querySelector('[data-wf="room-alert"]');
+    const struck = info !== null && info.debtOnly !== true;
+    const order = struck ? [strike, roomRow] : [roomRow, strike];
+    if (order.every((r) => r !== null) && el.firstElementChild !== order[0]) el.prepend(order[0]);
+    el.classList.toggle('d-none', info === null && !roomAlert);
+    el.classList.toggle('wf-alert-strike', struck || (roomAlert && room.full));
   });
   set('stop', (el) => {
     const working = view.isWorking(folk);

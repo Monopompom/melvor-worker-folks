@@ -83,7 +83,8 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
       return game.bank.filterItems((bankItem) => {
         const item = bankItem.item;
         if (!fits(item, slotId) || !rules.isFolkGear(item.id)) return false;
-        if (showAll) return true;
+        // A bag helps every Folk: it sizes the room, whatever the skill.
+        if (showAll || rules.isFolkOwnItem(item.id)) return true;
         return skill === undefined ? api.isSkilling(item, slotId) : api.helpsSkill(item, skill);
       });
     },

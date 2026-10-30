@@ -42,11 +42,16 @@ export function slotLayout(tier, { hasAoD = false, hasItA = false } = {}) {
 /**
  * Hiring gear (the mod's own items: outfit, capes, Lesser Relic) is worn by the player; its
  * modifiers are read from the player's table and its charges spent there, so a Folk can never
- * hold it. Everything else may go into a loadout.
+ * hold it. Everything else may go into a loadout. The bags (build .152) are the exception: made for a Folk's Cape
+ * slot, they size its room and do nothing for the player.
  */
 export const OWN_NAMESPACE = 'worker_folks';
+export const FOLK_OWN_ITEMS = Object.freeze(['Folk_Satchel', 'Folk_Pack', 'Folk_Frame_Pack']);
+export function isFolkOwnItem(itemId, ownNamespace = OWN_NAMESPACE) {
+  return typeof itemId === 'string' && FOLK_OWN_ITEMS.some((id) => itemId === `${ownNamespace}:${id}`);
+}
 export function isFolkGear(itemId, ownNamespace = OWN_NAMESPACE) {
-  return typeof itemId === 'string' && !itemId.startsWith(`${ownNamespace}:`);
+  return typeof itemId === 'string' && (!itemId.startsWith(`${ownNamespace}:`) || isFolkOwnItem(itemId, ownNamespace));
 }
 
 /** Picker default: hide items whose only effects are combat effects. */

@@ -20,7 +20,7 @@ const swalClass = (extra = {}) => {
   return typeof createSwalCustomClass === 'function' ? createSwalCustomClass(cls) : cls;
 };
 
-export function createHiringClass({ popupDidRender, titleName = (s) => s, time, numbers, selectDelegable, log, createCrew, createEventBus, createGuards, folkView, folkModel, pickName, renderFolkCards, renderReservePanel, produceRate, rules, perks, promotion, pricing, tips, layout, dashboard }) {
+export function createHiringClass({ popupDidRender, titleName = (s) => s, time, numbers, selectDelegable, log, createCrew, createEventBus, createGuards, folkView, folkModel, pickName, renderFolkCards, renderReservePanel, produceRate, rules, perks, promotion, pricing, tips, layout, dashboard, daydream }) {
   class FolkSlotAction extends MasteryAction {
     constructor(namespace, data, game, skill) {
       super(namespace, data, game);
@@ -557,6 +557,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       dashboard?.markDirty();
       const done = renderFolkCards(layout?.orderFolks(this.crew.all) ?? this.crew.all, {
         tip: (el, content) => tips?.set(el, content),
+        dream: daydream === undefined ? undefined : (el, folk) => daydream.fill(el, folk),
+        dreamSpare: daydream?.minSpare,
         roleName: (tier) => this.roleName(tier),
         portrait: (tier) => this.portrait(tier),
         slotText: (folk) => templateLangString('MOD_WF_CARD_SLOT', { slot: `${folk.slot + 1}` }),
@@ -583,8 +585,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
             // Not "ready" while striking (build .81); the strike band says the rest. A cooling-down Folk never gets
             // here: the card prints the cooldown line (with its time left) in place of this text (build .136).
             if (this.struck(folk)) return templateLangString('MOD_WF_CARD_STOPPED_STRIKE', { skill: this.skillName(skill) });
-            // Nor while its bank and room are full: the room band says so, this line says what to do.
-            if (this.room?.isFull(folk)) return templateLangString('MOD_WF_CARD_STOPPED_ROOM', { skill: this.skillName(skill) });
+            // Nor while its bank and room are full or its own stock is out: the alert band says why and holds the fix.
+            if (this.room?.isFull(folk) || this.room?.isDry(folk)) return templateLangString('MOD_WF_CARD_STOPPED', { skill: this.skillName(skill) });
             // Not qualified yet, or refused where it stands (Voyage): the reason, not "ready".
             const why = this.workRefusal(folk, skill);
             if (why !== '') return why;
@@ -631,18 +633,25 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
           const canSettle = blocked === '' && payroll.canSettle(folk);
           const apologyOpen = this.levels === undefined || this.levels.apologyUnlocked();
           const canApologise = blocked === '' && payroll.canSettle(folk, { apology: true });
-          const reason = blocked !== '' ? blocked : !payroll.canSettle(folk) ? templateLangString('MOD_WF_SETTLE_NEED', { amount: shortOf(plain.parts) })
-            : apologyOpen && !canApologise ? templateLangString('MOD_WF_APOLOGY_NEED', { amount: shortOf(apology.parts) })
-              : '';
+          // What is missing goes in each button's tooltip (the user, build .155); only a refusal stays as the line.
+          const settleWhy = blocked === '' && !payroll.canSettle(folk) ? templateLangString('MOD_WF_SETTLE_NEED', { amount: shortOf(plain.parts) }) : '';
+          const apologyWhy = blocked === '' && apologyOpen && !canApologise ? templateLangString('MOD_WF_APOLOGY_NEED', { amount: shortOf(apology.parts) }) : '';
           return {
-            reason,
+            reason: blocked,
+            settleWhy,
+            apologyWhy,
             owedText: templateLangString('MOD_WF_STRIKE_OWED', { amount: fmt({ [plain.debtCurrency]: plain.debt }) }),
             // its own line (the user, build .108): a long amount never wraps the severance; none when it is free
             severanceText: plain.severance > 0 ? templateLangString('MOD_WF_STRIKE_SEVERANCE', { severance: numberWithCommas(plain.severance) }) : '',
-            settleText: templateLangString('MOD_WF_BUTTON_SETTLE', { amount: fmt(plain.parts) }),
-            apologyText: this.levels !== undefined && !this.levels.apologyUnlocked()
-              ? `${templateLangString('MOD_WF_BUTTON_APOLOGY', { amount: fmt(apology.parts) })} (${this.levels.lockText(this.levels.apologyLevel)})`
-              : templateLangString('MOD_WF_BUTTON_APOLOGY', { amount: fmt(apology.parts) }),
+            // Settle and Apologise side by side (build .153): the word, the price on the line under it.
+            settleLabel: getLangString('MOD_WF_BUTTON_SETTLE'),
+            settleAmount: fmt(plain.parts),
+            apologyLabel: getLangString('MOD_WF_BUTTON_APOLOGY'),
+            apologyAmount: this.levels !== undefined && !this.levels.apologyUnlocked()
+              ? `${fmt(apology.parts)} (${this.levels.lockText(this.levels.apologyLevel)})`
+              : fmt(apology.parts),
+            // What it buys sits in its tooltip, not on the button (the user, build .155), above what is missing.
+            apologyTip: [getLangString('MOD_WF_APOLOGY_NO_COOLDOWN'), apologyWhy].filter((l) => l !== ''),
             canSettle,
             canApologise,
             onSettle: () => { if (!this.refused('staff', { action: 'settle', folk })) payroll.settle(folk); },
@@ -676,10 +685,16 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         perkLines: (folk) => this.perkLines(folk),
         overtime: (folk) => {
           const p = this.perksOf(folk);
-          // The button exists only once mastery 30 unlocks it; the perk list already explains the effect.
-          return { unlocked: p.overtimeUnlocked, on: p.overtimeActive, text: getLangString(p.overtimeActive ? 'MOD_WF_OVERTIME_ON' : 'MOD_WF_OVERTIME_OFF') };
+          // The switch exists only once mastery 30 unlocks it; the perk list says the rest.
+          return { unlocked: p.overtimeUnlocked, on: p.overtimeActive, text: getLangString('MOD_WF_SWITCH_OVERTIME'), sub: getLangString('MOD_WF_SWITCH_OVERTIME_SUB') };
         },
         onToggleOvertime: (folk) => this.setOvertime(folk, !folk.overtime),
+        ownStock: (folk) => this.room?.ownStockView(folk),
+        onToggleOwnStock: (folk) => this.room?.setOwnStock(folk, !folk.ownStock),
+        onRestock: (folk, actions) => this.room?.restock(folk, actions ?? Infinity),
+        restockView: (folk) => this.room?.restockView(folk),
+        /** A language string for the card's own labels (the Restock panel). */
+        text: (key, vars) => (vars === undefined ? getLangString(key) : templateLangString(key, vars)),
         perksTitle: () => getLangString('MOD_WF_PERKS_TITLE'),
         /** The card's Gear button: "Gear 3/9", worn items in the tooltip, amber when something ran out (build .54). */
         gear: (folk) => {

@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-10-29.151';
+export const BUILD = '2026-10-30.157';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -122,6 +122,8 @@ export async function setup(ctx) {
   const qualification = await ctx.loadModule('src/qualification.mjs');
   const workOrderRules = await ctx.loadModule('src/work-orders-model.mjs');
   const workOrders = await ctx.loadModule('src/work-orders.mjs');
+  const daydreamRules = await ctx.loadModule('src/daydream-model.mjs');
+  const daydream = (await ctx.loadModule('src/daydream.mjs')).install({ model: daydreamRules });
 
   // 1. Language strings were installed in step 0 (needed before any skill/page name is read).
 
@@ -140,6 +142,7 @@ export async function setup(ctx) {
     tips,
     layout,
     dashboard,
+    daydream,
   });
   ctx.gameData.buildPackage((pkg) => {
     pkg.skills.add(Hiring);
@@ -177,6 +180,12 @@ export async function setup(ctx) {
   }
   // The Steward, Hiring's Summoning familiar: its tablet, recipe (Summoning 30) and synergies.
   await ctx.gameData.addPackage({ $schema: '', namespace: 'worker_folks', data: stewardRules.stewardPackage() });
+  // The bags a Folk wears in its Cape slot for a bigger room (build .152): Crafting recipes among the game's Bags.
+  const hasFull = game.registeredNamespaces.hasNamespace('melvorF');
+  await ctx.gameData.addPackage({ $schema: '', namespace: 'worker_folks', data: roomRules.bagPackage({ hasFull }, (id) => ({
+    name: getLangString(`MOD_WF_ITEM_${id}`),
+    description: templateLangString('MOD_WF_BAG_DESC', roomRules.bagRange(id)),
+  })) });
   Object.entries(gearData.LANG.items).forEach(([id, keys]) => {
     const item = game.items.getObjectByID(`worker_folks:${id}`);
     if (item === undefined) return;
@@ -314,10 +323,12 @@ export async function setup(ctx) {
     log,
   });
 
-  // 7c. The Folk's room: output a full bank can't take waits there; every item a Folk makes is counted here (folkMade).
+  // 7c. The Folk's room: output a full bank can't take waits there; every item a Folk makes is counted here (folkMade);
+  //     a Folk set to work from its own stock takes its inputs from it.
   room.install(ctx, {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     model: roomRules,
+    resume,
     time,
     tips,
     log,

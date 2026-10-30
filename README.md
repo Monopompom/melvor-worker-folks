@@ -24,7 +24,10 @@ while you fight, raid or train something else.
 4. The **Hiring** page (sidebar, under the passive skills) is the crew overview. Its
    **Overview** block shows who is at work (trouble first), what your Folks made this session,
    the Payroll Reserve once unlocked, and your next Hiring unlock. Below it, a card per Folk
-   with its status, the skill it holds, what it is working on, and a Stop button. Fold a block
+   with its status, the skill it holds, what it is working on, and a Stop button; what needs you
+   (a strike, a debt, a Folk out of inputs or with bank and room full) sits right under its name,
+   with the button that fixes it. A card shorter than its neighbours fills the space with the
+   Folk's daydream, a new one every so often. Fold a block
    to its title or drag blocks and cards into your own order; Reset layout puts it back. The usual
    skill minibar floats at its side (mastery, milestones, the pet once found, quick-equip of
    Hiring gear, and the relics button in Ancient Relics).
@@ -66,8 +69,8 @@ on by default) turns the rule off.
 
 ## Gear
 
-Press **Gear** on a Folk card to open its gear window (**Details** holds the mastery perks and
-the Overtime toggle). Trainees carry a Cape and Gloves;
+Press **Gear** on a Folk card to open its gear window (**Details** holds the mastery perks;
+the Overtime and Own stock switches sit under the Folk's work). Trainees carry a Cape and Gloves;
 Apprentices add armour; Journeymen add Amulet, Ring and a Consumable; Masters add two
 Summon slots; Foremen add the Gem (Atlas of Discovery) and Enhancement slots (Into the
 Abyss). Click a slot to pick an item from your bank. For a Folk that already has a skill the
@@ -89,6 +92,32 @@ stop working at zero; buying charges turns them back on. When a stack runs out t
 empties and a notification names the Folk. Your own equipped tablets, consumables and
 charges are never spent by a Folk's work. From Hiring 50 Folks find Summoning marks at half
 your chance; before that they find none.
+
+## A Folk's room
+
+Every Folk has a room, measured in **hours of work**: 2 h for a Trainee up to 8 h for a
+Foreman. A bar on its card shows how full it is; hover it for the list.
+
+**A full bank.** An item a Folk makes that your bank can't take (a new kind and no free slot)
+waits in its room instead of being lost, and goes to the bank on its own once a slot frees.
+When the room is full too, the Folk stops ("Bank and room full").
+
+**Own stock.** The **Own stock** switch on a card makes the Folk take its recipe's inputs
+only from its room, never from your bank: a Folk on Steel Bars can't eat the Coal you keep
+for yourself. **Restock** on the card fills the free room with the inputs of its current
+recipe from your bank (as many actions as fit and as your bank has) and starts the Folk
+again; the arrow beside it opens a slider to restock only up to the hours you pick, with
+what that takes from your bank shown before you press it. When the stock runs out, the Folk stops ("Out of inputs"); its wages don't wait.
+Leftovers from an earlier recipe are used by any later recipe that needs them. Switching
+Own stock off sends the stock to your bank as far as it has space; what finds no free slot
+is lost, and the card warns you beside the switch.
+
+**Bags.** A Folk wearing a bag in its Cape slot gets a bigger room, in place of a skillcape:
+the **Folk Satchel** (Crafting 20: 40 Leather, 1 Amulet of Looting) adds a third of the
+tier's bag room, the **Folk Pack** (Crafting 50: a Satchel, 10 Bobby's Pockets, 150
+Mithril Bars, 6 Amulets) two thirds, the **Folk Frame Pack** (Crafting 80: a Pack, 250 Black
+Dragonhide, 400 Runite Bars, 12 Amulets) all of it: up to 4 h for a Trainee and 12 h for a Foreman. The recipes
+are with the game's Bags in Crafting (full game). A bag does nothing for you.
 
 ## Folk health
 
@@ -149,7 +178,8 @@ and the minutes left), another when the Payroll Reserve drops under an hour of w
 amber line on the card and in the Worker box, and the offline summary lists Folks that
 went into debt or struck while you were away. Put money back before the grace runs out
 and the owed wages are collected on the next action, ending the "In debt" state. Otherwise
-the skill stops, the Shift Slot is freed and the card turns red with the amount owed.
+the skill stops, the Shift Slot is freed and the card turns red with the amount owed
+(hover a grey Settle or Apologise to see how much you are short).
 Settling costs the owed wages plus severance (5% of that tier's next hire price). After
 settling, the Folk cools down (Trainee 30 min · Apprentice 1 h · Journeyman 2 h ·
 Master 4 h · Foreman 8 h, offline time counts). Pay three times the severance instead to
@@ -210,7 +240,7 @@ Skill XP; with all four worn you also get +8% Hiring Mastery XP. The **Hiring Sk
 **Superior Hiring Skillcape** (Hiring 120, 10M GP) gives -10% wages, -20% cooldown and
 +15 min of strike grace. Hiring gear is worn by **you** (the outfit, the capes and the Lesser
 Relic never show up in a Folk's gear window); the wage, grace and cooldown effects reach
-every Folk. Wage reliefs from the pool, gear, the pet, relics
+every Folk. The bags are the other way round: made for a Folk's Cape slot (see "A Folk's room"). Wage reliefs from the pool, gear, the pet, relics
 and the Hiring 100 milestone are capped at 30% of the Folk's current raise (12% for a fresh
 Folk, 30% at mastery 99); they soften the raises, never reverse them.
 

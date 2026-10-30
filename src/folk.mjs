@@ -53,6 +53,8 @@ export function createFolk({ id, slot, tier, name, hiredAt = 0, paid = null }) {
     paid: typeof paid === 'number' && Number.isFinite(paid) && paid >= 0 ? paid : null,
     /** What the Folk holds for you, in hours of work (src/room-model.mjs). */
     room: createRoom(),
+    /** Work from its own stock: inputs come from its room only, never from your bank (build .152). */
+    ownStock: false,
   };
 }
 
@@ -116,24 +118,30 @@ export function normalizeFolk(raw) {
   folk.traitState = normalizeTraitState(raw.traitState);
   folk.paid = typeof raw.paid === 'number' && Number.isFinite(raw.paid) && raw.paid >= 0 ? raw.paid : null;
   folk.room = normalizeRoom(raw.room);
+  folk.ownStock = raw.ownStock === true;
   return folk;
 }
 
-/** A Folk's room (src/room-model.mjs): { haul: { itemId: { qty, ms } } }, ms the work that made the stack. */
+/**
+ * A Folk's room (src/room-model.mjs): { haul: { itemId: { qty, ms } }, stock: { … } }. The haul is what it made and
+ * holds for you (ms the work that made the stack), the stock the inputs it works from (ms the work they feed).
+ */
 export function createRoom() {
-  return { haul: {} };
+  return { haul: {}, stock: {} };
 }
 
 /** A clean room from whatever the save holds: stacks with whole positive quantities and a time of 0 or more. */
 export function normalizeRoom(raw) {
   const room = createRoom();
-  const haul = raw?.haul;
-  if (haul === null || typeof haul !== 'object' || Array.isArray(haul)) return room;
-  for (const [id, entry] of Object.entries(haul)) {
-    if (id === '' || entry === null || typeof entry !== 'object') continue;
-    if (!Number.isInteger(entry.qty) || entry.qty <= 0) continue;
-    room.haul[id] = { qty: entry.qty, ms: Number.isFinite(entry.ms) && entry.ms > 0 ? entry.ms : 0 };
-  }
+  ['haul', 'stock'].forEach((side) => {
+    const stacks = raw?.[side];
+    if (stacks === null || typeof stacks !== 'object' || Array.isArray(stacks)) return;
+    for (const [id, entry] of Object.entries(stacks)) {
+      if (id === '' || entry === null || typeof entry !== 'object') continue;
+      if (!Number.isInteger(entry.qty) || entry.qty <= 0) continue;
+      room[side][id] = { qty: entry.qty, ms: Number.isFinite(entry.ms) && entry.ms > 0 ? entry.ms : 0 };
+    }
+  });
   return room;
 }
 
@@ -239,7 +247,7 @@ export const MIGRATIONS = {
   6: (root) => ({
     ...root,
     v: 7,
-    folks: (Array.isArray(root.folks) ? root.folks : []).map((f) => ({ ...f, room: { haul: {} } })),
+    folks: (Array.isArray(root.folks) ? root.folks : []).map((f) => ({ ...f, room: { haul: {}, stock: {} } })),
   }),
 };
 

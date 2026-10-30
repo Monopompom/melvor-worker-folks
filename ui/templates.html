@@ -21,7 +21,7 @@
 
 <template id="wf-folk-card-template">
   <div class="col-12 col-md-6 col-xl-4">
-    <!-- Sections: who, work, health, strike (only on a strike or debt), actions.
+    <!-- Sections: who, alert (only when something needs you), work (with the room and the switches), health, actions.
          The card is a flex column and the actions band sits at the bottom. Closed cards in a row share one height;
          open Details grow only their own card (equalizeCards in cards.mjs, build .61). -->
     <div class="block block-rounded border-top border-worker-folks border-4x wf-card" role="group">
@@ -51,6 +51,46 @@
             </div>
           </div>
         </div>
+        <!-- What needs you, right under the name (build .153): a strike, a full bank and room or an empty stock, a debt;
+             most urgent first, each with its own button. Hidden while nothing is wrong. -->
+        <div class="wf-band wf-band-alert d-none" data-wf="alert">
+          <div class="wf-alert-row d-none" data-wf="strike">
+            <div class="d-block font-w600" data-wf="strike-owed"></div>
+            <div class="wf-block font-w600 text-danger d-none" data-wf="strike-severance"></div>
+            <div class="wf-pay-row mt-2">
+              <button type="button" class="btn btn-sm btn-success wf-pay" data-wf="settle"><span data-wf="settle-label"></span><small data-wf="settle-amount"></small></button>
+              <button type="button" class="btn btn-sm btn-outline-success wf-pay" data-wf="apologise"><span data-wf="apologise-label"></span><small data-wf="apologise-amount"></small></button>
+            </div>
+            <small class="wf-block text-warning mt-1 d-none" data-wf="strike-why"></small>
+          </div>
+          <div class="wf-alert-row d-none" data-wf="room-alert">
+            <div class="wf-alert-split">
+              <div class="wf-min0">
+                <div class="font-w600 text-warning" data-wf="room-status"></div>
+                <small class="d-block wf-subtle" data-wf="room-why"></small>
+              </div>
+              <div class="wf-restock d-none" data-wf="alert-restock">
+                <button type="button" class="btn btn-sm btn-info wf-restock-fill"></button>
+                <button type="button" class="btn btn-sm btn-info wf-restock-more" aria-expanded="false"><i class="fa fa-caret-down" aria-hidden="true"></i></button>
+              </div>
+            </div>
+            <!-- Restock an amount (build .153): a slider from what the room holds to full, what it takes, its own Restock. -->
+            <div class="wf-restock-panel d-none" data-wf="alert-restock-panel">
+              <div class="wf-restock-label"><span class="wf-restock-up-to"></span><b class="wf-restock-value"></b></div>
+              <input type="range" class="wf-restock-range" min="1" max="1" step="1" value="1" />
+              <div class="wf-restock-ends"><small class="wf-restock-now"></small><small class="wf-restock-full"></small></div>
+              <small class="d-block wf-subtle wf-restock-cost"></small>
+              <small class="d-block text-warning wf-restock-bank d-none"></small>
+              <button type="button" class="btn btn-sm btn-info btn-block mt-2 wf-restock-go"></button>
+            </div>
+          </div>
+        </div>
+        <!-- The Folk's daydream (build .155): a game icon in a thought bubble and a line to match, changed every so often.
+             Only in a card's spare height while the alert band is empty (equalizeCards in cards.mjs). -->
+        <div class="wf-band wf-dream d-none" data-wf="dream">
+          <small class="wf-dream-text" data-wf="dream-text"></small>
+          <div class="wf-dream-bubble"><img class="wf-dream-icon" data-wf="dream-icon" alt="" /></div>
+        </div>
         <div class="wf-band wf-band-work">
           <div class="d-flex align-items-center justify-content-center wf-gap wf-skill-stop">
             <span class="font-w700 wf-card-skill" data-wf="skill"></span>
@@ -60,26 +100,43 @@
           <!-- Where the Folk stands: a line another mod gives (Voyage, phase 6b); hidden without one. -->
           <small class="d-block text-center wf-subtle d-none" data-wf="where"></small>
           <mastery-display class="wf-mastery mt-1" data-wf="mastery"></mastery-display>
-        </div>
-        <div class="wf-band wf-band-health text-center" data-wf="hp">
-          <div class="progress wf-hp-bar"><div class="progress-bar bg-danger" role="progressbar" data-wf="hp-bar"></div></div>
-          <small class="d-block" data-wf="hp-text"></small>
-          <small class="d-block" data-wf="food"></small>
-        </div>
-        <!-- What the Folk holds for you (a full bank's buffer); hidden while empty. -->
-        <div class="wf-band wf-band-room text-center d-none" data-wf="room">
-          <div class="progress wf-room-bar"><div class="progress-bar bg-info" role="progressbar" data-wf="room-bar"></div></div>
-          <small class="d-block" data-wf="room-text"></small>
-          <small class="d-block text-danger font-w600 d-none" data-wf="room-status"></small>
-        </div>
-        <div class="wf-band wf-band-strike d-none" data-wf="strike">
-          <div class="d-block font-w600" data-wf="strike-owed"></div>
-          <div class="wf-block font-w600 text-danger d-none" data-wf="strike-severance"></div>
-          <div class="wf-card-actions wf-stack mt-1">
-            <button type="button" class="btn btn-sm btn-outline-success" data-wf="apologise"></button>
-            <button type="button" class="btn btn-sm btn-success" data-wf="settle"></button>
+          <!-- The room holds the work's inputs and haul, so it sits with the work; hidden while empty and off. -->
+          <div class="wf-room mt-2 d-none" data-wf="room">
+            <div class="wf-room-head">
+              <small class="wf-min0" data-wf="room-text"></small>
+              <div class="wf-restock d-none" data-wf="restock">
+              <button type="button" class="btn btn-sm btn-outline-info wf-restock-fill"></button>
+              <button type="button" class="btn btn-sm btn-outline-info wf-restock-more" aria-expanded="false"><i class="fa fa-caret-down" aria-hidden="true"></i></button>
+            </div>
+            </div>
+            <div class="progress wf-room-bar"><div class="progress-bar bg-info" role="progressbar" data-wf="room-bar"></div><div class="progress-bar wf-room-preview" data-wf="room-preview"></div></div>
+            <!-- Restock an amount (build .153): a slider from what the room holds to full, what it takes, its own Restock. -->
+            <div class="wf-restock-panel d-none" data-wf="restock-panel">
+              <div class="wf-restock-label"><span class="wf-restock-up-to"></span><b class="wf-restock-value"></b></div>
+              <input type="range" class="wf-restock-range" min="1" max="1" step="1" value="1" />
+              <div class="wf-restock-ends"><small class="wf-restock-now"></small><small class="wf-restock-full"></small></div>
+              <small class="d-block wf-subtle wf-restock-cost"></small>
+              <small class="d-block text-warning wf-restock-bank d-none"></small>
+              <button type="button" class="btn btn-sm btn-info btn-block mt-2 wf-restock-go"></button>
+            </div>
           </div>
-          <small class="wf-block text-warning mt-1 d-none" data-wf="strike-why"></small>
+          <!-- The Folk's switches, always in sight (build .153): Overtime once mastery unlocks it, Own stock. -->
+          <div class="wf-switches" data-wf="switches">
+            <button type="button" class="wf-switch d-none" role="switch" aria-checked="false" data-wf="overtime">
+              <span class="wf-switch-track" aria-hidden="true"><span class="wf-switch-knob"></span></span>
+              <span class="wf-min0"><span class="d-block font-w600" data-wf="overtime-label"></span><small class="d-block wf-subtle" data-wf="overtime-sub"></small></span>
+            </button>
+            <button type="button" class="wf-switch" role="switch" aria-checked="false" data-wf="own-stock">
+              <span class="wf-switch-track" aria-hidden="true"><span class="wf-switch-knob"></span></span>
+              <span class="wf-min0"><span class="d-block font-w600" data-wf="own-stock-label"></span><small class="d-block d-none" data-wf="own-stock-note"></small></span>
+            </button>
+          </div>
+        </div>
+        <!-- Health on one line: the HP text, its bar, the food. -->
+        <div class="wf-band wf-band-health" data-wf="hp">
+          <small class="text-nowrap" data-wf="hp-text"></small>
+          <div class="progress wf-hp-bar"><div class="progress-bar bg-danger" role="progressbar" data-wf="hp-bar"></div></div>
+          <small data-wf="food"></small>
         </div>
         <div class="wf-band wf-band-actions">
           <!-- Promote on a line of its own, full width like the HP bar, so Fire never wraps (build .61, user layout);
@@ -93,12 +150,12 @@
             <button type="button" class="btn btn-sm btn-outline-info" data-wf="traits-button"></button>
             <button type="button" class="btn btn-sm btn-outline-danger ml-auto" data-wf="fire"></button>
           </div>
-          <!-- Why Promote, Gear or Fire is grey: another mod's refusal (Voyage), in Worker Folks' own card. -->
-          <small class="wf-block text-warning mt-1 d-none" data-wf="staff-why"></small>
+          <!-- Why Promote, Gear or Fire is grey: another mod's refusal (Voyage), in Worker Folks' own card; one line that
+               slides when it is too long (build .154). -->
+          <small class="wf-marquee text-warning mt-1 d-none" data-wf="staff-why"><span class="wf-marquee-text"></span></small>
           <div class="wf-details d-none mt-2" data-wf="details">
             <div class="wf-band-head mb-1" data-wf="perks-title"></div>
-            <ul class="pl-3 mb-2" data-wf="perks"></ul>
-            <button type="button" class="btn btn-sm btn-outline-warning d-none" data-wf="overtime" aria-pressed="false"></button>
+            <ul class="pl-3 mb-0" data-wf="perks"></ul>
           </div>
         </div>
       </div>

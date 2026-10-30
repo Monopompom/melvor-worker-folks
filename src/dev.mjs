@@ -242,13 +242,26 @@ export function install({ hiring, log, tiers }) {
       hiring.workOrders?.advance(Math.round(hours * 72000));
       return hiring.workOrders?.board?.ticks;
     },
-    /** What a Folk holds in its room: one row a stack, its work in minutes. */
+    /** What a Folk holds in its room: one row a stack (haul or stock), its work in minutes. */
     room(id) {
       const folk = hiring.crew.byId(ref(id));
       if (folk === undefined) return null;
-      const rows = Object.entries(folk.room?.haul ?? {}).map(([item, e]) => ({ item, qty: e.qty, minutes: Math.round((e.ms / 60000) * 100) / 100 }));
+      const rows = ['haul', 'stock'].flatMap((side) => Object.entries(folk.room?.[side] ?? {})
+        .map(([item, e]) => ({ side, item, qty: e.qty, minutes: Math.round((e.ms / 60000) * 100) / 100 })));
       console.table(rows);
       return rows;
+    },
+    /** ownStock(id, on): the Folk's "Work from its own stock" switch, as its button does it. */
+    ownStock(id, on = true) {
+      const folk = hiring.crew.byId(ref(id));
+      if (folk === undefined) return null;
+      hiring.room?.setOwnStock(folk, on);
+      return folk.ownStock;
+    },
+    /** restock(id, actions?): the card's Restock; with a count, at most that many actions' inputs (the slider). */
+    restock(id, actions) {
+      const folk = hiring.crew.byId(ref(id));
+      return folk === undefined ? null : hiring.room?.restock(folk, actions ?? Infinity);
     },
     /** bankFull(true): the bank reads as having no free slot (nothing is moved); bankFull(false) puts it back. */
     bankFull(on = true) {
@@ -259,6 +272,6 @@ export function install({ hiring, log, tiers }) {
     tiers: tiers.slice(),
   };
   globalThis.workerFolksDev = api;
-  log('dev commands (a Folk = its row in list(), its name or its id): workerFolksDev.spawn(tier, name?) | fire(id) | assign(id, skillId) | strike(id, debt?) | debt(id, gp?) | cooldown(id, ticks) | reset(id) | hp(id, hp) | kill(id) | thaw(slot?) | loadout(id) | gear(id, skillId?, {replace, qty}) | reserve() | mastery(id, level) | poolXP(xp) | list() | clear() | dump() | load(root) | shiftSlots(n) | delegated() | pet() | relics(n) | orders() | orderClock(hours) | room(id) | bankFull(on)');
+  log('dev commands (a Folk = its row in list(), its name or its id): workerFolksDev.spawn(tier, name?) | fire(id) | assign(id, skillId) | strike(id, debt?) | debt(id, gp?) | cooldown(id, ticks) | reset(id) | hp(id, hp) | kill(id) | thaw(slot?) | loadout(id) | gear(id, skillId?, {replace, qty}) | reserve() | mastery(id, level) | poolXP(xp) | list() | clear() | dump() | load(root) | shiftSlots(n) | delegated() | pet() | relics(n) | orders() | orderClock(hours) | room(id) | ownStock(id, on) | restock(id, actions?) | bankFull(on)');
   return api;
 }

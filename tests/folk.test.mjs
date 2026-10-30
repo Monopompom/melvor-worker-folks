@@ -5,7 +5,7 @@ import { createFolk, normalizeFolk, migrateRoot, parseRoot, serializeRoot, norma
 
 test('createFolk fills defaults and rejects bad input', () => {
   const f = createFolk({ id: 'a', slot: 0, tier: 'Newbie', name: 'Ada' });
-  assert.deepEqual(f, { id: 'a', slot: 0, tier: 'Newbie', name: 'Ada', skillId: null, loadout: {}, debt: 0, debtCurrency: null, debtMs: 0, onStrike: false, cooldownTicks: 0, wageCarry: 0, overtime: false, strikes: 0, restartWhenReady: false, hp: null, place: null, travel: 'idle', hiredAt: 0, traitState: { traits: [], waiting: [], counts: {} }, paid: null, room: { haul: {} } });
+  assert.deepEqual(f, { id: 'a', slot: 0, tier: 'Newbie', name: 'Ada', skillId: null, loadout: {}, debt: 0, debtCurrency: null, debtMs: 0, onStrike: false, cooldownTicks: 0, wageCarry: 0, overtime: false, strikes: 0, restartWhenReady: false, hp: null, place: null, travel: 'idle', hiredAt: 0, traitState: { traits: [], waiting: [], counts: {} }, paid: null, room: { haul: {}, stock: {} }, ownStock: false });
   assert.equal(createFolk({ id: 'a', slot: 0, tier: 'Newbie', name: 'Ada', paid: 4200 }).paid, 4200);
   assert.throws(() => createFolk({ id: 'a', slot: -1, tier: 'Newbie', name: 'Ada' }));
   assert.throws(() => createFolk({ id: 'a', slot: 0, tier: 'Boss', name: 'Ada' }));
@@ -116,9 +116,10 @@ test('a real v3 save migrates to v7: every Folk kept as it was, with no place, n
   assert.equal(r.root.v, 7);
   assert.equal(r.root.folks.length, before.folks.length);
   r.root.folks.forEach((folk, i) => {
-    const { place, travel, traitState, paid, room, ...rest } = folk;
+    const { place, travel, traitState, paid, room, ownStock, ...rest } = folk;
     assert.equal(paid, null);
-    assert.deepEqual(room, { haul: {} });
+    assert.deepEqual(room, { haul: {}, stock: {} });
+    assert.equal(ownStock, false);
     assert.equal(place, null);
     assert.equal(travel, 'idle');
     assert.deepEqual(traitState, { traits: [], waiting: [], counts: {} });
@@ -143,9 +144,14 @@ test('place and travel: only plain integer hexes and known states survive', () =
 test('a room rides in the save and reads back as it was', () => {
   const folk = createFolk({ id: 'r', slot: 0, tier: 'Junior', name: 'Rook' });
   folk.room.haul['melvorD:Bird_Nest'] = { qty: 4, ms: 12_000 };
+  folk.room.stock['melvorD:Coal_Ore'] = { qty: 90, ms: 45_000 };
+  folk.ownStock = true;
   const back = parseRoot(serializeRoot([folk]));
-  assert.deepEqual(back.root.folks[0].room, { haul: { 'melvorD:Bird_Nest': { qty: 4, ms: 12_000 } } });
-  assert.deepEqual(normalizeFolk({ ...folk, room: 'full' }).room, { haul: {} });
+  assert.deepEqual(back.root.folks[0].room, { haul: { 'melvorD:Bird_Nest': { qty: 4, ms: 12_000 } }, stock: { 'melvorD:Coal_Ore': { qty: 90, ms: 45_000 } } });
+  assert.equal(back.root.folks[0].ownStock, true);
+  assert.deepEqual(normalizeFolk({ ...folk, room: 'full' }).room, { haul: {}, stock: {} });
+  assert.equal(normalizeFolk({ ...folk, ownStock: 'yes' }).ownStock, false);
+  assert.equal(normalizeFolk({ ...folk, ownStock: true }).ownStock, true);
 });
 
 test('normalizeLost keeps whole stacks of frozen slots only', () => {

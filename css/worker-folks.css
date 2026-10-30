@@ -12,6 +12,7 @@
   --wf-dis-text: #6c757d; --wf-dis-line: #b6bec7;
   /* build .112 (scan A-36, B-18): band edges and dimmed icons are tokens too; a dimmed icon keeps more ink on white */
   --wf-edge-strike: #bf1f1f; --wf-edge-debt: #d99a1e; --wf-dim: .65;
+  --wf-dream: #f3e6c4; --wf-dream-edge: rgba(120,88,36,0.28); /* build .155: the daydream's thought bubble, a warm sepia */
 }
 body.darkMode {
   --wf-band: rgba(255,255,255,0.045); --wf-tile: rgba(255,255,255,0.03); --wf-well: rgba(0,0,0,0.2);
@@ -21,6 +22,7 @@ body.darkMode {
   --wf-working: #5ccf6b; --wf-idle: #aab4be; --wf-strike: #ff6b6b; --wf-cooldown: #6fb3ff; --wf-debt: #f0b84a; --wf-alert: #f0b84a;
   --wf-dis-text: #8a949e; --wf-dis-line: #5c6873;
   --wf-edge-strike: #bf1f1f; --wf-edge-debt: #c98a16; --wf-dim: .4;
+  --wf-dream: #cdb98b; --wf-dream-edge: transparent;
 }
 /* Super Dark (body.darkMode.superDark, build .105 after the design canvas): blocks are pure black, so a black well
    vanishes and Dark's faint tints barely show: wells, bands, lines and tracks are a step stronger light tints, and the
@@ -30,6 +32,7 @@ body.darkMode.superDark {
   --wf-line: rgba(255,255,255,0.14); --wf-row-line: rgba(255,255,255,0.07); --wf-track: rgba(255,255,255,0.1);
   --wf-subtle: #b0b0b0; --wf-head: #9e9e9e; --wf-grip: #6a6a6a; --wf-idle: #a8a8a8;
   --wf-dis-text: #8a8a8a; --wf-dis-line: #4a4a4a;
+  --wf-dream: #9c8a63; /* on pure black a light bubble glares: an old-paper brown */
 }
 /* The game's progress tracks on our bands (build .107): Dark's track #2d3542 is the band's own tone, so
    the card's mastery and HP tracks vanished; inside a band they take our track tint, which lands within a shade of
@@ -107,8 +110,70 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 .wf-card-body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; }
 .wf-band { background: var(--wf-band); border-radius: 6px; padding: 12px; } /* 12px on the page (build .87); 20px in popups */
 .wf-band-actions { margin-top: auto; }
-.wf-band-strike { box-shadow: inset 3px 0 0 var(--wf-edge-strike); }
-.wf-band-strike.wf-debt-block { box-shadow: inset 3px 0 0 var(--wf-edge-debt); }
+/* The alert band (build .153): amber edge for a debt or an empty stock, red for a strike or a full bank and room; its
+   rows, most urgent first, split by a line. */
+.wf-band-alert { box-shadow: inset 3px 0 0 var(--wf-edge-debt); }
+.wf-band-alert.wf-alert-strike { box-shadow: inset 3px 0 0 var(--wf-edge-strike); }
+.wf-alert-row:not(.d-none) ~ .wf-alert-row:not(.d-none) { border-top: 1px solid var(--wf-line-soft); margin-top: 10px; padding-top: 10px; }
+.wf-alert-split { display: flex; align-items: center; gap: 10px; }
+.wf-alert-split > :first-child { flex: 1 1 auto; }
+/* Settle and Apologise side by side, the price under the word. */
+.wf-pay-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.wf-pay { display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.25; white-space: normal; }
+.wf-pay small { font-weight: 400; font-size: 0.8rem; }
+/* The Folk's daydream (build .155): its line on top, then a thought bubble with a game icon, filling a card's spare
+   height. The bubble keeps room under it for its two puffs. */
+.wf-dream { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; }
+.wf-dream-bubble { position: relative; display: flex; align-items: center; justify-content: center; width: 132px; height: 84px; margin-bottom: 24px; border-radius: 50%;
+  background: var(--wf-dream); box-shadow: 0 0 0 1px var(--wf-dream-edge); }
+.wf-dream-bubble::before, .wf-dream-bubble::after { content: ''; position: absolute; border-radius: 50%; background: var(--wf-dream); box-shadow: 0 0 0 1px var(--wf-dream-edge); }
+.wf-dream-bubble::before { width: 22px; height: 14px; left: 22px; bottom: -14px; }
+.wf-dream-bubble::after { width: 12px; height: 8px; left: 12px; bottom: -24px; }
+.wf-dream-icon { width: 52px; height: 52px; object-fit: contain; }
+.wf-dream-text { margin-bottom: 14px; max-width: 280px; color: var(--wf-subtle); font-style: italic; }
+.wf-dream-in .wf-dream-bubble, .wf-dream-in .wf-dream-text { animation: wf-dream-in .8s ease-out; }
+@keyframes wf-dream-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .wf-dream-in .wf-dream-bubble, .wf-dream-in .wf-dream-text { animation: none; } }
+/* The room meter in the work band: its line centred over the bar like the rest of the band, Restock at the right. */
+.wf-room-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; margin-bottom: 4px; }
+.wf-room-head > small { grid-column: 2; text-align: center; }
+.wf-room-head > .wf-restock { grid-column: 3; justify-self: end; }
+/* Restock as a split button: the word fills the free room, the caret opens the amount panel. */
+.wf-restock { display: inline-flex; flex: none; }
+.wf-restock .wf-restock-fill:has(+ .wf-restock-more:not(.d-none)) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.wf-restock .wf-restock-more { margin-left: -1px; padding-left: 0.5rem; padding-right: 0.5rem; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.wf-restock .btn-info.wf-restock-more { border-left-color: rgba(255,255,255,0.35); }
+.wf-restock-panel { margin-top: 8px; padding: 10px 12px; border-radius: 6px; background: var(--wf-well); border: 1px solid var(--wf-line-soft); }
+.wf-restock-label { display: flex; justify-content: space-between; gap: 8px; font-size: 0.85rem; color: var(--wf-subtle); }
+.wf-restock-label b { color: var(--wf-hover); }
+.wf-restock-range { display: block; width: 100%; margin: 6px 0 0; accent-color: var(--wf-cooldown); }
+.wf-restock-ends { display: flex; justify-content: space-between; color: var(--wf-subtle); margin-bottom: 6px; }
+.wf-room-preview { background-color: var(--wf-cooldown); opacity: 0.4; }
+/* The Folk's switches under the work: a track and knob, the label and a line under it. */
+.wf-switches { display: flex; flex-direction: column; border-top: 1px solid var(--wf-line-soft); margin-top: 10px; padding-top: 6px; }
+.wf-switch { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 4px; background: none; border: 0; border-radius: 4px; color: inherit; text-align: left; }
+.wf-switch:hover:not(:disabled) { background: var(--wf-tile); }
+.wf-switch:focus-visible { outline: 2px solid var(--wf-cooldown); outline-offset: 1px; }
+.wf-switch:disabled { opacity: 0.6; cursor: default; }
+.wf-switch-track { position: relative; flex: none; width: 36px; height: 20px; border-radius: 10px; background: var(--wf-dis-line); transition: background-color .15s; }
+.wf-switch-knob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; }
+.wf-switch-on .wf-switch-knob { left: 18px; }
+.wf-switch-on .wf-switch-track { background: var(--wf-cooldown); }
+.wf-switch-warn.wf-switch-on .wf-switch-track { background: var(--wf-alert); }
+.wf-switch small { white-space: pre-line; } /* a note's second sentence on a line of its own */
+/* Health on one line: the HP text, its bar, the food (which wraps under when long). */
+.wf-band-health { display: flex; flex-wrap: wrap; align-items: center; column-gap: 10px; row-gap: 2px; }
+.wf-band-health .wf-hp-bar { flex: 1 1 60px; margin-bottom: 0; }
+.wf-hp-food { flex: 0 1 auto; }
+/* Why Promote, Gear or Fire is grey, on one line: when it is longer than the card it slides to its end and back. */
+.wf-marquee { display: block; overflow: hidden; white-space: nowrap; }
+.wf-marquee-text { display: inline-block; }
+.wf-marquee-run .wf-marquee-text { animation: wf-marquee var(--wf-marquee-time, 6s) ease-in-out infinite alternate; }
+@keyframes wf-marquee { 0%, 15% { transform: translateX(0); } 85%, 100% { transform: translateX(var(--wf-marquee-shift, 0)); } }
+@media (prefers-reduced-motion: reduce) {
+  .wf-marquee { white-space: normal; }
+  .wf-marquee-run .wf-marquee-text { animation: none; }
+}
 /* On Thieving without food: the card's top border turns amber (the food line says why). */
 .wf-card-alert { border-color: var(--wf-alert) !important; }
 .wf-card-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
@@ -277,9 +342,6 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 /* Card layout: full-width sections under the portrait row, a button row with even gaps. */
 .wf-min0 { min-width: 0; }
 .wf-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-/* The strike band's Apologise and Settle: each full width on its own line (the user, build .102; their labels are too
-   long to share a line on a card). */
-.wf-card-actions.wf-stack { flex-direction: column; align-items: stretch; }
 /* Gear modal: the game's popup width and padding, no extra of ours (build .68); the bonus band spans the popup. */
 .wf-gear-head { margin-bottom: 0.75rem; }
 .wf-picker-head { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
@@ -304,8 +366,8 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 /* Custom checkbox: the box is positioned for the game's 14 px text; centre it on our bigger label. */
 .wf-ui .custom-control-label { display: inline-flex; align-items: center; min-height: 1.5rem; }
 .wf-ui .custom-control-label::before, .wf-ui .custom-control-label::after { top: 50% !important; transform: translateY(-50%); }
-.wf-hp-bar { height: 6px; margin-bottom: 2px; }
-.wf-room-bar { height: 6px; margin-bottom: 2px; }
+.wf-hp-bar { height: 6px; }
+.wf-room-bar { height: 6px; }
 /* Dimmed: the portrait, title and countdown; the lost items' tiles stay at full strength, as in the bank. */
 .wf-frozen [data-wf="title"], .wf-frozen [data-wf="text"] { opacity: 0.75; }
 .wf-frozen-portrait { filter: grayscale(1) brightness(0.6); }

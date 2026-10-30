@@ -104,9 +104,13 @@ export function install(ctx, { getHiring, time, log }) {
       const skill = this.skills.getObjectByID(skillId);
       if (skill !== undefined && hiring.isDelegated(skill)) return;
       const d = describe(skillId);
-      // Stopped by a full bank and room (build .151): that reason and its fix, not "out of materials".
-      const full = hiring.room?.isFull(hiring.crew.bySkill(skillId)) === true;
-      lines.push({ media: d.media, html: fill('MOD_WF_OFFLINE_STOPPED', { name: d.name, skill: d.skill, why: getLangString(full ? 'MOD_WF_OFFLINE_STOPPED_ROOM_WHY' : 'MOD_WF_OFFLINE_STOPPED_WHY') }, { why: 'text-danger' }, d.media), fix: getLangString(full ? 'MOD_WF_OFFLINE_STOPPED_ROOM_FIX' : 'MOD_WF_OFFLINE_STOPPED_FIX') });
+      // Stopped by a full bank and room (build .151), or out of its own stock (build .152): that reason and its fix,
+      // not "out of materials".
+      const folk = hiring.crew.bySkill(skillId);
+      const full = hiring.room?.isFull(folk) === true;
+      const out = !full && hiring.room?.isDry(folk) === true;
+      const key = full ? 'ROOM_' : out ? 'DRY_' : '';
+      lines.push({ media: d.media, html: fill('MOD_WF_OFFLINE_STOPPED', { name: d.name, skill: d.skill, why: getLangString(`MOD_WF_OFFLINE_STOPPED_${key}WHY`) }, { why: 'text-danger' }, d.media), fix: getLangString(`MOD_WF_OFFLINE_STOPPED_${key}FIX`) });
     });
     // What a Folk's room holds on your return, its skill's icon first: kept there while the bank had no free slot.
     if (hiring.room !== undefined) hiring.crew.all.forEach((folk) => {
