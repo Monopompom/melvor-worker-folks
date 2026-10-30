@@ -275,7 +275,9 @@ difficulty) through Easy (¼), Relaxed (½), **Standard** (full wages, the defau
 Hard (×2), Brutal (×3) to **Evil hardcore** (×5); Abyssal
 Pieces wages on/off, Hiring XP rate (default 100%), and **Hide Folks' gain popups**
 (off by default: when on, the XP, item, currency and mastery popups from your Folks' work stay hidden;
-level-ups, warnings and your own popups still show).
+level-ups, warnings and your own popups still show), and **Faster mastery displays** (on by default:
+mastery bars are updated without searching the whole page on every mastery gain; off brings back the
+game's own search, in case a mastery bar from another mod stops updating).
 
 ## Languages
 
