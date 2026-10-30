@@ -20,7 +20,7 @@ const swalClass = (extra = {}) => {
   return typeof createSwalCustomClass === 'function' ? createSwalCustomClass(cls) : cls;
 };
 
-export function createHiringClass({ popupDidRender, titleName = (s) => s, time, numbers, selectDelegable, log, createCrew, createEventBus, createGuards, folkView, folkModel, pickName, renderFolkCards, renderReservePanel, produceRate, rules, perks, promotion, pricing, tips, layout, dashboard, daydream }) {
+export function createHiringClass({ popupDidRender, titleName = (s) => s, time, numbers, selectDelegable, log, createCrew, createEventBus, createGuards, folkView, folkModel, pickName, renderFolkCards, cardListId, renderReservePanel, produceRate, rules, perks, promotion, pricing, tips, layout, dashboard, daydream }) {
   class FolkSlotAction extends MasteryAction {
     constructor(namespace, data, game, skill) {
       super(namespace, data, game);
@@ -78,6 +78,12 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       this.acting = undefined;
       /** Outcome of the most recent delegated action: 'fail' | 'ok' | 'bonus'. */
       this.lastOutcome = undefined;
+      /**
+       * folk → { level, overtime, perks } while the delegated skills tick (delegation.mjs): a Folk action asks for its
+       * perks a dozen times (wages, traits, status). A mastery level or an Overtime switch counts at once; anything else
+       * on the next tick.
+       */
+      this.perksMemo = undefined;
       this.events.on('crewChanged', () => {
         this.renderQueue.folks = true;
         this.sortedMasteryActions.forEach((a) => this.renderQueue.actionMastery.add(a));
@@ -881,9 +887,29 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
     }
 
     perksOf(folk) {
+      const level = this.masteryLevelOf(folk);
+      const memo = this.perksMemo?.get(folk);
+      if (memo !== undefined && memo.level === level && memo.overtime === folk.overtime) return memo.perks;
       // Workaholic makes Overtime cheaper, on top of the Hiring 85 milestone.
       const overtimeWageFactor = (this.levels?.overtimeWageFactor() ?? 2) * this.traitEffects(folk).overtimeWageFactor;
-      return perks.combinedPerks(this.masteryLevelOf(folk), this.bonusPerks(), { overtimeOn: folk.overtime, overtimeWageFactor });
+      const result = perks.combinedPerks(level, this.bonusPerks(), { overtimeOn: folk.overtime, overtimeWageFactor });
+      this.perksMemo?.set(folk, { level, overtime: folk.overtime, perks: result });
+      return result;
+    }
+
+    /**
+     * A Hiring mastery shows only on its Folk's card. The game looks for a mastery's displays in the whole page (over
+     * 100,000 elements with the skill pages built): each Folk action paid that search once more, and a crew change once
+     * per slot. The search stays inside the card list.
+     */
+    updateMasteryDisplays(action) {
+      const list = document.getElementById(cardListId);
+      if (list === null) {
+        super.updateMasteryDisplays(action);
+        return;
+      }
+      const progress = this.getMasteryProgress(action);
+      list.querySelectorAll(`mastery-display[data-action-id="${action.id}"]`).forEach((display) => display.updateValues(progress));
     }
 
     /** What the Folk's earned traits add up to (nothing before the traits slice is in). */

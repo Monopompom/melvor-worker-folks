@@ -5,10 +5,61 @@
 
 export function install(ctx, { getHiring, rate, log }) {
   let hiring;
-  /** folk.id → { table, dirty } */
+  /** folk.id → { table, dirty, key, skillId, memo } */
   const tables = new Map();
+  /**
+   * What the Folk tables hold of the player's stat providers: provider → { table, sources, lists }, the provider's
+   * entries as they were last copied. null until a table is built.
+   */
+  let copied = null;
 
   const invalidateAll = () => tables.forEach((t) => { t.dirty = true; });
+
+  const providers = () => {
+    const out = [];
+    game.combat.statProviders.forEach((provider) => { if (provider.modifiers !== undefined) out.push(provider); });
+    return out;
+  };
+  const snapshot = (provider) => {
+    const table = provider.modifiers;
+    return { table, sources: [...table.entries.keys()], lists: [...table.entries.values()].map((list) => [...list]) };
+  };
+  const unchanged = (snap, table) => {
+    if (snap.table !== table || snap.sources.length !== table.entries.size) return false;
+    let i = 0;
+    for (const [source, list] of table.entries) {
+      const was = snap.lists[i];
+      if (snap.sources[i] !== source || was.length !== list.length) return false;
+      for (let j = 0; j < list.length; j += 1) if (was[j] !== list[j]) return false;
+      i += 1;
+    }
+    return true;
+  };
+  /**
+   * The player's modifiers were worked out again. Every mastery level-up does it, and with a dozen Folks on fresh
+   * actions that is every few seconds: rebuilding each Folk's table from nothing was most of the offline loop's time.
+   * Only the providers that changed are swapped in the built tables, with the game's own removeTable and addTable.
+   */
+  const syncProviders = () => {
+    if (copied === null) return;
+    const now = providers();
+    if (now.length !== copied.size || now.some((p) => !copied.has(p))) {
+      invalidateAll();
+      copied = new Map(now.map((p) => [p, snapshot(p)]));
+      return;
+    }
+    now.forEach((provider) => {
+      const snap = copied.get(provider);
+      if (unchanged(snap, provider.modifiers)) return;
+      const old = { entries: new Map(snap.sources.map((source, i) => [source, snap.lists[i]])) };
+      tables.forEach((t) => {
+        if (t.dirty) return;
+        t.table.removeTable(old);
+        t.table.addTable(provider.modifiers);
+      });
+      copied.set(provider, snapshot(provider));
+    });
+  };
 
   const workingExperts = (exceptFolk) => {
     let n = 0;
@@ -21,19 +72,8 @@ export function install(ctx, { getHiring, rate, log }) {
 
   const sourceFor = (folk) => hiring.sortedMasteryActions[folk.slot] ?? hiring;
 
-  const buildTable = (folk, skill) => {
-    const table = new PlayerModifierTable();
-    table.init(game);
-    // Everything the player has earned that is not worn: pets, shop, potions,
-    // Agility, Astrology, Township, mastery tokens, skill trees...
-    game.combat.statProviders.forEach((provider) => {
-      if (provider.modifiers !== undefined) table.addTable(provider.modifiers);
-    });
-    if (game.currentGamemode.playerModifiers !== undefined) {
-      table.addModifiers(game.currentGamemode, game.currentGamemode.playerModifiers);
-    }
-    // The Folk's own gear (never the player's): items, item synergies, inherited capes, summon synergy.
-    hiring.loadout?.modifierSources(folk, skill).forEach(({ source, modifiers }) => table.addModifiers(source, modifiers));
+  /** The Folk's own part of its table, as modifier data: tier, perks, traits, crew bonus, the Steward. */
+  const ownData = (folk, skill) => {
     const tier = rate.tierModifiers(folk.tier, { preservationDisabled: !!game.currentGamemode.disablePreservation });
     const perk = hiring.perksOf?.(folk) ?? { skillXP: 0, intervalPercent: 0 };
     // Earned traits: Specialist only in its own skill, Night Owl only while the player fights.
@@ -48,18 +88,41 @@ export function install(ctx, { getHiring, rate, log }) {
     if (preservation !== 0) data.skillPreservationChance = [{ skillID: skill.id, value: preservation }];
     if (bonusXP !== 0) data.skillXP = [{ skillID: skill.id, value: bonusXP }];
     if (trait.doubling !== 0) data.skillItemDoublingChance = [{ skillID: skill.id, value: trait.doubling }];
+    return data;
+  };
+
+  const buildTable = (folk, skill, data = ownData(folk, skill)) => {
+    // The built tables and the copy record catch up first, so this table and they hold the same provider entries.
+    if (copied === null) copied = new Map(providers().map((p) => [p, snapshot(p)]));
+    else syncProviders();
+    const table = new PlayerModifierTable();
+    table.init(game);
+    // Everything the player has earned that is not worn: pets, shop, potions,
+    // Agility, Astrology, Township, mastery tokens, skill trees...
+    providers().forEach((provider) => table.addTable(provider.modifiers));
+    if (game.currentGamemode.playerModifiers !== undefined) {
+      table.addModifiers(game.currentGamemode, game.currentGamemode.playerModifiers);
+    }
+    // The Folk's own gear (never the player's): items, item synergies, inherited capes, summon synergy.
+    hiring.loadout?.modifierSources(folk, skill).forEach(({ source, modifiers }) => table.addModifiers(source, modifiers));
     if (Object.keys(data).length > 0) table.addModifiers(sourceFor(folk), game.getModifierValuesFromData(data));
     return table;
   };
 
   const tableFor = (folk, skill) => {
     let entry = tables.get(folk.id);
-    // Night Owl's XP counts only while the player fights: such a table follows combat starting and ending.
-    const fighting = hiring.traits?.followsCombat(folk) === true && hiring.traits.fighting();
-    if (entry === undefined || entry.dirty || entry.skillId !== skill.id || entry.fighting !== fighting) {
-      entry = { table: buildTable(folk, skill), dirty: false, skillId: skill.id, fighting };
+    // Within one tick of the delegated skills (one perks memo) the Folk's own part is worked out once.
+    const memo = hiring.perksMemo;
+    if (entry !== undefined && !entry.dirty && memo !== undefined && entry.memo === memo && entry.skillId === skill.id) return entry.table;
+    // The Folk's own part is compared each time: perks, traits (Night Owl only while the player fights), the Steward,
+    // the crew bonus and Hiring's level all count as soon as they change.
+    const data = ownData(folk, skill);
+    const key = `${skill.id}|${JSON.stringify(data)}`;
+    if (entry === undefined || entry.dirty || entry.key !== key) {
+      entry = { table: buildTable(folk, skill, data), dirty: false, key, skillId: skill.id };
       tables.set(folk.id, entry);
     }
+    entry.memo = memo;
     return entry.table;
   };
 
@@ -119,8 +182,8 @@ export function install(ctx, { getHiring, rate, log }) {
     return acting !== undefined ? acting.table : next();
   });
 
-  // 2. Rebuild lazily whenever the player's own modifiers recompute.
-  ctx.patch(Player, 'computeModifiers').after(() => invalidateAll());
+  // 2. The player's own modifiers recomputed: the providers that changed are swapped in the built tables.
+  ctx.patch(Player, 'computeModifiers').after(() => syncProviders());
 
   // 3. Timers started for a delegated skill use the Folk's interval.
   ctx.patch(GatheringSkill, 'startActionTimer').replace(function (original) {

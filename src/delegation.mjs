@@ -187,6 +187,7 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
     if (hiring === undefined || this.isGolbinRaid || this._isPaused || hiring.delegated.size === 0) return;
     ticking = true;
     hiring.folkTurn = true; // quiet-popups.mjs: what these ticks queue comes from the Folks
+    hiring.perksMemo = new Map(); // each Folk's perks worked out once this tick (hiring-skill.mjs perksOf)
     try {
       for (const skill of Array.from(hiring.delegated)) {
         try {
@@ -210,6 +211,7 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
     } finally {
       ticking = false;
       hiring.folkTurn = false;
+      hiring.perksMemo = undefined;
     }
   });
 

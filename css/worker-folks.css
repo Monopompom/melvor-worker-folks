@@ -414,9 +414,10 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 
 /* Mod Settings window (user feedback, 16 Oct 2026: "looks small"). The game opens every mod's settings with
    font-size-sm and puts each hint in <small>, so hints came out near 11px. Scoped to the window that holds this mod's
-   settings (inputs are id'd "worker_folks:name"): labels at body size, hints 0.9rem, dropdowns 1rem. */
+   settings (inputs are id'd "worker_folks:name"): labels at body size, hints 0.9rem, dropdowns 1rem. A "\n" in a
+   hint starts a new line. */
 .mm__container:has([id^="worker_folks:"]) { font-size: 1rem !important; }
-.mm__container:has([id^="worker_folks:"]) label > small, .mm__container:has([id^="worker_folks:"]) small.d-block { font-size: .9rem !important; line-height: 1.45; }
+.mm__container:has([id^="worker_folks:"]) label > small, .mm__container:has([id^="worker_folks:"]) small.d-block { font-size: .9rem !important; line-height: 1.45; white-space: pre-line; }
 .mm__container:has([id^="worker_folks:"]) .dropdown-toggle, .mm__container:has([id^="worker_folks:"]) .dropdown-menu, .mm__container:has([id^="worker_folks:"]) .btn { font-size: 1rem !important; }
 .mm__container:has([id^="worker_folks:"]) .content-heading { font-size: 1.25rem; }
 

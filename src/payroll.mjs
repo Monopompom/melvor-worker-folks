@@ -255,13 +255,16 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
   /** Reserve dropped under RESERVE_WARN_HOURS of the working crew: warn once until it is refilled past the line. */
   const reserveWarned = new Set();
   const warnReserve = (id) => {
+    // Offline the warning is never shown and the reserve only goes down: the whole crew's hourly wage was worked out
+    // after every Folk action all the same, most of what a Folk action cost the offline loop.
+    if (!game._isInOnlineLoop) return;
     const hours = api.hoursCovered(id);
     const reserve = hiring.crew.reserveOf(id);
     if (!wages.reserveLow(hours, reserve)) {
       if (hours >= wages.RESERVE_WARN_HOURS) reserveWarned.delete(id);
       return;
     }
-    if (reserveWarned.has(id) || !game._isInOnlineLoop) return;
+    if (reserveWarned.has(id)) return;
     reserveWarned.add(id);
     // Rounded down: under an hour must not read "covers 1.0 h" (build .81).
     const cur = currency(id);
