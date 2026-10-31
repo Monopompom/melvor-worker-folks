@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-10-30.159';
+export const BUILD = '2026-10-31.160';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -107,6 +107,7 @@ export async function setup(ctx) {
   const offline = await ctx.loadModule('src/offline.mjs');
   const produceRate = await ctx.loadModule('src/produce-rate.mjs');
   const acting = await ctx.loadModule('src/acting.mjs');
+  const { createTablePool } = await ctx.loadModule('src/table-pool-model.mjs');
   const thievingRate = await ctx.loadModule('src/thieving-rate.mjs');
   const roomRules = await ctx.loadModule('src/room-model.mjs');
   const room = await ctx.loadModule('src/room.mjs');
@@ -315,6 +316,7 @@ export async function setup(ctx) {
   acting.install(ctx, {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     rate: produceRate,
+    createTablePool,
     log,
   });
 

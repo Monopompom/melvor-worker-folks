@@ -3,10 +3,24 @@
 // roll (fail / ok / bonus) and tier flavour (no pets, interval, preservation,
 // crew bonus). Game-facing.
 
-export function install(ctx, { getHiring, rate, log }) {
+export function install(ctx, { getHiring, rate, createTablePool, log }) {
   let hiring;
   /** folk.id → { table, dirty, key, skillId, memo } */
   const tables = new Map();
+  /**
+   * One PlayerModifierTable per Folk, made once and refilled on every rebuild. The game's ModifierQuery caches its
+   * results in a Map keyed by table and never drops a table it was asked about: a new table per rebuild stayed in
+   * memory for good, and a long offline count ran the browser out of memory (1.5.0). A fired Folk's table goes to the
+   * next hire.
+   */
+  const newTable = () => {
+    const table = new PlayerModifierTable();
+    table.init(game);
+    return table;
+  };
+  const pool = createTablePool(newTable);
+  /** The dev check's fresh build, refilled each time for the same reason. */
+  let scratch;
   /**
    * What the Folk tables hold of the player's stat providers: provider → { table, sources, lists }, the provider's
    * entries as they were last copied. null until a table is built.
@@ -91,12 +105,13 @@ export function install(ctx, { getHiring, rate, log }) {
     return data;
   };
 
-  const buildTable = (folk, skill, data = ownData(folk, skill)) => {
+  /** Fills `table` from nothing: the player's providers, the game mode, the Folk's gear and own part. */
+  const buildTable = (table, folk, skill, data = ownData(folk, skill)) => {
     // The built tables and the copy record catch up first, so this table and they hold the same provider entries.
     if (copied === null) copied = new Map(providers().map((p) => [p, snapshot(p)]));
     else syncProviders();
-    const table = new PlayerModifierTable();
-    table.init(game);
+    // empty() also drops the table's own query caches; the game's queries see that and work their results out again.
+    table.empty();
     // Everything the player has earned that is not worn: pets, shop, potions,
     // Agility, Astrology, Township, mastery tokens, skill trees...
     providers().forEach((provider) => table.addTable(provider.modifiers));
@@ -119,7 +134,9 @@ export function install(ctx, { getHiring, rate, log }) {
     const data = ownData(folk, skill);
     const key = `${skill.id}|${JSON.stringify(data)}`;
     if (entry === undefined || entry.dirty || entry.key !== key) {
-      entry = { table: buildTable(folk, skill, data), dirty: false, key, skillId: skill.id };
+      // Marked dirty while it refills, so the provider sync inside buildTable leaves it alone.
+      if (entry !== undefined) entry.dirty = true;
+      entry = { table: buildTable(pool.get(folk.id), folk, skill, data), dirty: false, key, skillId: skill.id };
       tables.set(folk.id, entry);
     }
     entry.memo = memo;
@@ -163,7 +180,11 @@ export function install(ctx, { getHiring, rate, log }) {
     hiring.acting = undefined;
     hiring.invalidateFolkTables = invalidateAll;
     /** Dev diagnostics: a fresh table for the Folk on a skill (not cached). */
-    hiring.debugTable = (folk, skill) => buildTable(folk, skill);
+    hiring.debugTable = (folk, skill) => buildTable(scratch ??= newTable(), folk, skill);
+    hiring.events.on('folkFired', ({ folk }) => {
+      tables.delete(folk.id);
+      pool.release(folk.id);
+    });
     /** Runs fn with the Folk's modifiers in game.modifiers, no action and no roll: what the Folk would get. */
     hiring.asFolk = (folk, skill, fn) => {
       if (hiring.acting !== undefined) return fn();
