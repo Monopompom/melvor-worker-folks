@@ -2,7 +2,7 @@
 // skill (you or a Folk), see what the Folk is doing, stop the Folk. Game-facing.
 
 const TEMPLATE_ID = 'wf-skill-control-template';
-const EVENTS = ['crewChanged', 'folkAssigned', 'folkFired', 'folkHired', 'folkStarted', 'folkReleased', 'folkPromoted', 'folkPending'];
+const EVENTS = ['crewChanged', 'folkAssigned', 'folkFired', 'folkHired', 'folkStarted', 'folkReleased', 'folkPromoted', 'folkPending', 'folkMoved'];
 
 export function install(ctx, { getHiring, isDisabled = () => false, popupDidRender, effectsFragment, log }) {
   let hiring;
@@ -300,13 +300,20 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
     stop.onclick = () => { if (holder !== undefined) hiring.stopFolk(holder); };
   };
 
-  const renderAll = () => controls.forEach((root, skill) => renderOne(skill, root));
+  const drawAll = () => controls.forEach((root, skill) => renderOne(skill, root));
+  /** Offline nobody sees the boxes: the events only mark them, and the timer below draws them once back online. */
+  let heldOffline = false;
+  const renderAll = () => {
+    if (!game._isInOnlineLoop) { heldOffline = true; return; }
+    heldOffline = false;
+    drawAll();
+  };
 
   ctx.onCharacterLoaded(() => {
     if (isDisabled()) return;
     hiring = getHiring();
     mount();
-    renderAll();
+    drawAll();
     EVENTS.forEach((name) => hiring.events.on(name, renderAll));
     // Debt has no event of its own per action (build .81): the box showed "is working on" for a whole debt episode.
     // Re-render a skill's box after each action while its Folk owes wages (the minutes count down), and once more on
@@ -327,6 +334,7 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
     // A cooling-down Folk's time left counts down in the box (build .112): its open page redraws once a second, and
     // only the line that changed is written.
     setInterval(() => {
+      if (heldOffline && game._isInOnlineLoop) renderAll();
       const open = game.openPage;
       controls.forEach((root, skill) => {
         const holder = hiring.crew.bySkill(skill.id);

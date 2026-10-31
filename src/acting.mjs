@@ -179,6 +179,11 @@ export function install(ctx, { getHiring, rate, createTablePool, log }) {
     hiring = getHiring();
     hiring.acting = undefined;
     hiring.invalidateFolkTables = invalidateAll;
+    /** One Folk's table built again on its next action: what changed is its own (its hex). */
+    hiring.invalidateFolkTable = (folk) => {
+      const entry = tables.get(folk.id);
+      if (entry !== undefined) entry.dirty = true;
+    };
     /** Dev diagnostics: a fresh table for the Folk on a skill (not cached). */
     hiring.debugTable = (folk, skill) => buildTable(scratch ??= newTable(), folk, skill);
     hiring.events.on('folkFired', ({ folk }) => {

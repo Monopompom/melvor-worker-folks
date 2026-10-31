@@ -30,7 +30,7 @@ export function install(ctx, { getHiring, model, milestones, tips, popupDidRende
 
   ctx.onModsLoaded(() => {
     hiring = getHiring();
-    for (const name of ['folkActionDone', 'crewChanged', 'folkStruck', 'folkInDebt', 'folkReleased', 'folkStarted', 'folkDied']) {
+    for (const name of ['folkActionDone', 'crewChanged', 'folkStruck', 'folkInDebt', 'folkReleased', 'folkStarted', 'folkDied', 'folkMoved']) {
       try { hiring.events.on(name, mark); } catch (err) { log('overview listener failed', name, err); }
     }
     hiring.events.on('folkMade', ({ item, quantity }) => { if (tally.addItem(item?.id, quantity)) dirty = true; });

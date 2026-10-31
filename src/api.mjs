@@ -101,10 +101,11 @@ export function createApi({ getHiring, model, pricing, rules, version = API_VERS
     return Object.freeze({ ok: true, price });
   };
   const moved = (folk, from) => {
-    // A trait's effects may follow the Folk's hex (v5): its table is built again.
-    hiring().invalidateFolkTables?.();
+    // A trait's effects may follow the Folk's hex (v5): its own table is built again, not every Folk's. A walk moves its
+    // Folk a hex every few game minutes, and each move used to rebuild every working Folk's table and, through
+    // crewChanged, redraw every skill's Worker box. What shows a Folk's place or its refusals listens to folkMoved.
+    hiring().invalidateFolkTable?.(folk);
     hiring().events.emit('folkMoved', { folk, from: placeCopy(from.place), fromTravel: from.travel });
-    hiring().crew.touch();
   };
   return Object.freeze({
     version,

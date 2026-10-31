@@ -11,6 +11,8 @@ export const EVENT_NAMES = [
   'folkReleased',
   'folkStarted',
   'crewChanged',
+  // The Payroll Reserve took a deposit or paid a wage or debt: { currencyId, amount } (the new total).
+  'reserveChanged',
   'folkPending',
   'loadoutChanged',
   'folkDied',

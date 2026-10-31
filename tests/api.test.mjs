@@ -77,6 +77,25 @@ test('api: version, read-only views, places and travel with a folkMoved event', 
   assert.ok(Object.isFrozen(moves[0].folk), 'listeners get views, not records');
 });
 
+test('api: a move rebuilds only the moved Folk\'s table and is no crew change', () => {
+  const { hiring } = makeHiring();
+  const api = createApi({ getHiring: () => hiring, model });
+  const walker = hiring.crew.hire('Newbie');
+  hiring.crew.hire('Expert');
+  const one = [];
+  let all = 0;
+  let crewChanges = 0;
+  hiring.invalidateFolkTable = (folk) => one.push(folk.id);
+  hiring.invalidateFolkTables = () => { all += 1; };
+  hiring.events.on('crewChanged', () => { crewChanges += 1; });
+  assert.equal(api.setPlace(walker.id, { q: 3, r: 4 }), true);
+  assert.equal(api.setPlace(walker.id, { q: 4, r: 4 }), true);
+  assert.equal(api.setTravel(walker.id, 'walking'), true);
+  assert.deepEqual(one, [walker.id, walker.id, walker.id]);
+  assert.equal(all, 0);
+  assert.equal(crewChanges, 0);
+});
+
 test('api: guards registered through it reach the skill and redraw its buttons', () => {
   const { hiring, refreshed } = makeHiring();
   const api = createApi({ getHiring: () => hiring, model });

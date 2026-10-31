@@ -92,6 +92,21 @@ test('reserve survives serialize/load and never goes negative', () => {
   assert.equal(other.reserveOf('ap'), 0);
 });
 
+test('a reserve change emits reserveChanged with the new total, never crewChanged', () => {
+  const { bus, crew } = make();
+  const seen = [];
+  bus.on('reserveChanged', (e) => seen.push(e));
+  bus.on('crewChanged', () => seen.push('crewChanged'));
+  crew.adjustReserve('gp', 500);
+  crew.adjustReserve('gp', -41);
+  crew.adjustReserve('gp', -1000);
+  assert.deepEqual(seen, [
+    { currencyId: 'gp', amount: 500 },
+    { currencyId: 'gp', amount: 459 },
+    { currencyId: 'gp', amount: 0 },
+  ]);
+});
+
 test('promote changes the tier and emits folkPromoted', () => {
   const { bus, crew } = make();
   const folk = crew.hire('Newbie');

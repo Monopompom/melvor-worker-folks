@@ -160,12 +160,16 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
     reserveOf(currencyId) {
       return reserve[currencyId] ?? 0;
     },
-    /** Adds (or, negative, removes) from the reserve; never below zero. Returns the new amount. */
+    /**
+     * Adds (or, negative, removes) from the reserve; never below zero. Returns the new amount. Emits reserveChanged,
+     * not crewChanged: wages leave the reserve on every Folk action, and crewChanged rebuilds every Folk's modifier
+     * table and redraws every skill's Worker box (1.5.1: offline progress three times slower with a funded reserve).
+     */
     adjustReserve(currencyId, delta) {
       const next = Math.max(0, Math.floor((reserve[currencyId] ?? 0) + delta));
       if (next === 0) delete reserve[currencyId];
       else reserve[currencyId] = next;
-      emitChange();
+      bus.emit('reserveChanged', { currencyId, amount: next });
       return next;
     },
     get board() {

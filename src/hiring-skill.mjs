@@ -88,6 +88,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         this.renderQueue.folks = true;
         this.sortedMasteryActions.forEach((a) => this.renderQueue.actionMastery.add(a));
       });
+      // The reserve panel and the Payroll bar are drawn with the Folk cards; a Folk's card shows what its hex allows.
+      ['reserveChanged', 'folkMoved'].forEach((name) => this.events.on(name, () => { this.renderQueue.folks = true; }));
       this.events.on('folkReleased', ({ skill: released, folk }) => {
         if (folk === undefined) return;
         this.pending.forEach((id, skill) => {
