@@ -259,7 +259,7 @@
   "MOD_WF_WAGE_PRESET_brutal": "Brutal · ×3 wages",
   "MOD_WF_WAGE_PRESET_evil": "Evil hardcore · ×5 wages",
   "MOD_WF_SETTING_AP_WAGES": "Abyssal Realm wages in Abyssal Pieces",
-  "MOD_WF_SETTING_AP_WAGES_HINT": "Folks working an Abyssal Realm action are paid in AP instead of GP.",
+  "MOD_WF_SETTING_AP_WAGES_HINT": "Folks are paid in AP instead of GP.",
   "MOD_WF_SETTING_XP_RATE": "Hiring XP rate (%)",
   "MOD_WF_SETTING_XP_RATE_HINT": "Every hour a Folk works grants Hiring XP by its tier: Trainee 60, Apprentice 140, Journeyman 220, Master 380, Foreman 600. 100 is the default, 200 doubles it.",
   "MOD_WF_SETTING_QUIET_POPUPS": "Hide Folks' gain popups",
