@@ -83,25 +83,58 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, ma
 
   // ---- the Guild Charter (Known) -----------------------------------------------------------------------------------
 
-  const charterItem = () => game.items.getObjectByID(`worker_folks:${model.CHARTER_ID}`);
-  const hallOf = () => township()?.buildings?.getObjectByID(`worker_folks:${model.HALL_ID}`);
-  const charterFound = () => {
-    const item = charterItem();
+  const charterItem = (id = model.CHARTER_ID) => game.items.getObjectByID(`worker_folks:${id}`);
+  const buildingOf = (id) => township()?.buildings?.getObjectByID(`worker_folks:${id}`);
+  const hallOf = () => buildingOf(model.HALL_ID);
+  const found = (item) => {
     try { return item !== undefined && game.stats.itemFindCount(item) > 0; } catch { return false; }
   };
   /**
-   * The town hands over the charter once Known is reached, and again if it was never found (lost to a full bank in an
-   * older build, say). Bank space or not: it is one item, and Township's Guild Hall asks for it.
+   * The town hands over each charter once its tier is reached (Known: the Guild Charter; Honoured: Freedom of the
+   * Town), and again if it was never found (lost to a full bank in an older build, say). Bank space or not: it is one
+   * item, and the Township building it opens asks for it.
    */
   const grantCharter = () => {
-    const item = charterItem();
-    if (item === undefined || hallOf() === undefined || !model.charterDue(state, charterFound())) return;
+    for (const ch of model.CHARTERS) {
+      const item = charterItem(ch.itemId);
+      if (item === undefined || buildingOf(ch.buildingId) === undefined || !model.charterDue(state, found(item), ch.tier)) continue;
+      try {
+        game.bank.addItem(item, 1, true, true, true, true, 'worker_folks.Commissions');
+      } catch (err) { log(`${ch.itemId} not given`, err); continue; }
+      notify('success', getLangString(`MOD_WF_COMM_CHARTER_GIVEN_${ch.itemId}`), item.media);
+      log(`${ch.itemId} given`);
+      markDirty();
+    }
+  };
+  /** Guild Squares built in Grasslands and what they give the town now (efficiency counted), or null without them. */
+  const squares = () => {
+    const square = buildingOf(model.SQUARE_ID);
+    const biome = township()?.biomes?.getObjectByID(model.HALL_BIOME);
+    if (square === undefined || biome === undefined) return null;
     try {
-      game.bank.addItem(item, 1, true, true, true, true, 'worker_folks.Commissions');
-    } catch (err) { log('charter not given', err); return; }
-    notify('success', getLangString('MOD_WF_COMM_CHARTER_GIVEN'), item.media);
-    log('Guild Charter given');
-    markDirty();
+      const built = biome.getBuildingCount(square);
+      const share = built * (biome.getBuildingEfficiency(square) / 100);
+      const r = (v) => Math.round(share * v * 10) / 10;
+      return { built, happiness: r(model.SQUARE_HAPPINESS), education: r(model.SQUARE_EDUCATION) };
+    } catch { return null; }
+  };
+
+  // ---- Townsfolk and Local (Trusted) -------------------------------------------------------------------------------
+
+  /** The town's happiness in percent, or NaN when it can't be read. */
+  const happiness = () => {
+    const ts = township();
+    const v = ts?.currentHappiness ?? ts?.townData?.happiness;
+    return typeof v === 'number' ? v : NaN;
+  };
+  /** A shop hire from Trusted on is one in four times from your own town: the Local trait, for good. */
+  const onHired = ({ folk, source }) => {
+    if (source !== 'shop' || state === null || !founded() || folk === undefined) return;
+    if (!model.townsfolkRoll(tier())) return;
+    folk.townsfolk = true;
+    log(`${folk.name} is a Townsfolk`);
+    notify('success', templateLangString('MOD_WF_COMM_TOWNSFOLK_HIRED', { name: folk.name }), media('assets/town_badge.webp'));
+    hiring.renderQueue.folks = true;
   };
   /** Guild Halls built in Grasslands and the wage relief they give now (efficiency counted), or null without them. */
   const halls = () => {
@@ -184,7 +217,12 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, ma
     const parts = [...(added > 0 ? [resourceText(c.resourceId, added)] : []), templateLangString('MOD_WF_COMM_REWARD_STANDING', { points: n(p.standing) }), templateLangString('MOD_WF_COMM_REWARD_XP', { xp: n(xp) })];
     notify('success', templateLangString('MOD_WF_COMM_DELIVERED', { figure: figureName(c.figure), name: folk?.name ?? '', what: askText(c), line: thanks, rewards: parts.join(', ') }), portraitOf(c.figure));
     if (added < p.resources) notify('error', templateLangString('MOD_WF_COMM_STORAGE_FULL', { lost: resourceText(c.resourceId, p.resources - added) }));
-    if (tiers.after > tiers.before) notify('success', templateLangString('MOD_WF_COMM_TIER_UP', { tier: getLangString(`MOD_WF_STANDING_${model.TIERS[tiers.after].id}`) }), township()?.media);
+    if (tiers.after > tiers.before) {
+      const id = model.TIERS[tiers.after].id;
+      // What the tier does now (Trusted: a fourth commission and Townsfolk); the charters bring their own notice.
+      const gives = id === 'Trusted' ? ` ${getLangString('MOD_WF_COMM_TIER_GIVES_Trusted')}` : '';
+      notify('success', `${templateLangString('MOD_WF_COMM_TIER_UP', { tier: getLangString(`MOD_WF_STANDING_${id}`) })}${gives}`, township()?.media);
+    }
     grantCharter();
     hiring.events.emit('commissionDelivered', { commission: c, folk, reward: { ...p, resources: added, xp }, offline: !online() });
     log(`commission delivered: ${c.id} ${c.figure} ${c.itemId} ×${c.qty}`, p);
@@ -262,7 +300,8 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, ma
       hiring.forceStop(skill);
     }
     // The pick goes into the save as ids too, so the Folk starts on the same thing after a reload.
-    state.runs[folkId] = { ticks: model.RUN_TICKS, commissionId: c.id, restart: working, pick: resume.toSaved(pick) };
+    // A Local Folk knows the way: half the time.
+    state.runs[folkId] = { ticks: model.runTicksFor(folk.townsfolk === true), commissionId: c.id, restart: working, pick: resume.toSaved(pick) };
     const carried = hiring.room?.townQty(folk, c.itemIds) ?? 0;
     notify('success', templateLangString('MOD_WF_COMM_RUN_START', { name: folk.name, figure: figureName(c.figure), qty: n(carried), item: itemOf(c.itemId)?.name ?? c.itemId }), portraitOf(c.figure));
     hiring.events.emit('commissionRun', { commission: c, folk, qty: carried, offline: !online() });
@@ -303,7 +342,7 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, ma
     } else {
       hiring.room?.townHome(folk);
     }
-    if (skill !== undefined) hiring.payroll?.chargeTime?.(folk, skill, model.RUN_TICKS * TICK_INTERVAL);
+    if (skill !== undefined) hiring.payroll?.chargeTime?.(folk, skill, model.runTicksFor(folk.townsfolk === true) * TICK_INTERVAL);
     if (run.restart) restart(folk, run.pick);
     hiring.renderQueue.folks = true;
     markDirty();
@@ -637,11 +676,16 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, ma
       tier: getLangString(`MOD_WF_STANDING_${model.TIERS[tier()].id}`), points: n(points), next: next === null ? '' : n(next),
     });
     const h = state.reached >= model.CHARTER_TIER ? halls() : null;
-    const hallLine = h === null ? '' : templateLangString('MOD_WF_COMM_HALLS', { built: full(h.built), max: full(model.HALL_MAX), relief: h.relief });
+    const sq = state.reached >= model.FREEDOM_TIER ? squares() : null;
+    const lines = [
+      ...(h === null ? [] : [templateLangString('MOD_WF_COMM_HALLS', { built: full(h.built), max: full(model.HALL_MAX), relief: h.relief })]),
+      ...(sq === null ? [] : [templateLangString('MOD_WF_COMM_SQUARES', { built: full(sq.built), max: full(model.SQUARE_MAX), happiness: sq.happiness, education: sq.education })]),
+    ];
+    const hallLine = lines.join('\n');
     if (standingEl.textContent !== label || hallLine !== lastHallLine) {
       standingEl.textContent = label;
       lastHallLine = hallLine;
-      tips?.set(standingEl, [getLangString('MOD_WF_COMM_STANDING_TIP'), ...(hallLine === '' ? [] : [hallLine])]);
+      tips?.set(standingEl, [getLangString('MOD_WF_COMM_STANDING_TIP'), ...lines]);
     }
   };
 
@@ -676,6 +720,35 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, ma
       if (run === undefined) return '';
       const c = commissionById(run.commissionId);
       return templateLangString('MOD_WF_COMM_RUN_REFUSAL', { figure: c === undefined ? '' : figureName(c.figure), time: time.shortTime(run.ticks * TICK_INTERVAL) });
+    },
+    /** The factor on a strike's cooldown for this Folk: halved for a Townsfolk while the town is happy. */
+    localCooldownFactor(folk) {
+      return model.localCooldownFactor(folk?.townsfolk === true, happiness());
+    },
+    /**
+     * A Townsfolk's Local trait for the card and the Traits popup ({ media, name, tip, badge, badgeTip }), or null. The
+     * tip says whether the happy-town half applies now.
+     */
+    localView(folk) {
+      if (folk?.townsfolk !== true) return null;
+      const name = getLangString('MOD_WF_TRAIT_Local');
+      const happy = model.localCooldownFactor(true, happiness()) < 1;
+      const now = Number.isNaN(happiness()) ? '' : templateLangString(happy ? 'MOD_WF_TRAIT_Local_NOW_ON' : 'MOD_WF_TRAIT_Local_NOW_OFF', { happiness: full(happiness()), need: full(model.LOCAL_HAPPINESS) });
+      const desc = templateLangString('MOD_WF_TRAIT_Local_DESC', { need: full(model.LOCAL_HAPPINESS) });
+      return {
+        media: media('assets/trait_local.webp'),
+        name,
+        kind: 'good',
+        tip: [{ text: name, cls: 'font-w600' }, desc, ...(now === '' ? [] : [now]), { text: getLangString('MOD_WF_TRAIT_Local_LASTS'), cls: 'wf-subtle' }],
+        badge: media('assets/town_badge.webp'),
+        badgeTip: getLangString('MOD_WF_TOWNSFOLK_BADGE'),
+      };
+    },
+    /** Dev aid: makes a Folk a Townsfolk (or not). */
+    setTownsfolk(folk, on = true) {
+      if (folk === undefined) return;
+      folk.townsfolk = on === true;
+      hiring.renderQueue.folks = true;
     },
     /** Dev aid: every clock moved by `ticks` (the board's day, deadlines, runs, fading). */
     advance(n = 1) {
@@ -715,6 +788,7 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, ma
     picks.clear();
     fillNow();
     hiring.events.on('folkActionDone', afterAction);
+    hiring.events.on('folkHired', onHired);
     hiring.events.on('folkFired', ({ folk }) => {
       if (state === null) return;
       delete state.runs[folk.id];

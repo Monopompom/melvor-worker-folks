@@ -263,8 +263,10 @@ export function install(ctx, { getHiring, model, popupDidRender, titleName = (s)
     cardView(folk) {
       const s = stateOf(folk);
       const open = model.openSlots(hiring.masteryLevelOf(folk));
+      // A Townsfolk's Local trait comes first, beside the slots: born with it, never learned or forgotten.
+      const local = hiring.commissions?.localView(folk) ?? null;
       return {
-        icons: s.traits.map((t) => ({ media: mediaOf(t), name: nameOf(t), kind: kindOf(t), tip: tipOf(t) })),
+        icons: [...(local === null ? [] : [local]), ...s.traits.map((t) => ({ media: mediaOf(t), name: nameOf(t), kind: kindOf(t), tip: tipOf(t) }))],
         buttonText: templateLangString('MOD_WF_BUTTON_TRAITS', { held: `${s.traits.length}`, open: `${open}` }),
       };
     },
@@ -288,6 +290,19 @@ export function install(ctx, { getHiring, model, popupDidRender, titleName = (s)
       };
       const cost = forgetPrice(folk);
       const canPay = gp()?.canAfford(cost) === true;
+      const local = hiring.commissions?.localView(folk) ?? null;
+      if (local !== null) {
+        // Above the slots and outside them, with no Forget.
+        const r = row('wf-trait-good wf-trait-born');
+        const img = document.createElement('img');
+        img.className = 'wf-trait-icon';
+        img.src = local.media;
+        img.alt = '';
+        const body = document.createElement('div');
+        body.className = 'wf-trait-body';
+        local.tip.forEach((l) => body.append(typeof l === 'string' ? text('small', 'd-block', l) : text(l.cls === 'font-w600' ? 'div' : 'small', `d-block ${l.cls}`, l.text)));
+        r.append(img, body);
+      }
       s.traits.forEach((trait, index) => {
         const r = row(`wf-trait-${kindOf(trait)}`);
         const img = document.createElement('img');

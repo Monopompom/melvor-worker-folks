@@ -204,6 +204,14 @@ function fillCard(col, folk, view) {
     const card = col.querySelector('.wf-card');
     if (card !== null) setAttr(card, 'aria-labelledby', id);
   });
+  set('town-badge', (el) => {
+    const local = view.local?.(folk) ?? null;
+    el.classList.toggle('d-none', local === null);
+    if (local === null || el.getAttribute('src') === local.badge) return;
+    el.src = local.badge;
+    setAttr(el, 'alt', local.badgeTip);
+    view.tip(el, local.badgeTip);
+  });
   set('role', (el) => setText(el, view.roleName(folk.tier)));
   set('slot', (el) => setText(el, view.slotText(folk)));
   set('rate', (el) => setText(el, view.rateText(folk)));

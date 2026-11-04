@@ -7,6 +7,8 @@ import {
   candidatePool, rollCommission, createState, normalizeCommission, normalizeState, fill, refresh, advance, fade,
   ticksLeft, deadlineLeft, commissionOf, remaining, deliver, payout, proRata, gainStanding, runDue, runsLeft,
   noteReached, charterDue, guildPackage, CHARTER_TIER, HALL_MAX, HALL_WAGE_DISCOUNT,
+  TOWNSFOLK_TIER, TOWNSFOLK_CHANCE, LOCAL_HAPPINESS, townsfolkRoll, runTicksFor, localCooldownFactor,
+  FREEDOM_TIER, CHARTERS, SQUARE_MAX, SQUARE_HAPPINESS, SQUARE_EDUCATION,
 } from '../src/commissions-model.mjs';
 
 const seq = (...values) => { let i = 0; return () => values[i++ % values.length]; };
@@ -271,5 +273,60 @@ test('the guild package: a charter item and a Grasslands Hall that asks for it, 
   assert.deepEqual(hall.requirements, [{ type: 'ItemFound', itemID: 'worker_folks:Guild_Charter' }]);
   assert.equal(hall.cost[0].biomeID, 'melvorF:Grasslands');
   assert.ok(hall.cost[0].cost.every((c) => c.quantity > 0 && c.id.startsWith('melvorF:')));
-  assert.deepEqual(ts.data.buildingDisplayOrder, [{ insertAt: 'After', afterID: 'melvorF:Town_Hall', ids: ['worker_folks:Guild_Hall'] }]);
+  assert.deepEqual(ts.data.buildingDisplayOrder, [{ insertAt: 'After', afterID: 'melvorF:Town_Hall', ids: ['worker_folks:Guild_Hall', 'worker_folks:Guild_Square'] }]);
+});
+
+test('Townsfolk: from Trusted, one hire in four', () => {
+  assert.equal(townsfolkRoll(TOWNSFOLK_TIER - 1, () => 0), false, 'never before Trusted');
+  assert.equal(townsfolkRoll(TOWNSFOLK_TIER, () => 0), true);
+  assert.equal(townsfolkRoll(TOWNSFOLK_TIER, () => TOWNSFOLK_CHANCE - 0.001), true);
+  assert.equal(townsfolkRoll(TOWNSFOLK_TIER, () => TOWNSFOLK_CHANCE), false);
+  assert.equal(townsfolkRoll(3, () => 0.1), true, 'Honoured too');
+  assert.equal(TIERS[TOWNSFOLK_TIER].id, 'Trusted');
+  assert.equal(slotsFor(TOWNSFOLK_TIER), 4, 'the fourth commission comes with the same tier');
+});
+
+test('Local: half-length runs, a halved strike cooldown only while the town is happy', () => {
+  assert.equal(runTicksFor(false), RUN_TICKS);
+  assert.equal(runTicksFor(true), RUN_TICKS / 2);
+  assert.equal(localCooldownFactor(true, LOCAL_HAPPINESS), 0.5);
+  assert.equal(localCooldownFactor(true, 120), 0.5);
+  assert.equal(localCooldownFactor(true, LOCAL_HAPPINESS - 0.1), 1);
+  assert.equal(localCooldownFactor(true, undefined), 1, 'unreadable happiness: no relief');
+  assert.equal(localCooldownFactor(false, 200), 1, 'only Local Folks');
+});
+
+test('a run already under way keeps its ticks through a reload, whatever its length', () => {
+  const s = normalizeState({ runs: { f1: { ticks: runTicksFor(true), commissionId: 'c1', restart: true } } });
+  assert.equal(s.runs.f1.ticks, RUN_TICKS / 2);
+});
+
+test('Freedom of the Town is owed from Honoured until it is found; the Guild Charter keeps its own rule', () => {
+  assert.equal(charterDue({ reached: 2 }, false, FREEDOM_TIER), false);
+  assert.equal(charterDue({ reached: 3 }, false, FREEDOM_TIER), true);
+  assert.equal(charterDue({ reached: 3 }, true, FREEDOM_TIER), false);
+  assert.equal(TIERS[FREEDOM_TIER].id, 'Honoured');
+  assert.deepEqual(CHARTERS.map((c) => [c.tier, c.itemId, c.buildingId]), [[1, 'Guild_Charter', 'Guild_Hall'], [3, 'Freedom_of_the_Town', 'Guild_Square']]);
+});
+
+test('the Guild Square: a Grasslands building behind Freedom of the Town, +2% happiness and education, half the Hall\'s bill', () => {
+  const pkg = guildPackage({ freedom: 'F', freedomDesc: 'FD', square: 'S' });
+  const freedom = pkg.items.find((i) => i.id === 'Freedom_of_the_Town');
+  assert.equal(freedom.name, 'F');
+  assert.equal(freedom.customDescription, 'FD');
+  assert.equal(freedom.sellsFor, 0);
+  assert.equal(freedom.ignoreCompletion, true);
+  const [hall, square] = pkg.skillData[0].data.buildings;
+  assert.equal(square.id, 'Guild_Square');
+  assert.equal(square.name, 'S');
+  assert.equal(square.maxUpgrades, SQUARE_MAX);
+  assert.equal(square.tier, hall.tier);
+  assert.deepEqual(square.biomes, ['melvorF:Grasslands']);
+  assert.equal(square.modifiers, undefined, 'the town\'s own stats, no player modifier');
+  assert.deepEqual(square.provides, [{ biomeID: 'melvorF:Grasslands', population: 0, happiness: SQUARE_HAPPINESS, education: SQUARE_EDUCATION, storage: 0, resources: [] }]);
+  assert.equal(SQUARE_MAX * SQUARE_HAPPINESS, 10);
+  assert.deepEqual(square.requirements, [{ type: 'ItemFound', itemID: 'worker_folks:Freedom_of_the_Town' }]);
+  const hallCost = Object.fromEntries(hall.cost[0].cost.map((c) => [c.id, c.quantity]));
+  square.cost[0].cost.forEach((c) => assert.equal(c.quantity * 2, hallCost[c.id], c.id));
+  assert.equal(square.cost[0].cost.length, hall.cost[0].cost.length);
 });

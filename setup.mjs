@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-11-04.176';
+export const BUILD = '2026-11-04.177';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -189,10 +189,17 @@ export async function setup(ctx) {
     name: getLangString(`MOD_WF_ITEM_${id}`),
     description: templateLangString('MOD_WF_BAG_DESC', roomRules.bagRange(id)),
   })) });
-  // Township Commissions at Known: the Guild Charter and Township's Guild Hall, which asks for it (Township's biomes
-  // come with the full game).
+  // Township Commissions at Known and Honoured: the Guild Charter and Freedom of the Town, and Township's Guild Hall and
+  // Guild Square, which ask for them (Township's biomes come with the full game).
   if (hasFull) {
-    const guildText = { charter: getLangString('MOD_WF_ITEM_Guild_Charter'), charterDesc: getLangString('MOD_WF_ITEM_Guild_Charter_DESC'), hall: getLangString('MOD_WF_BUILDING_Guild_Hall') };
+    const guildText = {
+      charter: getLangString('MOD_WF_ITEM_Guild_Charter'),
+      charterDesc: getLangString('MOD_WF_ITEM_Guild_Charter_DESC'),
+      hall: getLangString('MOD_WF_BUILDING_Guild_Hall'),
+      freedom: getLangString('MOD_WF_ITEM_Freedom_of_the_Town'),
+      freedomDesc: getLangString('MOD_WF_ITEM_Freedom_of_the_Town_DESC'),
+      square: getLangString('MOD_WF_BUILDING_Guild_Square'),
+    };
     await ctx.gameData.addPackage({ $schema: '', namespace: 'worker_folks', data: commissionRules.guildPackage(guildText) });
   }
   Object.entries(gearData.LANG.items).forEach(([id, keys]) => {

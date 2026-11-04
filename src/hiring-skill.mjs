@@ -726,6 +726,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         },
         onGear: (folk) => { if (!this.refused('gear', { folk })) this.loadout?.openLoadout(folk); },
         traits: (folk) => this.traits?.cardView(folk),
+        local: (folk) => this.commissions?.localView(folk) ?? null,
         onTraits: (folk) => this.traits?.openTraits(folk),
         hp: (folk) => this.health?.hpView(folk),
         room: (folk) => this.room?.cardView(folk),
@@ -954,7 +955,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
     }
 
     cooldownFactor(folk) {
-      return this.perksOf(folk).cooldownMult * this.traitEffects(folk).cooldownFactor;
+      // A Townsfolk's Local trait halves it while the town is happy (Township Commissions).
+      return this.perksOf(folk).cooldownMult * this.traitEffects(folk).cooldownFactor * (this.commissions?.localCooldownFactor?.(folk) ?? 1);
     }
 
     severanceFree(folk) {

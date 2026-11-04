@@ -57,6 +57,8 @@ export function createFolk({ id, slot, tier, name, hiredAt = 0, paid = null }) {
     room: createRoom(),
     /** Work from its own stock: inputs come from its room only, never from your bank (build .152). */
     ownStock: false,
+    /** Hired from your own town (Township Commissions, Trusted): born with the Local trait, for good. */
+    townsfolk: false,
   };
 }
 
@@ -122,6 +124,7 @@ export function normalizeFolk(raw) {
   folk.paid = typeof raw.paid === 'number' && Number.isFinite(raw.paid) && raw.paid >= 0 ? raw.paid : null;
   folk.room = normalizeRoom(raw.room);
   folk.ownStock = raw.ownStock === true;
+  folk.townsfolk = raw.townsfolk === true;
   return folk;
 }
 

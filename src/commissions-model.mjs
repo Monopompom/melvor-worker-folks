@@ -34,7 +34,10 @@ export const RECENT_RECIPES = 5;
 export const FADE_AFTER_TICKS = 3 * DAY_TICKS;
 export const FADE_PER_DAY = 0.02;
 
-/** Town Standing tiers: points needed and what each opens (Known: the Guild Charter; Trusted: a fourth commission). */
+/**
+ * Town Standing tiers: points needed and what each opens (Known: the Guild Charter; Trusted: a fourth commission and
+ * Townsfolk; Honoured: Freedom of the Town).
+ */
 export const TIERS = [
   { id: 'Strangers', points: 0 },
   { id: 'Known', points: 80 },
@@ -89,7 +92,36 @@ export function nextTierPoints(points) {
 
 /** Commissions on the board: three, four from Trusted. */
 export function slotsFor(tier) {
-  return tier >= 2 ? 4 : 3;
+  return tier >= TOWNSFOLK_TIER ? 4 : 3;
+}
+
+// ---- Townsfolk and the Local trait (Trusted) ------------------------------------------------------------------------
+
+/**
+ * From Trusted, a Folk hired in the shop is one in four times from your own town: a Townsfolk, born with the Local trait
+ * (never learned, never forgotten, beside the earned traits' slots). Local: runs to town take half the time, and while
+ * the town is happy (Township happiness 50% or more when a strike is settled) the cooldown after it is halved. What the
+ * tier gives follows the tier held now; Townsfolk already hired stay Local.
+ */
+export const TOWNSFOLK_TIER = 2;
+export const TOWNSFOLK_CHANCE = 0.25;
+export const LOCAL_RUN_FACTOR = 0.5;
+export const LOCAL_HAPPINESS = 50;
+export const LOCAL_COOLDOWN_FACTOR = 0.5;
+
+/** Whether a new hire is from your town: Trusted or higher now, then the roll. */
+export function townsfolkRoll(tier, rng = Math.random) {
+  return tier >= TOWNSFOLK_TIER && rng() < TOWNSFOLK_CHANCE;
+}
+
+/** A run's length in ticks: half for a Local Folk. */
+export function runTicksFor(local) {
+  return Math.round(RUN_TICKS * (local ? LOCAL_RUN_FACTOR : 1));
+}
+
+/** The factor on a strike's cooldown: halved for a Local Folk while the town's happiness is at least LOCAL_HAPPINESS. */
+export function localCooldownFactor(local, happiness) {
+  return local && Number(happiness) >= LOCAL_HAPPINESS ? LOCAL_COOLDOWN_FACTOR : 1;
 }
 
 /** Township's Casual Task scale at a Township level, interpolated between the data's points. */
@@ -435,31 +467,57 @@ export const HALL_BIOME = 'melvorF:Grasslands';
 /** Per Hall: Town Hall's bill in GP and in the trades the guild works for (Planks, Stone, Bar) (the user, 4 Nov 2026). */
 export const HALL_COST = Object.freeze([['melvorF:GP', 100000000], ['melvorF:Planks', 100000], ['melvorF:Stone', 100000], ['melvorF:Bar', 100000]]);
 
-/** Whether the town owes the guild its charter: Known reached once, the charter never found. */
-export function charterDue(state, found) {
-  return state !== null && state !== undefined && state.reached >= CHARTER_TIER && !found;
-}
+// ---- Freedom of the Town and the Guild Square (Honoured) ----------------------------------------------------------
 
 /**
- * The data package for the charter and the Hall (only with Township's biomes loaded). `text`: { charter, charterDesc,
- * hall } names, set again from the language file after loading.
+ * Honoured gives Freedom of the Town, a second charter item; Township's Guild Square asks for it. Each Square built in
+ * Grasslands gives the town +2% happiness and +2% education, up to five, at half the Hall's bill (the user, 4 Nov 2026).
+ */
+export const FREEDOM_TIER = 3;
+export const FREEDOM_ID = 'Freedom_of_the_Town';
+export const SQUARE_ID = 'Guild_Square';
+export const SQUARE_MAX = 5;
+export const SQUARE_HAPPINESS = 2;
+export const SQUARE_EDUCATION = 2;
+export const SQUARE_TIER = 5;
+export const SQUARE_COST = Object.freeze(HALL_COST.map(([id, quantity]) => [id, quantity / 2]));
+
+/** The town's gifts for reaching a Standing tier: the item it hands over and the building that asks for it. */
+export const CHARTERS = Object.freeze([
+  { tier: CHARTER_TIER, itemId: CHARTER_ID, buildingId: HALL_ID },
+  { tier: FREEDOM_TIER, itemId: FREEDOM_ID, buildingId: SQUARE_ID },
+]);
+
+/** Whether the town owes the guild a charter: its tier reached once, the item never found. Known's by default. */
+export function charterDue(state, found, tier = CHARTER_TIER) {
+  return state !== null && state !== undefined && state.reached >= tier && !found;
+}
+
+const charterItem = ({ id, name, media, desc }) => ({
+  itemType: 'Item',
+  id,
+  name,
+  category: 'Hiring',
+  type: 'Misc',
+  media,
+  ignoreCompletion: true,
+  obtainFromItemLog: false,
+  golbinRaidExclusive: false,
+  sellsFor: 0,
+  customDescription: desc ?? '',
+});
+
+/**
+ * The data package for the charters, the Hall and the Square (only with Township's biomes loaded). `text`: { charter,
+ * charterDesc, hall, freedom, freedomDesc, square } names, set again from the language file after loading.
  */
 export function guildPackage(text = {}) {
   const ns = (id) => `worker_folks:${id}`;
   return {
-    items: [{
-      itemType: 'Item',
-      id: CHARTER_ID,
-      name: text.charter ?? 'Guild Charter',
-      category: 'Hiring',
-      type: 'Misc',
-      media: 'assets/guild_charter.webp',
-      ignoreCompletion: true,
-      obtainFromItemLog: false,
-      golbinRaidExclusive: false,
-      sellsFor: 0,
-      customDescription: text.charterDesc ?? '',
-    }],
+    items: [
+      charterItem({ id: CHARTER_ID, name: text.charter ?? 'Guild Charter', media: 'assets/guild_charter.webp', desc: text.charterDesc }),
+      charterItem({ id: FREEDOM_ID, name: text.freedom ?? 'Freedom of the Town', media: 'assets/town_freedom.webp', desc: text.freedomDesc }),
+    ],
     skillData: [{
       skillID: 'melvorD:Township',
       data: {
@@ -475,8 +533,19 @@ export function guildPackage(text = {}) {
           modifiers: { [ns('folkWageDiscount')]: HALL_WAGE_DISCOUNT },
           requirements: [{ type: 'ItemFound', itemID: ns(CHARTER_ID) }],
           canDegrade: true,
+        }, {
+          id: SQUARE_ID,
+          name: text.square ?? 'Guild Square',
+          media: 'assets/guild_square.webp',
+          tier: SQUARE_TIER,
+          cost: [{ biomeID: HALL_BIOME, cost: SQUARE_COST.map(([id, quantity]) => ({ id, quantity })) }],
+          provides: [{ biomeID: HALL_BIOME, population: 0, happiness: SQUARE_HAPPINESS, education: SQUARE_EDUCATION, storage: 0, resources: [] }],
+          biomes: [HALL_BIOME],
+          maxUpgrades: SQUARE_MAX,
+          requirements: [{ type: 'ItemFound', itemID: ns(FREEDOM_ID) }],
+          canDegrade: true,
         }],
-        buildingDisplayOrder: [{ insertAt: 'After', afterID: 'melvorF:Town_Hall', ids: [ns(HALL_ID)] }],
+        buildingDisplayOrder: [{ insertAt: 'After', afterID: 'melvorF:Town_Hall', ids: [ns(HALL_ID), ns(SQUARE_ID)] }],
       },
     }],
   };

@@ -33,7 +33,11 @@
               <div class="d-flex justify-content-between align-items-start">
                 <div class="wf-min0">
                   <!-- The whole name, wrapping onto balanced lines (scan A-06, C-12, build .112); "· Slot N" never splits (A-11). -->
-                  <h5 class="font-w600 mb-0 wf-card-name" data-wf="name"></h5>
+                  <!-- A Townsfolk's town crest after the name (Township Commissions, Trusted). -->
+                  <div class="d-flex align-items-start wf-min0">
+                    <h5 class="font-w600 mb-0 wf-card-name wf-min0" data-wf="name"></h5>
+                    <img class="wf-town-badge d-none" data-wf="town-badge" alt="" />
+                  </div>
                   <small class="wf-subtle"><span data-wf="role"></span> <span class="text-nowrap">&middot; <span data-wf="slot"></span></span></small>
                 </div>
                 <span class="badge wf-status wf-card-status">

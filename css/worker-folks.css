@@ -224,6 +224,8 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 .wf-card-skill { font-size: 1.05em; }
 /* A long name wraps onto balanced lines, never cut: the whole name on the card on every device (scan A-06, C-12). */
 .wf-card-name { text-wrap: balance; overflow-wrap: anywhere; }
+/* A Townsfolk's town crest after its name: the name's line height, so it sits on the first line. */
+.wf-town-badge { width: 18px; height: 18px; margin: 2px 0 0 6px; flex: 0 0 auto; object-fit: contain; }
 /* Worker box: a button that opens the worker modal. The status line takes the rest of the row and Stop sits at its
    end; once the row wraps, Stop fills its own line instead of hanging at the right (scan B-01, build
    .112): the status grows 999 times faster, so on a shared line Stop keeps its own width. Worker and Stop are one
@@ -273,6 +275,8 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 .wf-trait-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 8px 10px; border-radius: 6px; background: var(--wf-tile); border: 1px solid var(--wf-line-soft); }
 .wf-trait-row .wf-trait-icon { width: 40px; height: 40px; }
 .wf-trait-row.wf-trait-bad { border-color: var(--wf-alert); }
+/* Local, born with it: no Forget, so its row has no third column. */
+.wf-trait-row.wf-trait-born { grid-template-columns: 40px minmax(0, 1fr); }
 .wf-trait-row.wf-trait-empty, .wf-trait-row.wf-trait-locked { display: block; background: transparent; border-style: dashed; color: var(--wf-subtle); }
 .wf-trait-waiting, .wf-trait-note { font-size: 0.9rem; }
 .wf-trait-note { border-top: 1px solid var(--wf-line); padding-top: 8px; margin-top: 8px; }
