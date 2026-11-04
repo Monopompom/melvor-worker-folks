@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { selectionOf, startAgain } from '../src/resume.mjs';
+import { selectionOf, startAgain, toSaved, fromSaved } from '../src/resume.mjs';
 
 test('trees: the pick is the tree set, replayed through selectTree', () => {
   const calls = [];
@@ -62,4 +62,66 @@ test('a skill that keeps its own pick gets a plain start()', () => {
   assert.equal(selectionOf(fishing), null);
   startAgain(fishing, null);
   assert.equal(started, 1);
+});
+
+test('Cooking: the pick is the active category, replayed through its Cook button once the category is gone', () => {
+  const calls = [];
+  const cooking = { selectedRecipes: new Map(), activeCookingCategory: 'fire', onActiveCookButtonClick(c) { calls.push(`cook ${c}`); }, start() { calls.push('start'); } };
+  const pick = selectionOf(cooking);
+  assert.deepEqual(pick, { cook: 'fire' });
+  startAgain(cooking, pick);
+  cooking.activeCookingCategory = undefined;
+  startAgain(cooking, pick);
+  assert.deepEqual(calls, ['start', 'cook fire']);
+  assert.equal(selectionOf(cooking), null, 'no category: nothing to keep');
+});
+
+const registry = (...ids) => {
+  const objs = new Map(ids.map((id) => [id, { id }]));
+  return { getObjectByID: (id) => objs.get(id) };
+};
+
+test('a pick goes into the save as ids and comes back as the skill\'s own objects', () => {
+  const wc = { actions: registry('oak', 'willow'), activeTrees: new Set(), selectTree() {} };
+  const saved = toSaved({ trees: [{ id: 'oak' }, { id: 'willow' }] });
+  assert.deepEqual(saved, { trees: ['oak', 'willow'] });
+  assert.deepEqual(JSON.parse(JSON.stringify(saved)), saved);
+  const back = fromSaved(wc, saved);
+  assert.equal(back.trees[0], wc.actions.getObjectByID('oak'));
+  assert.equal(back.trees.length, 2);
+  const mining = { actions: registry('copper'), onRockClick() {} };
+  assert.equal(fromSaved(mining, toSaved({ rock: { id: 'copper' } })).rock, mining.actions.getObjectByID('copper'));
+  const harvesting = { actions: registry('v1'), onVeinClick() {} };
+  assert.equal(fromSaved(harvesting, toSaved({ vein: { id: 'v1' } })).vein.id, 'v1');
+  const arch = { actions: registry('site'), startDigging() {} };
+  assert.equal(fromSaved(arch, toSaved({ digSite: { id: 'site' } })).digSite.id, 'site');
+  const cooking = { categories: registry('fire'), onActiveCookButtonClick() {} };
+  assert.equal(fromSaved(cooking, toSaved({ cook: { id: 'fire' } })).cook.id, 'fire');
+});
+
+test('Cartography picks keep hex coordinates and recipe or dig site ids', () => {
+  const hexes = new Map([['1,2', { q: 1, r: 2, extra: 'hex a' }], ['3,4', { q: 3, r: 4 }]]);
+  const carto = { startAutoSurvey() {}, activeMap: { getHex: ({ q, r }) => hexes.get(`${q},${r}`) }, paperRecipes: registry('paper') };
+  const game = { archaeology: { actions: registry('site') } };
+  const queue = toSaved({ mode: 1, hexes: [hexes.get('1,2'), hexes.get('3,4')] });
+  assert.deepEqual(queue, { mode: 1, hexes: [{ q: 1, r: 2 }, { q: 3, r: 4 }] });
+  assert.equal(fromSaved(carto, queue, game).hexes[0].extra, 'hex a');
+  assert.equal(fromSaved(carto, toSaved({ mode: 2, hex: hexes.get('3,4') }), game).hex, hexes.get('3,4'));
+  assert.equal(fromSaved(carto, toSaved({ mode: 3, recipe: { id: 'paper' } }), game).recipe.id, 'paper');
+  assert.equal(fromSaved(carto, toSaved({ mode: 4, digSite: { id: 'site' } }), game).digSite.id, 'site');
+  assert.equal(fromSaved(carto, { mode: 2, hex: { q: 9, r: 9 } }, game), null, 'a hex the map lacks');
+});
+
+test('a saved pick another skill or a gone id cannot use gives null: a plain start', () => {
+  const smithing = { actions: registry('bar'), categories: registry('fire'), start() {} };
+  assert.equal(fromSaved(smithing, { cook: 'fire' }), null, 'categories but no Cook button');
+  assert.equal(fromSaved(smithing, { rock: 'bar' }), null, 'no rock starter');
+  const mining = { actions: registry('copper'), onRockClick() {} };
+  assert.equal(fromSaved(mining, { rock: 'mithril' }), null);
+  assert.equal(fromSaved(mining, { trees: ['copper'] }), null);
+  assert.equal(fromSaved(mining, null), null);
+  assert.equal(fromSaved(undefined, { rock: 'copper' }), null);
+  assert.equal(toSaved(null), null);
+  assert.equal(toSaved({ trees: [] }), null);
+  assert.equal(toSaved({ mode: 0 }), null);
 });

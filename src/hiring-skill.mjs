@@ -559,6 +559,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       this.wireHelp();
       dashboard?.wire(); // before the layout: it finds the Overview block by id
       this.workOrders?.wire(); // the Work Orders block, likewise
+      this.commissions?.wire(); // and the Township Commissions block
       layout?.wire({ rerender: () => { this.renderQueue.folks = true; } });
       this.renderReserve();
       layout?.refresh();
@@ -728,6 +729,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         onTraits: (folk) => this.traits?.openTraits(folk),
         hp: (folk) => this.health?.hpView(folk),
         room: (folk) => this.room?.cardView(folk),
+        commission: (folk) => this.commissions?.cardView(folk),
         frozenSlots: () => this.health?.frozenSlotsView() ?? [],
         tipItems: (root) => this.room?.tipTiles(root),
         frozenTitle: () => getLangString('MOD_WF_SLOT_FROZEN_TITLE'),
@@ -745,6 +747,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       this.renderFolks();
       dashboard?.render();
       this.workOrders?.render();
+      this.commissions?.render();
     }
 
     /**

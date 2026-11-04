@@ -254,6 +254,24 @@ function fillCard(col, folk, view) {
     setText(el, text);
     el.classList.toggle('d-none', text === '');
   });
+  // A Township commission (build .163): the figure's portrait, what came of the amount, runs left and the deadline;
+  // amber when the Folk makes something else or the deadline has passed.
+  set('commission', (el) => {
+    const c = view.commission?.(folk);
+    el.classList.toggle('d-none', c === undefined);
+    if (c === undefined) return;
+    const icon = el.querySelector('[data-wf="commission-icon"]');
+    if (icon !== null && icon.getAttribute('src') !== c.icon) icon.src = c.icon;
+    const text = el.querySelector('[data-wf="commission-text"]');
+    if (text !== null) setText(text, c.text);
+    const sub = el.querySelector('[data-wf="commission-sub"]');
+    if (sub !== null) {
+      setText(sub, c.sub ?? '');
+      sub.classList.toggle('text-warning', c.warn === true);
+      sub.classList.toggle('wf-subtle', c.warn !== true);
+    }
+    view.tip(el, c.tip);
+  });
   // Health is always shown, so cards in a row keep one height (user, build .55). Food matters on Thieving only:
   // muted elsewhere, amber when low, red with an amber card border when there is none.
   let foodAlert = false;

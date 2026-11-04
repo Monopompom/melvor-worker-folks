@@ -174,6 +174,10 @@ export function install(ctx, { log, tips, model }) {
     const orders = document.getElementById('worker-folks-orders');
     const ordersHead = orders?.querySelector('.wf-dash-content > .wf-dash-title');
     if (orders && ordersHead) dress('orders', orders, ordersHead);
+    // The Township Commissions block (commissions.mjs), only with Township in the game.
+    const commissions = document.getElementById('worker-folks-commissions');
+    const commissionsHead = commissions?.querySelector('.wf-dash-content > .wf-dash-title');
+    if (commissions && commissionsHead) dress('commissions', commissions, commissionsHead);
     // The cards' grid: a place in the column the Overview moves around, with no title row to drag or fold it by.
     list.classList.add('wf-layout-block');
     list.dataset.wfBlock = 'crew';

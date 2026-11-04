@@ -242,6 +242,23 @@ export function install({ hiring, log, tiers }) {
       hiring.workOrders?.advance(Math.round(hours * 72000));
       return hiring.workOrders?.board?.ticks;
     },
+    /** The Township Commissions board as a table (null before it opens), with Standing and runs under way. */
+    commissions() {
+      const state = hiring.commissions?.state ?? null;
+      if (state === null) return null;
+      const rows = state.commissions.map((c) => ({ id: c.id, figure: c.figure, item: c.itemId, done: `${c.delivered}/${c.qty}`, hours: c.hours, state: c.state, late: c.late, folk: c.folkId ?? '-', deadlineH: +(c.deadline / 72000).toFixed(1), age: +(c.age / 72000).toFixed(1), resources: c.resources }));
+      console.table(rows);
+      log('standing', state.standing, 'runs', state.runs, 'board clock h', +(state.ticks / 72000).toFixed(2));
+      return rows;
+    },
+    /** Moves every commission clock by `hours` of game time: the board, deadlines, runs, Standing's fading. */
+    commissionClock(hours = 1) {
+      hiring.commissions?.advance(Math.round(hours * 72000));
+      return hiring.commissions?.state?.ticks;
+    },
+    /** Ends every run now; `reroll()`: a new board, keeping commissions a Folk is on. */
+    finishRuns() { hiring.commissions?.finishRuns(); },
+    rerollCommissions() { hiring.commissions?.reroll(); },
     /** What a Folk holds in its room: one row a stack (haul or stock), its work in minutes. */
     room(id) {
       const folk = hiring.crew.byId(ref(id));
@@ -272,6 +289,6 @@ export function install({ hiring, log, tiers }) {
     tiers: tiers.slice(),
   };
   globalThis.workerFolksDev = api;
-  log('dev commands (a Folk = its row in list(), its name or its id): workerFolksDev.spawn(tier, name?) | fire(id) | assign(id, skillId) | strike(id, debt?) | debt(id, gp?) | cooldown(id, ticks) | reset(id) | hp(id, hp) | kill(id) | thaw(slot?) | loadout(id) | gear(id, skillId?, {replace, qty}) | reserve() | mastery(id, level) | poolXP(xp) | list() | clear() | dump() | load(root) | shiftSlots(n) | delegated() | pet() | relics(n) | orders() | orderClock(hours) | room(id) | ownStock(id, on) | restock(id, actions?) | bankFull(on)');
+  log('dev commands (a Folk = its row in list(), its name or its id): workerFolksDev.spawn(tier, name?) | fire(id) | assign(id, skillId) | strike(id, debt?) | debt(id, gp?) | cooldown(id, ticks) | reset(id) | hp(id, hp) | kill(id) | thaw(slot?) | loadout(id) | gear(id, skillId?, {replace, qty}) | reserve() | mastery(id, level) | poolXP(xp) | list() | clear() | dump() | load(root) | shiftSlots(n) | delegated() | pet() | relics(n) | orders() | orderClock(hours) | commissions() | commissionClock(hours) | finishRuns() | rerollCommissions() | room(id) | ownStock(id, on) | restock(id, actions?) | bankFull(on)');
   return api;
 }

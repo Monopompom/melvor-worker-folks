@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createEventBus } from '../src/events.mjs';
+import { readdirSync, readFileSync } from 'node:fs';
+import { createEventBus, EVENT_NAMES } from '../src/events.mjs';
 
 test('on/emit/off and unknown names', () => {
   const bus = createEventBus();
@@ -24,4 +25,15 @@ test('a throwing listener does not block the others', () => {
   assert.equal(bus.emit('a'), 2);
   assert.equal(hit, 1);
   assert.deepEqual(errors, ['boom']);
+});
+
+test('every event a module emits or listens to by name is a known one', () => {
+  const dir = new URL('../src/', import.meta.url);
+  const names = new Set();
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.mjs'))) {
+    const src = readFileSync(new URL(file, dir), 'utf8');
+    for (const m of src.matchAll(/events\.(?:emit|on)\('([A-Za-z]+)'/g)) names.add(m[1]);
+  }
+  assert.ok(names.size >= 15);
+  for (const name of names) assert.ok(EVENT_NAMES.includes(name), `unknown event ${name}`);
 });

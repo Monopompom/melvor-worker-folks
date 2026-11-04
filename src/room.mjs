@@ -21,6 +21,11 @@
 // the free room with the current recipe's inputs from your bank and starts it again. Switched off, its stock goes to
 // the bank as far as there is space; the rest is lost, which the switch warns of beside it (the user's call).
 // A bag in the Folk's Cape slot makes the room bigger. The room's rules are in room-model.mjs, passed in from setup.mjs.
+//
+// Township Commissions (build .163): a Folk sent on a commission puts that item, whatever the bank's space, on its
+// room's town side (commissions.mjs claims it); it is counted as made there too (`folkMade` with `town`, so Work
+// Orders leave it out). Runs to town take it from there; what is left over moves to the haul side, and from there to
+// the bank like anything else the room holds for you.
 
 const CHECK_TICKS = 20;
 const CAPE_SLOT = 'melvorD:Cape';
@@ -139,16 +144,17 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     return splitNow([
       ...(gear ? (hiring.loadout?.items(folk) ?? []).map(({ item, qty }) => ({ id: item.id, qty })) : []),
       ...sideList(folk, 'haul'),
+      ...sideList(folk, 'town'),
       ...sideList(folk, 'stock'),
     ]);
   };
 
   /** A Folk leaves the crew: its room goes to the bank as far as it has space; returns what was lost. */
   const leave = (folk) => {
-    if (folk?.room === undefined || (model.isEmpty(folk.room) && model.isEmpty(folk.room, 'stock'))) return [];
+    if (folk?.room === undefined || (model.isEmpty(folk.room) && model.isEmpty(folk.room, 'stock') && model.isEmpty(folk.room, 'town'))) return [];
     const { kept, lost } = leaveSplit(folk, { gear: false });
     lost.push(...toBank(kept));
-    folk.room = { haul: {}, stock: {} };
+    folk.room = { haul: {}, stock: {}, town: {} };
     forget(folk);
     log(`room: ${folk.name} left; ${kept.length} kind(s) to the bank, ${lost.length} lost`);
     return lost;
@@ -381,12 +387,14 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
       const full = isFull(folk);
       const stockOn = folk.ownStock === true;
       const noStock = model.isEmpty(folk.room, 'stock');
-      if (model.isEmpty(folk.room) && noStock && !full && !stockOn) return undefined;
+      const noTown = model.isEmpty(folk.room, 'town');
+      if (model.isEmpty(folk.room) && noStock && noTown && !full && !stockOn) return undefined;
       const out = !full && isDry(folk);
       const fill = model.fillView(folk.room, capOf(folk));
       const lines = [];
       if (stockOn || !noStock) lines.push(getLangString('MOD_WF_ROOM_TIP_STOCK'), ...tipLines(folk, 'stock'));
-      if (!model.isEmpty(folk.room) || !stockOn) lines.push(getLangString('MOD_WF_ROOM_TIP'), ...tipLines(folk, 'haul'));
+      if (!noTown) lines.push(getLangString('MOD_WF_ROOM_TIP_TOWN'), ...tipLines(folk, 'town'));
+      if (!model.isEmpty(folk.room) || (!stockOn && noTown)) lines.push(getLangString('MOD_WF_ROOM_TIP'), ...tipLines(folk, 'haul'));
       const text = templateLangString('MOD_WF_CARD_ROOM', { used: hoursOf(fill.usedHours), cap: time.hoursText(fill.capHours) });
       return {
         percent: fill.percent,
@@ -419,6 +427,33 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
       };
     },
     empty,
+    /** How many of these items (a commission's) the room's town side holds. */
+    townQty(folk, ids) {
+      return folk?.room === undefined ? 0 : ids.reduce((sum, id) => sum + model.qtyOf(folk.room, id, 'town'), 0);
+    },
+    /** Takes up to `max` of these items off the town side (a run delivered them); returns how many. */
+    takeTown(folk, ids, max) {
+      if (folk?.room === undefined) return 0;
+      let taken = 0;
+      for (const id of ids) {
+        if (taken >= max) break;
+        taken += model.take(folk.room, id, max - taken, 'town').qty;
+      }
+      if (taken > 0) hiring.renderQueue.folks = true;
+      return taken;
+    },
+    /** What the town side still holds goes over to what the room holds for you, and so to the bank. */
+    townHome(folk) {
+      if (folk?.room === undefined || model.isEmpty(folk.room, 'town')) return;
+      model.entries(folk.room, 'town').forEach(({ id }) => {
+        const { qty, ms } = model.take(folk.room, id, Infinity, 'town');
+        model.put(folk.room, id, qty, ms);
+      });
+      hiring.renderQueue.folks = true;
+    },
+    /** The room's size and what it holds now, in ms of work. */
+    capMs: (folk) => capOf(folk),
+    usedMs: (folk) => (folk?.room === undefined ? 0 : model.usedMs(folk.room)),
   };
 
   ctx.onModsLoaded(() => {
@@ -429,6 +464,15 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
   ctx.patch(Bank, 'addItem').replace(function (original, item, quantity, ...rest) {
     const acting = hiring?.acting;
     if (acting === undefined || item === undefined || !(quantity > 0)) return original(item, quantity, ...rest);
+    // A commission's item goes to the room's town side, bank space or not.
+    const folk = acting.folk;
+    if (folk?.room !== undefined && Number.isInteger(quantity) && hiring.commissions?.claim(folk, item) !== undefined) {
+      model.put(folk.room, item.id, quantity, acting.roomCharged === true ? 0 : intervalOf(acting.skill), 'town');
+      acting.roomCharged = true;
+      hiring.events.emit('folkMade', { folk, skill: acting.skill, item, quantity, held: true, town: true });
+      hiring.renderQueue.folks = true;
+      return true;
+    }
     const ignoreSpace = rest[2] === true;
     if (!ignoreSpace && Number.isInteger(quantity) && !bankTakes(this, item) && hold(acting, item, quantity)) {
       made(acting, item, quantity, true);

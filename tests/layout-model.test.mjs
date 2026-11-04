@@ -6,16 +6,16 @@ import {
   setFolded,
 } from '../src/layout-model.mjs';
 
-test('the default layout: the Overview, then Work Orders, above the cards, nothing folded', () => {
+test('the default layout: the Overview, Work Orders and Commissions above the cards, nothing folded', () => {
   const d = defaultLayout();
-  assert.deepEqual(d, { cols: { wide: ['dashboard', 'orders', 'crew'] }, folded: [], cards: [] });
+  assert.deepEqual(d, { cols: { wide: ['dashboard', 'orders', 'commissions', 'crew'] }, folded: [], cards: [] });
   assert.ok(isDefault(d));
   d.cols.wide.push('x');
-  assert.deepEqual(DEFAULT_COLS.wide, ['dashboard', 'orders', 'crew'], 'a default layout is a copy');
+  assert.deepEqual(DEFAULT_COLS.wide, ['dashboard', 'orders', 'commissions', 'crew'], 'a default layout is a copy');
 });
 
 test('a saved layout round-trips', () => {
-  const saved = { cols: { wide: ['crew', 'orders', 'dashboard'] }, folded: ['dashboard', 'orders'], cards: ['f2', 'f1'] };
+  const saved = { cols: { wide: ['crew', 'commissions', 'orders', 'dashboard'] }, folded: ['dashboard', 'orders'], cards: ['f2', 'f1'] };
   const back = parseLayout(serializeLayout(saved));
   assert.deepEqual(back, saved);
   assert.equal(isDefault(back), false);
@@ -29,23 +29,27 @@ test('junk reads as the default layout', () => {
 
 test('unknown ids and repeats are dropped', () => {
   const l = cleanLayout({ cols: { wide: ['crew', 'ghost', 'crew', 7, 'dashboard', 'dashboard'] }, folded: ['ghost', 'dashboard', 'dashboard', null, 'crew'], cards: ['a', 'a', 5, '', 'b'] });
-  assert.deepEqual(l, { cols: { wide: ['crew', 'orders', 'dashboard'] }, folded: ['dashboard'], cards: ['a', 'b'] });
+  assert.deepEqual(l, { cols: { wide: ['crew', 'orders', 'commissions', 'dashboard'] }, folded: ['dashboard'], cards: ['a', 'b'] });
 });
 
 test('a layout from builds .93-.97 (two top columns, a reserve block) cleans to one column', () => {
   const old = { cols: { left: ['reserve'], right: ['dashboard'], wide: ['crew'] }, folded: ['reserve'], cards: ['f1'] };
-  assert.deepEqual(cleanLayout(old), { cols: { wide: ['dashboard', 'orders', 'crew'] }, folded: [], cards: ['f1'] });
+  assert.deepEqual(cleanLayout(old), { cols: { wide: ['dashboard', 'orders', 'commissions', 'crew'] }, folded: [], cards: ['f1'] });
   const below = { cols: { left: ['reserve'], right: [], wide: ['crew', 'dashboard'] }, folded: ['dashboard'] };
-  assert.deepEqual(cleanLayout(below).cols, { wide: ['crew', 'orders', 'dashboard'] }, 'the Overview kept below the cards');
+  assert.deepEqual(cleanLayout(below).cols, { wide: ['crew', 'orders', 'commissions', 'dashboard'] }, 'the Overview kept below the cards');
   assert.deepEqual(cleanLayout(below).folded, ['dashboard']);
 });
 
 test('a block missing from the saved order goes back to its default place', () => {
-  assert.deepEqual(cleanLayout({ cols: { wide: ['crew'] } }).cols, { wide: ['dashboard', 'orders', 'crew'] });
-  assert.deepEqual(cleanLayout({ cols: { wide: ['dashboard'] } }).cols, { wide: ['dashboard', 'orders', 'crew'] });
-  // A layout saved before Work Orders: the new block lands second, whatever order the player chose.
-  assert.deepEqual(cleanLayout({ cols: { wide: ['dashboard', 'crew'] } }).cols, { wide: ['dashboard', 'orders', 'crew'] });
-  assert.deepEqual(cleanLayout({ cols: { wide: ['crew', 'dashboard'] } }).cols, { wide: ['crew', 'orders', 'dashboard'] });
+  const full = ['dashboard', 'orders', 'commissions', 'crew'];
+  assert.deepEqual(cleanLayout({ cols: { wide: ['crew'] } }).cols, { wide: full });
+  assert.deepEqual(cleanLayout({ cols: { wide: ['dashboard'] } }).cols, { wide: full });
+  // A layout saved before Work Orders: the new blocks land second and third, whatever order the player chose.
+  assert.deepEqual(cleanLayout({ cols: { wide: ['dashboard', 'crew'] } }).cols, { wide: full });
+  assert.deepEqual(cleanLayout({ cols: { wide: ['crew', 'dashboard'] } }).cols, { wide: ['crew', 'orders', 'commissions', 'dashboard'] });
+  // A layout saved before Commissions (build .163): they land third.
+  assert.deepEqual(cleanLayout({ cols: { wide: ['dashboard', 'orders', 'crew'] } }).cols, { wide: full });
+  assert.deepEqual(cleanLayout({ cols: { wide: ['crew', 'orders', 'dashboard'] } }).cols, { wide: ['crew', 'orders', 'commissions', 'dashboard'] });
 });
 
 test('allowed: the one column only', () => {

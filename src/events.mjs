@@ -28,6 +28,11 @@ export const EVENT_NAMES = [
   'orderExpired',
   // A Folk's action made an item, into the bank or held in its room: { folk, skill, item, quantity, held } (build .150).
   'folkMade',
+  // Township Commissions (build .163): a Folk set off with what it holds { commission, folk, qty, offline }; a
+  // commission was delivered and paid { commission, folk, reward, offline }; its figure withdrew it { commission, folk, offline }.
+  'commissionRun',
+  'commissionDelivered',
+  'commissionWithdrawn',
 ];
 
 export function createEventBus(names = EVENT_NAMES, { onError } = {}) {

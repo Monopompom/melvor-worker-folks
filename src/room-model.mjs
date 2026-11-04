@@ -14,6 +14,9 @@
 // inputs are used the room empties at the rate the Folk works. Haul and stock share one size. A bag worn in the
 // Folk's Cape slot makes the room bigger: a Satchel by a third of the tier's bag room, a Pack by two thirds, a Frame
 // Pack by all of it.
+//
+// Township Commissions (build .163) add a third side, `town`: what a Folk makes for a commission, kept for the town
+// and never emptied to the bank. It takes room like the rest, so a full room sends the Folk on a run to town.
 
 const HOUR_MS = 3_600_000;
 
@@ -111,17 +114,20 @@ export function capacityMs(tier, extraHours = 0) {
   return (base + extra) * HOUR_MS;
 }
 
-const sideOf = (room, side) => room?.[side === 'stock' ? 'stock' : 'haul'];
+/** The room's sides: 'haul' (what it holds for you), 'stock' (its inputs), 'town' (a commission's goods). */
+export const SIDES = Object.freeze(['haul', 'stock', 'town']);
+const keyOf = (side) => (SIDES.includes(side) ? side : 'haul');
+const sideOf = (room, side) => room?.[keyOf(side)];
 
 /** Nothing held on that side ('haul', the default, or 'stock'). */
 export function isEmpty(room, side = 'haul') {
   return Object.keys(sideOf(room, side) ?? {}).length === 0;
 }
 
-/** Work held on both sides, in ms. */
+/** Work held on every side, in ms. */
 export function usedMs(room) {
   const sum = (stacks) => Object.values(stacks ?? {}).reduce((total, e) => total + e.ms, 0);
-  return sum(room?.haul) + sum(room?.stock);
+  return sum(room?.haul) + sum(room?.stock) + sum(room?.town);
 }
 
 /** Whether `ms` more work fits in a room of `capMs`. */
@@ -132,7 +138,7 @@ export function fits(room, capMs, ms) {
 /** Puts qty of an item worth `ms` of work on a side of the room (the caller checked it fits). */
 export function put(room, itemId, qty, ms, side = 'haul') {
   if (!Number.isInteger(qty) || qty <= 0) return;
-  const key = side === 'stock' ? 'stock' : 'haul';
+  const key = keyOf(side);
   room[key] ??= {};
   const entry = room[key][itemId] ?? { qty: 0, ms: 0 };
   entry.qty += qty;

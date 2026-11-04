@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-10-31.162';
+export const BUILD = '2026-11-04.165';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -123,6 +123,8 @@ export async function setup(ctx) {
   const qualification = await ctx.loadModule('src/qualification.mjs');
   const workOrderRules = await ctx.loadModule('src/work-orders-model.mjs');
   const workOrders = await ctx.loadModule('src/work-orders.mjs');
+  const commissionRules = await ctx.loadModule('src/commissions-model.mjs');
+  const commissions = await ctx.loadModule('src/commissions.mjs');
   const daydreamRules = await ctx.loadModule('src/daydream-model.mjs');
   const daydream = (await ctx.loadModule('src/daydream.mjs')).install({ model: daydreamRules });
 
@@ -367,6 +369,19 @@ export async function setup(ctx) {
   workOrders.install(ctx, {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     model: workOrderRules,
+    time,
+    numbers,
+    tips,
+    popupDidRender,
+    log,
+  });
+
+  // 11. Township Commissions: the town's board on the Hiring page, after Work Orders (it reads their candidates) and
+  // the room (a commission's items wait on its town side).
+  commissions.install(ctx, {
+    getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+    model: commissionRules,
+    resume,
     time,
     numbers,
     tips,

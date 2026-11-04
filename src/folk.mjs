@@ -1,7 +1,7 @@
 // Folk record model, validation and save-root migrations. Pure: no game globals.
 
 export const TIERS = ['Newbie', 'Junior', 'Middle', 'Senior', 'Expert'];
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 8;
 /**
  * A Folk's travel state: 'idle' stays on its place, 'with' goes along with the player, 'walking' is on its way somewhere
  * alone (Voyage, phase 6). Only 'idle' works.
@@ -41,6 +41,8 @@ export function createFolk({ id, slot, tier, name, hiredAt = 0, paid = null }) {
     overtime: false,
     strikes: 0,
     restartWhenReady: false,
+    /** What to start on again after a strike, as plain ids (src/resume.mjs toSaved); null = a plain start. */
+    restartPick: null,
     /** null = full health (max HP depends on the tier). */
     hp: null,
     /** Map hex { q, r } the Folk stands on; null = no place (no Voyage, or hired before 6b). */
@@ -112,6 +114,7 @@ export function normalizeFolk(raw) {
   folk.overtime = raw.overtime === true;
   folk.strikes = Number.isInteger(raw.strikes) && raw.strikes >= 0 ? raw.strikes : 0;
   folk.restartWhenReady = raw.restartWhenReady === true;
+  folk.restartPick = folk.onStrike || folk.restartWhenReady ? savedPick(raw.restartPick) : null;
   folk.hp = typeof raw.hp === 'number' && Number.isFinite(raw.hp) && raw.hp >= 0 ? Math.floor(raw.hp) : null;
   folk.place = normalizePlace(raw.place);
   folk.travel = TRAVEL.includes(raw.travel) ? raw.travel : 'idle';
@@ -122,18 +125,24 @@ export function normalizeFolk(raw) {
   return folk;
 }
 
+/** A saved pick is a plain object of ids; what it names is checked when it is replayed (src/resume.mjs fromSaved). */
+function savedPick(raw) {
+  return raw !== null && typeof raw === 'object' && !Array.isArray(raw) ? raw : null;
+}
+
 /**
- * A Folk's room (src/room-model.mjs): { haul: { itemId: { qty, ms } }, stock: { … } }. The haul is what it made and
- * holds for you (ms the work that made the stack), the stock the inputs it works from (ms the work they feed).
+ * A Folk's room (src/room-model.mjs): { haul: { itemId: { qty, ms } }, stock: { … }, town: { … } }. The haul is what it
+ * made and holds for you (ms the work that made the stack), the stock the inputs it works from (ms the work they
+ * feed), the town what it made for a Township commission (build .163).
  */
 export function createRoom() {
-  return { haul: {}, stock: {} };
+  return { haul: {}, stock: {}, town: {} };
 }
 
 /** A clean room from whatever the save holds: stacks with whole positive quantities and a time of 0 or more. */
 export function normalizeRoom(raw) {
   const room = createRoom();
-  ['haul', 'stock'].forEach((side) => {
+  ['haul', 'stock', 'town'].forEach((side) => {
     const stacks = raw?.[side];
     if (stacks === null || typeof stacks !== 'object' || Array.isArray(stacks)) return;
     for (const [id, entry] of Object.entries(stacks)) {
@@ -187,7 +196,7 @@ export function normalizeLost(raw, frozen = {}) {
 }
 
 export function createEmptyRoot() {
-  return { v: SAVE_VERSION, folks: [], reserve: createEmptyReserve(), frozen: {}, board: null, lost: {} };
+  return { v: SAVE_VERSION, folks: [], reserve: createEmptyReserve(), frozen: {}, board: null, lost: {}, commissions: null };
 }
 
 /**
@@ -248,6 +257,13 @@ export const MIGRATIONS = {
     ...root,
     v: 7,
     folks: (Array.isArray(root.folks) ? root.folks : []).map((f) => ({ ...f, room: { haul: {}, stock: {} } })),
+  }),
+  // v8: Township Commissions (no board yet) and a town side in every room, empty.
+  7: (root) => ({
+    ...root,
+    v: 8,
+    folks: (Array.isArray(root.folks) ? root.folks : []).map((f) => ({ ...f, room: { haul: {}, stock: {}, ...(f.room ?? {}), town: {} } })),
+    commissions: null,
   }),
 };
 
@@ -312,9 +328,12 @@ export function parseRoot(input) {
   // The Work Orders board, kept as saved: its own model checks it when the game loads (no board yet: null).
   const saved = migrated.root.board;
   const board = saved !== null && typeof saved === 'object' && !Array.isArray(saved) ? saved : null;
-  return { root: { v: SAVE_VERSION, folks, reserve, frozen, board, lost }, applied: migrated.applied, dropped, corrupt: false };
+  // Township Commissions' state, likewise checked by its own model (src/commissions-model.mjs).
+  const town = migrated.root.commissions;
+  const commissions = town !== null && typeof town === 'object' && !Array.isArray(town) ? town : null;
+  return { root: { v: SAVE_VERSION, folks, reserve, frozen, board, lost, commissions }, applied: migrated.applied, dropped, corrupt: false };
 }
 
-export function serializeRoot(folks, reserve = {}, frozen = {}, board = null, lost = {}) {
-  return JSON.stringify({ v: SAVE_VERSION, folks, reserve, frozen, board, lost });
+export function serializeRoot(folks, reserve = {}, frozen = {}, board = null, lost = {}, commissions = null) {
+  return JSON.stringify({ v: SAVE_VERSION, folks, reserve, frozen, board, lost, commissions });
 }

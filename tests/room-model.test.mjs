@@ -53,11 +53,11 @@ test('entries list the biggest share of work first', () => {
 });
 
 test('normalizeRoom keeps good stacks and drops the rest', () => {
-  assert.deepEqual(normalizeRoom(undefined), { haul: {}, stock: {} });
-  assert.deepEqual(normalizeRoom({ haul: [1] }), { haul: {}, stock: {} });
+  assert.deepEqual(normalizeRoom(undefined), { haul: {}, stock: {}, town: {} });
+  assert.deepEqual(normalizeRoom({ haul: [1] }), { haul: {}, stock: {}, town: {} });
   const room = normalizeRoom({ haul: { a: { qty: 3, ms: 900 }, b: { qty: 0, ms: 5 }, c: { qty: 2, ms: -1 }, d: null, e: { qty: 'x' } } });
-  assert.deepEqual(room, { haul: { a: { qty: 3, ms: 900 }, c: { qty: 2, ms: 0 } }, stock: {} });
-  assert.deepEqual(normalizeRoom({ stock: { a: { qty: 5, ms: 10 }, b: { qty: 1.5 } } }), { haul: {}, stock: { a: { qty: 5, ms: 10 } } });
+  assert.deepEqual(room, { haul: { a: { qty: 3, ms: 900 }, c: { qty: 2, ms: 0 } }, stock: {}, town: {} });
+  assert.deepEqual(normalizeRoom({ stock: { a: { qty: 5, ms: 10 }, b: { qty: 1.5 } } }), { haul: {}, stock: { a: { qty: 5, ms: 10 } }, town: {} });
 });
 
 test('fillView gives hours and a percent capped at 100', () => {
@@ -174,4 +174,17 @@ test('bags past the Satchel cost nothing the Shop sells: rare finds, drops and b
   assert.equal(costs('Folk_Pack')['melvorD:Mithril_Bar'], 150);
   assert.equal(costs('Folk_Frame_Pack')['melvorD:Black_Dragonhide'], 250);
   assert.equal(costs('Folk_Frame_Pack')['melvorD:Runite_Bar'], 400);
+});
+
+test('the town side holds a commission\'s goods: it takes room like the rest and is its own side', () => {
+  const room = createRoom();
+  put(room, 'oak', 100, 600_000, 'town');
+  put(room, 'nest', 2, 0);
+  assert.equal(qtyOf(room, 'oak', 'town'), 100);
+  assert.equal(qtyOf(room, 'oak'), 0);
+  assert.equal(usedMs(room), 600_000);
+  assert.equal(isEmpty(room, 'town'), false);
+  assert.deepEqual(take(room, 'oak', 40, 'town'), { qty: 40, ms: 240_000 });
+  assert.equal(usedMs(room), 360_000);
+  assert.deepEqual(entries(room, 'town'), [{ id: 'oak', qty: 60, ms: 360_000 }]);
 });

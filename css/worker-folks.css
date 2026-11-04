@@ -523,6 +523,20 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-order-done .wf-order-rewards, .wf-order-done .wf-order-bar + small { opacity: 0.7; }
 .wf-order-empty { justify-content: center; text-align: center; min-height: 6rem; }
 
+/* Township Commissions (build .163): the Work Orders grid and bands, a figure's portrait in place of the size icon,
+   its asking line under its name, what the Folk holds for it as a lighter part of the bar, the Folk or Send at the
+   foot. On a Folk's card, one line under where it stands: the figure's face, the count, runs left and the deadline. */
+#worker-folks-commissions > .wf-dash-content { padding: 16px !important; }
+.wf-comm-portrait { width: 48px; height: 48px; flex: none; border-radius: 50%; }
+/* The status badge on the figure's name line, not at the top of the portrait's row (the user, 4 Nov 2026). */
+.wf-comm .wf-order-state { align-self: center; }
+.wf-comm-line { font-style: italic; }
+.wf-comm .wf-comm-held { opacity: 0.45; }
+.wf-comm-foot { gap: 6px; margin-top: auto; padding-top: 8px; }
+.wf-comm-standing { font-size: 0.8rem; white-space: nowrap; }
+.wf-comm-card:not(.d-none) { display: flex; align-items: center; gap: 6px; margin-top: 4px; text-align: left; }
+.wf-comm-icon { width: 28px; height: 28px; flex: none; border-radius: 50%; }
+
 /* Overview (src/dashboard.mjs, build .95; merged with the Payroll Reserve in .98, the user 18 Oct 2026). One fixed
    height that holds a full crew: three bands side by side (At work, Payroll, Made this session), each scrolling inside.
    On a phone they stack, Payroll first, each with its own cap. The title row carries the Next unlock pill and, while

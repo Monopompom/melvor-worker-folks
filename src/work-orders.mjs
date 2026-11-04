@@ -37,7 +37,11 @@ export function install(ctx, { getHiring, model, time, numbers, tips, popupDidRe
   const level = () => hiring?.level ?? 0;
   const media = (path) => hiring.getMediaURL(path);
   const sizeIcon = (size) => media(`assets/work_order_${size.toLowerCase()}.webp`);
-  const n = (v) => numberWithCommas(Math.floor(v));
+  // Shown numbers: the short form past 9,999 ("540K", "2.5M"), as Township Commissions show them, built on the game's
+  // formatters; the exact one in tooltips. A price (the reroll) stays exact.
+  const n = (v) => numbers.shortNumber(Math.floor(v));
+  const full = (v) => numberWithCommas(Math.floor(v));
+  const isShort = (v) => n(v) !== full(v);
   const markDirty = () => { dirty = true; };
 
   // ---- what can be asked for ------------------------------------------------------------------------------------
@@ -141,9 +145,9 @@ export function install(ctx, { getHiring, model, time, numbers, tips, popupDidRe
     const parts = [];
     if (r.gp > 0) parts.push(templateLangString('MOD_WF_ORDER_REWARD_GP', { gp: n(r.gp) }));
     parts.push(templateLangString('MOD_WF_ORDER_REWARD_XP', { xp: n(r.xp) }));
-    if (r.tokens > 0) parts.push(r.tokens === 1 ? getLangString('MOD_WF_ORDER_REWARD_TOKEN') : templateLangString('MOD_WF_ORDER_REWARD_TOKENS', { count: `${r.tokens}` }));
+    if (r.tokens > 0) parts.push(r.tokens === 1 ? getLangString('MOD_WF_ORDER_REWARD_TOKEN') : templateLangString('MOD_WF_ORDER_REWARD_TOKENS', { count: full(r.tokens) }));
     r.items.forEach(({ itemId, qty }) => parts.push(templateLangString('MOD_WF_ORDER_REWARD_ITEM', { qty: n(qty), item: itemOf(itemId)?.name ?? itemId })));
-    if (r.gems > 0) parts.push(templateLangString('MOD_WF_ORDER_REWARD_GEMS', { count: `${r.gems}` }));
+    if (r.gems > 0) parts.push(templateLangString('MOD_WF_ORDER_REWARD_GEMS', { count: full(r.gems) }));
     return parts;
   };
 
@@ -184,8 +188,9 @@ export function install(ctx, { getHiring, model, time, numbers, tips, popupDidRe
 
   // ---- counting ------------------------------------------------------------------------------------------------------
 
-  const onMade = ({ folk, item, quantity }) => {
-    if (paying || folk === undefined || board === null || item === undefined) return;
+  const onMade = ({ folk, item, quantity, town }) => {
+    // What a Folk makes for a Township commission goes to the town: no order counts it (the user, 4 Nov 2026).
+    if (paying || town === true || folk === undefined || board === null || item === undefined) return;
     const folkId = folk.id;
     let a = actions.get(folkId);
     if (a === undefined) { a = { matched: new Set(), added: false }; actions.set(folkId, a); }
@@ -200,8 +205,8 @@ export function install(ctx, { getHiring, model, time, numbers, tips, popupDidRe
     if (done) due.push(order);
   };
 
-  const onPaid = ({ folk, currencyId, amount }) => {
-    if (board === null || currencyId !== GP_ID || !(amount > 0) || folk === undefined) return;
+  const onPaid = ({ folk, currencyId, amount, run }) => {
+    if (board === null || run === true || currencyId !== GP_ID || !(amount > 0) || folk === undefined) return;
     const a = actions.get(folk.id);
     let ids = a?.matched.size > 0 ? [...a.matched] : [];
     // A failed action: its wage goes to the order this Folk was filling.
@@ -278,9 +283,9 @@ export function install(ctx, { getHiring, model, time, numbers, tips, popupDidRe
     if (board === null || !model.rerollUnlocked(level())) return;
     const short = game.gp.amount < model.REROLL_COST;
     const none = !model.canReroll(board);
-    const fee = `<img class="skill-icon-xs mr-1" src="${game.gp.media}" alt="GP"><span class="font-w600 ${short ? 'text-danger' : 'text-warning'}">${n(model.REROLL_COST)}</span>`;
+    const fee = `<img class="skill-icon-xs mr-1" src="${game.gp.media}" alt="GP"><span class="font-w600 ${short ? 'text-danger' : 'text-warning'}">${full(model.REROLL_COST)}</span>`;
     const band = `<div class="wf-band text-left mt-2"><span class="${short ? 'text-danger' : 'text-success'}">${short ? '✗' : '✓'}</span> ${templateLangString('MOD_WF_ORDERS_REROLL_COST', { cost: fee })}</div>`;
-    const why = none ? getLangString('MOD_WF_ORDERS_REROLL_NONE') : short ? templateLangString('MOD_WF_ORDERS_REROLL_SHORT', { cost: n(model.REROLL_COST) }) : '';
+    const why = none ? getLangString('MOD_WF_ORDERS_REROLL_NONE') : short ? templateLangString('MOD_WF_ORDERS_REROLL_SHORT', { cost: full(model.REROLL_COST) }) : '';
     const cls = { popup: 'wf-ui', confirmButton: 'btn btn-warning m-1' };
     SwalLocale.fire({
       didRender: popupDidRender,
@@ -299,7 +304,7 @@ export function install(ctx, { getHiring, model, time, numbers, tips, popupDidRe
       if (!result.isConfirmed || board === null) return;
       // Asked again: the GP or the board may have changed while the popup was open.
       if (game.gp.amount < model.REROLL_COST || !model.canReroll(board)) {
-        game.notifications.createErrorNotification('worker_folks:order', !model.canReroll(board) ? getLangString('MOD_WF_ORDERS_REROLL_NONE') : templateLangString('MOD_WF_ORDERS_REROLL_SHORT', { cost: n(model.REROLL_COST) }));
+        game.notifications.createErrorNotification('worker_folks:order', !model.canReroll(board) ? getLangString('MOD_WF_ORDERS_REROLL_NONE') : templateLangString('MOD_WF_ORDERS_REROLL_SHORT', { cost: full(model.REROLL_COST) }));
         return;
       }
       game.gp.remove(model.REROLL_COST);
@@ -333,7 +338,7 @@ export function install(ctx, { getHiring, model, time, numbers, tips, popupDidRe
     rerollButton = el('button', 'btn btn-sm btn-outline-warning d-none', getLangString('MOD_WF_ORDERS_REROLL'));
     rerollButton.type = 'button';
     rerollButton.addEventListener('click', openReroll);
-    tips?.set(rerollButton, templateLangString('MOD_WF_ORDERS_REROLL_TIP', { cost: n(model.REROLL_COST) }));
+    tips?.set(rerollButton, templateLangString('MOD_WF_ORDERS_REROLL_TIP', { cost: full(model.REROLL_COST) }));
     right.append(clock, rerollButton);
     head.append(right);
     grid = el('div', 'wf-orders-grid');
@@ -364,6 +369,7 @@ export function install(ctx, { getHiring, model, time, numbers, tips, popupDidRe
     const ask = el('div', 'd-flex align-items-center mt-2 font-w600');
     const item = itemOf(order.itemId);
     ask.append(img(item?.media, 'skill-icon-xs mr-1'), document.createTextNode(askText(order)));
+    if (isShort(order.qty)) tips?.set(ask, templateLangString('MOD_WF_ORDER_ASK', { qty: full(order.qty), item: item?.name ?? order.itemId }));
     card.append(ask);
     const bar = el('div', 'progress wf-order-bar mt-2');
     const fillBar = el('div', `progress-bar ${done ? 'bg-success' : 'bg-info'}`);
@@ -371,23 +377,28 @@ export function install(ctx, { getHiring, model, time, numbers, tips, popupDidRe
     fillBar.style.width = `${Math.min(100, (order.delivered / order.qty) * 100)}%`;
     bar.append(fillBar);
     card.append(bar);
-    card.append(el('small', 'd-block text-center', templateLangString('MOD_WF_ORDER_PROGRESS', { done: n(order.delivered), qty: n(order.qty) })));
+    const progress = el('small', 'd-block text-center', templateLangString('MOD_WF_ORDER_PROGRESS', { done: n(order.delivered), qty: n(order.qty) }));
+    if (isShort(order.qty)) tips?.set(progress, templateLangString('MOD_WF_ORDER_PROGRESS', { done: full(order.delivered), qty: full(order.qty) }));
+    card.append(progress);
 
     // A delivered order shows what it paid; an open one what it would pay at today's level.
     const r = done && order.paid !== null ? { ...rewardOf(order), ...order.paid } : rewardOf(order);
     const list = el('div', 'wf-order-rewards mt-2');
-    const line = (icon, text, cls = '') => {
-      const row = el('div', `d-flex align-items-center wf-order-reward ${cls}`);
+    /** One reward a line; `exact`: the line with the full number, its tooltip when the line shows the short one. */
+    const line = (icon, text, exact) => {
+      const row = el('div', 'd-flex align-items-center wf-order-reward');
       row.append(img(icon, 'skill-icon-xs mr-1'), el('span', '', text));
+      if (exact !== undefined && exact !== text) tips?.set(row, exact);
       list.append(row);
     };
     if (done && order.paid !== null) line(game.gp.media, templateLangString('MOD_WF_ORDER_GP_PAID', { rate: numberWithCommas(order.gpRate), gp: numbers.shortNumber(order.paid.gp) }));
     else if (wagesOn()) line(game.gp.media, templateLangString('MOD_WF_ORDER_GP', { rate: numberWithCommas(order.gpRate), gp: numbers.shortNumber(order.wages * order.gpRate) }));
-    line(hiring.media, templateLangString('MOD_WF_ORDER_REWARD_XP', { xp: n(r.xp) }));
+    line(hiring.media, templateLangString('MOD_WF_ORDER_REWARD_XP', { xp: n(r.xp) }), templateLangString('MOD_WF_ORDER_REWARD_XP', { xp: full(r.xp) }));
     const token = hiring.masteryTokens?.get(game.defaultRealm)?.[0];
-    if (r.tokens > 0) line(token?.media, r.tokens === 1 ? getLangString('MOD_WF_ORDER_REWARD_TOKEN') : templateLangString('MOD_WF_ORDER_REWARD_TOKENS', { count: `${r.tokens}` }));
-    r.items.forEach(({ itemId, qty }) => line(itemOf(itemId)?.media, templateLangString('MOD_WF_ORDER_REWARD_ITEM', { qty: n(qty), item: itemOf(itemId)?.name ?? itemId })));
-    if (r.gems > 0) line(game.randomGemTable?.sortedDropsArray?.[0]?.item?.media, templateLangString('MOD_WF_ORDER_REWARD_GEMS', { count: `${r.gems}` }));
+    if (r.tokens > 0) line(token?.media, r.tokens === 1 ? getLangString('MOD_WF_ORDER_REWARD_TOKEN') : templateLangString('MOD_WF_ORDER_REWARD_TOKENS', { count: full(r.tokens) }));
+    r.items.forEach(({ itemId, qty }) => line(itemOf(itemId)?.media, templateLangString('MOD_WF_ORDER_REWARD_ITEM', { qty: n(qty), item: itemOf(itemId)?.name ?? itemId }),
+      templateLangString('MOD_WF_ORDER_REWARD_ITEM', { qty: full(qty), item: itemOf(itemId)?.name ?? itemId })));
+    if (r.gems > 0) line(game.randomGemTable?.sortedDropsArray?.[0]?.item?.media, templateLangString('MOD_WF_ORDER_REWARD_GEMS', { count: full(r.gems) }));
     card.append(list);
     return card;
   };

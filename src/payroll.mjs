@@ -6,7 +6,7 @@ const AP_ID = 'melvorItA:AbyssalPieces';
 const ABYSSAL_REALM = 'melvorItA:Abyssal';
 
 export function install(ctx, { getHiring, wages, pricing, milestones, resume, log }) {
-  const { selectionOf, startAgain } = resume;
+  const { selectionOf, startAgain, toSaved, fromSaved } = resume;
   let hiring;
   const section = ctx.settings.section('Wages');
   section.add([
@@ -136,23 +136,26 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
       if (hiring.levels?.autoRestart() && folk.skillId !== null) {
         folk.restartWhenReady = true;
         if (folk.cooldownTicks === 0) restartFolk(folk);
+      } else {
+        folk.restartPick = null;
       }
       hiring.crew.touch();
       return true;
     },
   };
 
-  // What the Folk was working on when it struck (build .81-.82; helpers in resume.mjs). Kept for this session only:
-  // after a reload a skill without a pick isn't restarted.
+  // What the Folk was working on when it struck (build .81-.82; helpers in resume.mjs). The game's objects for this
+  // session; the save keeps them as ids on the Folk (restartPick, build .164), found again after a reload.
   const strikeSelection = new Map();
 
   /** Starts the Folk's last skill again (online only); clears the flag either way. */
   const restartFolk = (folk) => {
     folk.restartWhenReady = false;
-    const pick = strikeSelection.get(folk.id);
-    strikeSelection.delete(folk.id);
-    if (!game._isInOnlineLoop || !(hiring.levels?.autoRestart())) return false;
     const skill = folk.skillId === null ? undefined : game.skills.getObjectByID(folk.skillId);
+    const pick = strikeSelection.get(folk.id) ?? fromSaved(skill, folk.restartPick, game);
+    strikeSelection.delete(folk.id);
+    folk.restartPick = null;
+    if (!game._isInOnlineLoop || !(hiring.levels?.autoRestart())) return false;
     if (skill === undefined || skill.isActive || hiring.delegated.has(skill)) return false;
     if (!hiring.folkAvailable(folk)) return false;
     // Refused where it stands (Voyage's work guard): it stays idle and says why, rather than the skill's own lock
@@ -205,7 +208,7 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
   };
 
   /** One finished action: collect old debt if possible, charge the prorated wage; unpaid wages pile up into a strike. */
-  const charge = ({ skill, folk, intervalMs }) => {
+  const charge = ({ skill, folk, intervalMs, run = false }) => {
     if (folk === undefined || !api.enabled || !(intervalMs > 0)) return;
     repayDebt(folk);
     const { amount, carry } = wages.wholeCharge(wages.wageForAction(folk.tier, intervalMs, { multiplier: multiplier() * (hiring.wageFactor?.(folk) ?? 1), discount: hiring.wageDiscount?.(folk) ?? 0 }), folk.wageCarry);
@@ -220,7 +223,8 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     warnReserve(id);
     // What was paid, for the Welcome Back summary's wages line (build .136).
     const paid = split.fromReserve + split.fromBank;
-    if (paid > 0) hiring.events.emit('folkPaid', { folk, skill, currencyId: id, amount: paid, offline: !game._isInOnlineLoop });
+    // run: a Township commission's run to town, paid like work (Work Orders leave it out).
+    if (paid > 0) hiring.events.emit('folkPaid', { folk, skill, currencyId: id, amount: paid, run, offline: !game._isInOnlineLoop });
     if (split.unpaid === 0) {
       if (folk.debt === 0 && folk.debtMs !== 0) folk.debtMs = 0;
       return;
@@ -281,6 +285,7 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     log(`${folk.name} strikes on ${skill.id}, owed ${folk.debt} ${folk.debtCurrency}`);
     const pick = selectionOf(skill);
     if (pick !== null) strikeSelection.set(folk.id, pick);
+    folk.restartPick = toSaved(pick);
     hiring.forceStop(skill);
     game.notifications.createErrorNotification(
       'worker_folks:strike',
@@ -359,6 +364,8 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
   ctx.onModsLoaded(() => {
     hiring = getHiring();
     hiring.payroll = api;
+    /** The wage for `ms` of a Folk's time that made nothing: a run to town for a Township commission (build .163). */
+    api.chargeTime = (folk, skill, ms) => charge({ skill, folk, intervalMs: ms, run: true });
   });
   ctx.onCharacterLoaded(() => {
     hiring.events.on('folkActionDone', charge);
