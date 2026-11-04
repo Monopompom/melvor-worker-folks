@@ -109,24 +109,31 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, po
     const biome = township()?.biomes?.getObjectByID(model.HALL_BIOME);
     if (hall === undefined || biome === undefined) return null;
     let built = 0;
+    let efficiency = 0;
     let relief = 0;
     try {
       built = biome.getBuildingCount(hall);
-      relief = built > 0 ? Math.max(1, built * (biome.getBuildingEfficiency(hall) / 100)) * model.HALL_WAGE_DISCOUNT : 0;
+      efficiency = biome.getBuildingEfficiency(hall);
+      relief = built > 0 ? Math.max(1, built * (efficiency / 100)) * model.HALL_WAGE_DISCOUNT : 0;
     } catch { return null; }
-    return { built, relief: Math.round(relief * 10) / 10 };
+    return { built, efficiency, relief: Math.round(relief * 10) / 10 };
   };
   /**
    * Township recomputes the player's modifiers only on some events (a season change, worship), not when a building is
-   * built, destroyed or wears down, so a new Hall's wage relief would wait for an unrelated stat change. When the Halls
-   * change, recompute once. The first check after load only records them: loading computes every stat already.
+   * built, destroyed or wears down, so a new Hall's wage relief would wait for an unrelated stat change. When the Halls'
+   * count or efficiency changes (each 1% of wear counts, though the shown relief is rounded), recompute once. The first
+   * check after load only records them: loading computes every stat already.
    */
   let hallKey;
   const syncHalls = () => {
     const h = halls();
-    const key = h === null ? '' : `${h.built}:${h.relief}`;
+    const key = h === null ? '' : `${h.built}:${h.efficiency}`;
     if (hallKey !== undefined && key !== hallKey) {
-      try { township().computeProvidedStats(true); } catch (err) { log('hall stats not updated', err); }
+      try {
+        // Township keeps each building's count x efficiency multiplier until told to refresh it.
+        township().setBuildingProvidedStatsMultiplier(hallOf());
+        township().computeProvidedStats(true);
+      } catch (err) { log('hall stats not updated', err); }
     }
     hallKey = key;
   };

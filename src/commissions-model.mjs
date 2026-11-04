@@ -36,9 +36,9 @@ export const FADE_PER_DAY = 0.02;
 /** Town Standing tiers: points needed and what each opens (Known: the Guild Charter; Trusted: a fourth commission). */
 export const TIERS = [
   { id: 'Strangers', points: 0 },
-  { id: 'Known', points: 40 },
-  { id: 'Trusted', points: 150 },
-  { id: 'Honoured', points: 400 },
+  { id: 'Known', points: 80 },
+  { id: 'Trusted', points: 300 },
+  { id: 'Honoured', points: 800 },
 ];
 
 /**
@@ -428,11 +428,11 @@ export const CHARTER_ID = 'Guild_Charter';
 export const HALL_ID = 'Guild_Hall';
 export const HALL_MAX = 5;
 export const HALL_WAGE_DISCOUNT = 1;
-/** Township tier 2: Township level 15, as the town's own second-tier buildings. */
-export const HALL_TIER = 2;
+/** Township tier 5, Town Hall's: Township level 80 and 40,000 citizens (the user, 4 Nov 2026). */
+export const HALL_TIER = 5;
 export const HALL_BIOME = 'melvorF:Grasslands';
-/** Per Hall, a tuning figure: about a Market's bill, in the trades the guild works for (Planks, Stone, Bar). */
-export const HALL_COST = Object.freeze([['melvorF:GP', 25000], ['melvorF:Planks', 4000], ['melvorF:Stone', 4000], ['melvorF:Bar', 2000]]);
+/** Per Hall: Town Hall's bill in GP and in the trades the guild works for (Planks, Stone, Bar) (the user, 4 Nov 2026). */
+export const HALL_COST = Object.freeze([['melvorF:GP', 100000000], ['melvorF:Planks', 100000], ['melvorF:Stone', 100000], ['melvorF:Bar', 100000]]);
 
 /** Whether the town owes the guild its charter: Known reached once, the charter never found. */
 export function charterDue(state, found) {

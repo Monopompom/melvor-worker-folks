@@ -631,7 +631,7 @@
   "MOD_WF_COMM_EMPTY": "No one is asking. The board fills again at the next refresh.",
   "MOD_WF_COMM_STANDING": "${tier} · ${points} / ${next}",
   "MOD_WF_COMM_STANDING_TOP": "${tier} · ${points}",
-  "MOD_WF_COMM_STANDING_TIP": "Town Standing: what your town thinks of your guild. Every delivered commission adds to it, a late one less. Known at 40 (the Guild Charter, for Township’s Guild Hall), Trusted at 150 (a fourth commission), Honoured at 400. After three days without a delivery it fades by 2% a day; the charter and the Halls stay.",
+  "MOD_WF_COMM_STANDING_TIP": "Town Standing: what your town thinks of your guild. Every delivered commission adds to it, a late one less. Known at 80 (the Guild Charter, for Township’s Guild Hall), Trusted at 300 (a fourth commission), Honoured at 800. After three days without a delivery it fades by 2% a day; the charter and the Halls stay.",
   "MOD_WF_STANDING_Strangers": "Strangers",
   "MOD_WF_STANDING_Known": "Known",
   "MOD_WF_STANDING_Trusted": "Trusted",

@@ -28,15 +28,15 @@ test('the board opens at Hiring 30 with three commissions, four from Trusted', (
   assert.equal(slotsFor(3), 4);
 });
 
-test('Standing tiers: Strangers, Known at 40, Trusted at 150, Honoured at 400', () => {
+test('Standing tiers: Strangers, Known at 80, Trusted at 300, Honoured at 800', () => {
   assert.deepEqual(TIERS.map((t) => t.id), ['Strangers', 'Known', 'Trusted', 'Honoured']);
   assert.equal(tierOf(0), 0);
-  assert.equal(tierOf(39.9), 0);
-  assert.equal(tierOf(40), 1);
-  assert.equal(tierOf(150), 2);
-  assert.equal(tierOf(1000), 3);
-  assert.equal(nextTierPoints(10), 40);
-  assert.equal(nextTierPoints(400), null);
+  assert.equal(tierOf(79.9), 0);
+  assert.equal(tierOf(80), 1);
+  assert.equal(tierOf(300), 2);
+  assert.equal(tierOf(2000), 3);
+  assert.equal(nextTierPoints(10), 80);
+  assert.equal(nextTierPoints(800), null);
 });
 
 test('resources follow Township Casual Tasks by Township level, ×1.25 per 8 hours of work', () => {
@@ -151,15 +151,15 @@ test('a withdrawn commission pays for what came, without the bonus', () => {
 });
 
 test('Standing grows with deliveries and fades 2% a day after three idle days', () => {
-  const standing = { points: 30, idle: 5 * DAY_TICKS };
+  const standing = { points: 70, idle: 5 * DAY_TICKS };
   assert.deepEqual(gainStanding(standing, 16), { before: 0, after: 1 });
   assert.equal(standing.idle, 0);
   fade(standing, 3 * DAY_TICKS);
-  assert.equal(standing.points, 46, 'no fading in the first three days');
+  assert.equal(standing.points, 86, 'no fading in the first three days');
   fade(standing, DAY_TICKS);
-  assert.ok(Math.abs(standing.points - 46 * 0.98) < 1e-9);
+  assert.ok(Math.abs(standing.points - 86 * 0.98) < 1e-9);
   fade(standing, 2 * DAY_TICKS);
-  assert.ok(Math.abs(standing.points - 46 * 0.98 ** 3) < 1e-9);
+  assert.ok(Math.abs(standing.points - 86 * 0.98 ** 3) < 1e-9);
 });
 
 test('a run is due when the room holds the rest, or has no space for one more action', () => {
@@ -232,15 +232,15 @@ test('what a commission paid keeps what a full storage turned away (none in olde
 test('the highest tier reached stays through fading; older saves start from the tier held now', () => {
   const state = createState();
   assert.equal(state.reached, 0);
-  gainStanding(state.standing, 45);
+  gainStanding(state.standing, 85);
   assert.equal(noteReached(state), true);
   assert.equal(state.reached, CHARTER_TIER);
   assert.equal(noteReached(state), false, 'no news the second time');
   fade(state.standing, DAY_TICKS * 40);
-  assert.ok(state.standing.points < 40);
+  assert.ok(state.standing.points < 80);
   noteReached(state);
   assert.equal(state.reached, CHARTER_TIER, 'fading takes no reached tier away');
-  assert.equal(normalizeState({ standing: { points: 160 } }).reached, 2, 'an older save: Trusted held, so Trusted reached');
+  assert.equal(normalizeState({ standing: { points: 320 } }).reached, 2, 'an older save: Trusted held, so Trusted reached');
   assert.equal(normalizeState({ standing: { points: 10 }, reached: 1 }).reached, 1);
   assert.equal(normalizeState({ standing: { points: 10 }, reached: 99 }).reached, 0, 'junk reached: from points');
   assert.equal(normalizeState({ standing: { points: 10 }, reached: 3 }).reached, 3);
