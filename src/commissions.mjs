@@ -19,7 +19,7 @@ const CHECK_TICKS = 20;
 /** How often the board looks whether the town still owes the charter (every 10 s). */
 const CHARTER_CHECK_TICKS = 200;
 
-export function install(ctx, { getHiring, model, resume, time, numbers, tips, popupDidRender, log }) {
+export function install(ctx, { getHiring, model, resume, time, numbers, tips, marquee, popupDidRender, log }) {
   let hiring;
   let state = null;
   let ticks = 0;
@@ -457,7 +457,8 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, po
     const top = el('div', 'd-flex align-items-center wf-order-head');
     top.append(img(portraitOf(c.figure), 'wf-comm-portrait mr-2'));
     const who = el('div', 'wf-min0 flex-fill');
-    who.append(el('div', 'font-w600', templateLangString('MOD_WF_COMM_FIGURE_TITLE', { figure: figureName(c.figure) })));
+    // Every line of a card stays one line: one longer than the card slides to its end and back (the user, 4 Nov 2026).
+    who.append(marquee('div', 'font-w600', templateLangString('MOD_WF_COMM_FIGURE_TITLE', { figure: figureName(c.figure) })));
     top.append(who);
     const stateKey = c.state === 'done' ? 'MOD_WF_COMM_STATE_DONE' : c.state === 'withdrawn' ? 'MOD_WF_COMM_STATE_WITHDRAWN' : c.late ? 'MOD_WF_COMM_STATE_LATE' : 'MOD_WF_COMM_STATE_OPEN';
     const badgeCls = c.state === 'done' ? 'badge-success' : c.state === 'withdrawn' ? 'badge-secondary' : c.late ? 'badge-warning' : 'badge-info';
@@ -468,12 +469,17 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, po
     card.append(el('small', 'wf-subtle d-block mt-1 wf-comm-line', line(c, 'ASK', c.line)));
 
     const ask = el('div', 'd-flex align-items-center mt-2 font-w600');
-    ask.append(img(itemOf(c.itemId)?.media, 'skill-icon-xs mr-1'), document.createTextNode(askText(c)));
+    ask.append(img(itemOf(c.itemId)?.media, 'skill-icon-xs mr-1'), marquee('span', 'wf-min0 flex-fill', askText(c)));
     if (isShort(c.qty)) tips?.set(ask, templateLangString('MOD_WF_COMM_ASK', { qty: full(c.qty), item: itemOf(c.itemId)?.name ?? c.itemId }));
     card.append(ask);
     const skill = game.skills.getObjectByID(c.skillId);
+    // Short enough for one line on the narrowest card; the whole sentence in the tooltip.
     const skillLine = el('small', 'wf-subtle d-flex align-items-center');
-    if (skill !== undefined) skillLine.append(img(skill.media, 'skill-icon-xs mr-1'), document.createTextNode(templateLangString('MOD_WF_COMM_HOURS', { skill: hiring.skillName(skill), hours: full(c.hours) })));
+    if (skill !== undefined) {
+      const args = { skill: hiring.skillName(skill), hours: full(c.hours) };
+      skillLine.append(img(skill.media, 'skill-icon-xs mr-1'), marquee('span', 'wf-min0 flex-fill', templateLangString('MOD_WF_COMM_HOURS', args)));
+      tips?.set(skillLine, templateLangString('MOD_WF_COMM_HOURS_TIP', args));
+    }
     card.append(skillLine);
 
     const folk = byId(c.folkId);
@@ -486,10 +492,15 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, po
     heldBar.style.width = `${Math.min(100 - Math.min(100, (c.delivered / c.qty) * 100), (held / c.qty) * 100)}%`;
     bar.append(fillBar, heldBar);
     card.append(bar);
-    const progressKey = held > 0 ? 'MOD_WF_COMM_PROGRESS_HELD' : 'MOD_WF_COMM_PROGRESS';
-    const progress = el('small', 'd-block text-center', templateLangString(progressKey, { done: n(c.delivered), qty: n(c.qty), held: n(held) }));
-    if (isShort(c.qty)) tips?.set(progress, templateLangString(progressKey, { done: full(c.delivered), qty: full(c.qty), held: full(held) }));
+    const progress = el('small', 'd-block text-center', templateLangString('MOD_WF_COMM_PROGRESS', { done: n(c.delivered), qty: n(c.qty) }));
+    if (isShort(c.qty)) tips?.set(progress, templateLangString('MOD_WF_COMM_PROGRESS', { done: full(c.delivered), qty: full(c.qty) }));
     card.append(progress);
+    // What the Folk holds for it on a line of its own: beside the count it wrapped mid-phrase on a narrow card.
+    if (held > 0) {
+      const heldLine = el('small', 'd-block text-center', templateLangString('MOD_WF_COMM_HELD', { held: n(held) }));
+      if (isShort(held)) tips?.set(heldLine, templateLangString('MOD_WF_COMM_HELD', { held: full(held) }));
+      card.append(heldLine);
+    }
 
     if (!done) {
       const left = model.deadlineLeft(c);
@@ -529,25 +540,37 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, po
     if (!done) {
       const foot = el('div', 'd-flex align-items-center flex-wrap mt-2 wf-comm-foot');
       if (folk !== undefined) {
+        // One row: the Folk's face, two lines (its name, what it does; each one line that runs when longer than its
+        // room, the whole sentence in the tooltip) and Recall at the right (the user, 4 Nov 2026).
         const run = state.runs[folk.id];
+        const backIn = run === undefined ? '' : time.shortTime(run.ticks * TICK_INTERVAL);
         const text = run !== undefined
-          ? templateLangString('MOD_WF_COMM_FOLK_RUN', { name: folk.name, time: time.shortTime(run.ticks * TICK_INTERVAL) })
+          ? templateLangString('MOD_WF_COMM_FOLK_RUN', { name: folk.name, time: backIn })
           : templateLangString('MOD_WF_COMM_FOLK_ON', { name: folk.name });
-        foot.append(img(hiring.portrait(folk.tier), 'skill-icon-xs mr-1'), el('small', 'flex-fill', text));
-        const back = el('button', 'btn btn-sm btn-outline-secondary', getLangString('MOD_WF_COMM_RECALL'));
+        const row = el('div', 'd-flex align-items-center wf-comm-folk');
+        const who = el('div', 'd-flex align-items-center wf-min0 flex-fill wf-comm-folk');
+        const words = el('div', 'wf-min0 flex-fill');
+        words.append(marquee('div', 'font-w600 wf-comm-folk-name', folk.name),
+          marquee('small', 'wf-subtle', run !== undefined
+            ? templateLangString('MOD_WF_COMM_FOLK_RUN_SHORT', { time: backIn })
+            : getLangString('MOD_WF_COMM_FOLK_ON_SHORT')));
+        who.append(img(hiring.portrait(folk.tier), 'wf-comm-icon'), words);
+        tips?.set(who, text);
+        const back = el('button', 'btn btn-sm btn-outline-info flex-shrink-0', getLangString('MOD_WF_COMM_RECALL'));
         back.type = 'button';
         back.addEventListener('click', () => recall(c));
         tips?.set(back, getLangString('MOD_WF_COMM_RECALL_TIP'));
-        foot.append(back);
+        row.append(who, back);
+        foot.append(row);
       } else {
         const holder = hiring.crew.bySkill(c.skillId);
         const busy = holder === undefined ? undefined : model.commissionOf(state, holder.id);
         if (holder === undefined) {
-          foot.append(el('small', 'wf-subtle', templateLangString('MOD_WF_COMM_NO_FOLK', { skill: hiring.skillName(c.skillId) })));
+          foot.append(marquee('small', 'wf-subtle wf-min0 flex-fill', templateLangString('MOD_WF_COMM_NO_FOLK', { skill: hiring.skillName(c.skillId) })));
         } else if (busy !== undefined) {
-          foot.append(el('small', 'wf-subtle', templateLangString('MOD_WF_COMM_BUSY', { name: holder.name, figure: figureName(busy.figure) })));
+          foot.append(marquee('small', 'wf-subtle wf-min0 flex-fill', templateLangString('MOD_WF_COMM_BUSY', { name: holder.name, figure: figureName(busy.figure) })));
         } else {
-          const go = el('button', 'btn btn-sm btn-info', templateLangString('MOD_WF_COMM_SEND', { name: holder.name }));
+          const go = el('button', 'btn btn-sm btn-info text-truncate mw-100', templateLangString('MOD_WF_COMM_SEND', { name: holder.name }));
           go.type = 'button';
           go.addEventListener('click', () => send(c));
           tips?.set(go, templateLangString('MOD_WF_COMM_SEND_TIP', { name: holder.name, figure: figureName(c.figure) }));
@@ -568,6 +591,7 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, po
     open: isOpen(),
     lv: level(),
     tier: tier(),
+    points: Math.floor(state?.standing.points ?? 0),
     crew: hiring.crew.all.map((f) => [f.id, f.skillId]),
     c: state?.commissions.map((c) => [c.id, c.delivered, c.state, c.late, c.folkId, Math.floor(model.deadlineLeft(c) / 72000),
       c.folkId === null ? 0 : (hiring.room?.townQty(byId(c.folkId), c.itemIds) ?? 0)]) ?? null,
@@ -582,6 +606,16 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, po
     else {
       state.commissions.forEach((c) => nodes.push(commissionCard(c)));
       for (let i = state.commissions.length; i < slots(); i += 1) nodes.push(el('div', 'wf-band wf-order wf-order-empty wf-subtle', getLangString('MOD_WF_COMM_EMPTY')));
+      // The fourth slot before Trusted, with the Standing it needs: the row stays full and says what is ahead.
+      const top = model.slotsFor(model.TIERS.length - 1);
+      // From the cards shown: Standing that faded under Trusted leaves its fourth commission on the board.
+      for (let i = Math.max(slots(), state.commissions.length); i < top; i += 1) {
+        const slot = el('div', 'wf-band wf-order wf-order-empty wf-order-slot wf-subtle');
+        const lock = el('i', 'fa fa-lock');
+        lock.setAttribute('aria-hidden', 'true');
+        slot.append(lock, el('div', '', templateLangString('MOD_WF_COMM_SLOT_LOCKED', { points: n(state.standing.points), need: n(model.TIERS[model.TIERS.findIndex((_, t) => model.slotsFor(t) > i)].points) })));
+        nodes.push(slot);
+      }
     }
     grid.replaceChildren(...nodes);
     tips?.sweep?.();

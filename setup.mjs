@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-11-04.169';
+export const BUILD = '2026-11-04.176';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -64,7 +64,7 @@ export async function setup(ctx) {
   const apiModule = await ctx.loadModule('src/api.mjs');
   const { pickName } = await ctx.loadModule('src/names.mjs');
   const { createCrew } = await ctx.loadModule('src/crew.mjs');
-  const { renderFolkCards, effectsFragment, LIST_ID: cardListId } = await ctx.loadModule('src/cards.mjs');
+  const { renderFolkCards, effectsFragment, marqueeLine, LIST_ID: cardListId } = await ctx.loadModule('src/cards.mjs');
   const { renderReservePanel } = await ctx.loadModule('src/reserve-panel.mjs');
   // One way to write a time left (build .112, scan A-12 / C-26).
   const time = await ctx.loadModule('src/time-format.mjs');
@@ -391,6 +391,7 @@ export async function setup(ctx) {
     time,
     numbers,
     tips,
+    marquee: marqueeLine,
     popupDidRender,
     log,
   });

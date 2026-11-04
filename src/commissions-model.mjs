@@ -25,8 +25,9 @@ export const OVERDUE_TICKS = DAY_TICKS;
 export const BONUS = 1.25;
 export const LATE_RESOURCES = 0.5;
 export const LATE_STANDING = 0.8;
-/** Hiring XP, in levels' worth at delivery, for 8 hours of work (a third of a Work Order's pace). */
-export const XP_LEVELS_PER_8H = 0.05;
+/** Hiring XP, in levels' worth at delivery, for 8 hours of work (build .175: halved from 0.05, so a day of commissions
+ * is a quarter to a third of a day of Work Orders late on and Hiring 99 comes about four days early, not eight). */
+export const XP_LEVELS_PER_8H = 0.025;
 /** Per skill, the newest recipes you have unlocked are the candidates, as for Work Orders. */
 export const RECENT_RECIPES = 5;
 /** Standing fades 2% a day once three days pass with no delivery. */

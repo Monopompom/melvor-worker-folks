@@ -176,6 +176,17 @@ function setMarquee(el, value) {
   requestAnimationFrame(() => fitMarquee(el));
 }
 
+/** A new one-line box for `value` that slides to its end and back while longer than the box (the commission cards). */
+export function marqueeLine(tag, cls, value) {
+  const box = document.createElement(tag);
+  box.className = `wf-marquee ${cls}`.trim();
+  const text = document.createElement('span');
+  text.className = 'wf-marquee-text';
+  box.append(text);
+  setMarquee(box, value);
+  return box;
+}
+
 function fillCard(col, folk, view) {
   const set = (key, fn) => {
     const el = col.querySelector(`[data-wf="${key}"]`);

@@ -403,6 +403,14 @@ export function install(ctx, { getHiring, model, time, numbers, tips, popupDidRe
     return card;
   };
 
+  const lockedSlot = (text) => {
+    const slot = el('div', 'wf-band wf-order wf-order-empty wf-order-slot wf-subtle');
+    const lock = el('i', 'fa fa-lock');
+    lock.setAttribute('aria-hidden', 'true');
+    slot.append(lock, el('div', '', text));
+    return slot;
+  };
+
   const viewKey = () => JSON.stringify({
     lv: level(),
     wages: wagesOn(),
@@ -418,6 +426,11 @@ export function install(ctx, { getHiring, model, time, numbers, tips, popupDidRe
     } else {
       board.orders.forEach((o) => nodes.push(orderCard(o)));
       for (let i = board.orders.length; i < slots; i += 1) nodes.push(el('div', 'wf-band wf-order wf-order-empty wf-subtle', getLangString('MOD_WF_ORDER_EMPTY')));
+      // Slots still to come, each with the Hiring level that opens it: the row stays full and says what is ahead.
+      for (let i = Math.max(slots, board.orders.length); i < model.MAX_ORDERS; i += 1) {
+        const at = [model.BOARD_LEVEL, model.BOARD_LEVEL, model.MEDIUM_LEVEL, model.LARGE_LEVEL][i];
+        nodes.push(lockedSlot(templateLangString('MOD_WF_ORDER_SLOT_LOCKED', { level: `${at}` })));
+      }
     }
     grid.replaceChildren(...nodes);
     tips?.sweep?.();

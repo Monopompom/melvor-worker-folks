@@ -49,7 +49,7 @@ test('resources follow Township Casual Tasks by Township level, ×1.25 per 8 hou
   const r = rewardFor({ hours: 16, townshipLevel: 50 });
   assert.equal(r.resources, niceQuantity(30000 * 2 * BONUS));
   assert.equal(r.standing, 16);
-  assert.ok(Math.abs(r.xpLevels - 0.1) < 1e-9);
+  assert.ok(Math.abs(r.xpLevels - 0.05) < 1e-9);
 });
 
 test('a quantity is two significant digits of the work asked', () => {

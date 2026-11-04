@@ -510,6 +510,9 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
    count; then one reward a line. A delivered one dims under its green badge. */
 #worker-folks-orders > .wf-dash-content { padding: 16px !important; }
 .wf-orders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 12px; }
+/* Four columns at most (build .176): a board holds four cards at most, so on a wide screen the cards grow to fill the
+   row instead of leaving a fifth column empty. 36px: the three gaps. */
+.wf-orders-grid { grid-template-columns: repeat(auto-fill, minmax(max(15rem, calc((100% - 36px) / 4)), 1fr)); }
 /* A band with only text in it (the board before Hiring 8) takes the whole row, not one card's width. */
 .wf-orders-locked { grid-column: 1 / -1; }
 .wf-orders-clock { font-size: 0.9rem; white-space: nowrap; }
@@ -522,6 +525,9 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-order-reward .skill-icon-xs, .wf-order .skill-icon-xs { flex: none; }
 .wf-order-done .wf-order-rewards, .wf-order-done .wf-order-bar + small { opacity: 0.7; }
 .wf-order-empty { justify-content: center; text-align: center; min-height: 6rem; }
+/* A slot the board opens later (build .176): dashed and see-through, a lock over what opens it. */
+.wf-order-slot { background: transparent; border: 1px dashed var(--wf-line-soft); align-items: center; gap: 6px; }
+.wf-order-slot .fa-lock { font-size: 1.1rem; opacity: 0.8; }
 
 /* Township Commissions (build .163): the Work Orders grid and bands, a figure's portrait in place of the size icon,
    its asking line under its name, what the Folk holds for it as a lighter part of the bar, the Folk or Send at the
@@ -530,9 +536,19 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-comm-portrait { width: 48px; height: 48px; flex: none; border-radius: 50%; }
 /* The status badge on the figure's name line, not at the top of the portrait's row (the user, 4 Nov 2026). */
 .wf-comm .wf-order-state { align-self: center; }
+/* Every line of a card is one line (the user, 4 Nov 2026): one longer than the card slides to its end and back (the
+   Folk cards' marquee). On a card under ~275px the portrait is 40px and the name 0.9rem, so "The Runewright" fits
+   beside its badge without sliding. */
+.wf-comm { container-type: inline-size; }
+@container (max-width: 250px) {
+  .wf-comm-portrait { width: 40px; height: 40px; }
+  .wf-comm .wf-order-head .font-w600 { font-size: 0.9rem; }
+}
 .wf-comm-line { font-style: italic; }
 .wf-comm .wf-comm-held { opacity: 0.45; }
 .wf-comm-foot { gap: 6px; margin-top: auto; padding-top: 8px; }
+.wf-comm-folk { gap: 8px; width: 100%; }
+.wf-comm-folk-name { font-size: 0.9rem; line-height: 1.2; }
 .wf-comm-standing { font-size: 0.8rem; white-space: nowrap; }
 .wf-comm-card:not(.d-none) { display: flex; align-items: center; gap: 6px; margin-top: 4px; text-align: left; }
 .wf-comm-icon { width: 28px; height: 28px; flex: none; border-radius: 50%; }
