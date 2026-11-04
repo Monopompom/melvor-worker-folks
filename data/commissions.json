@@ -1,0 +1,59 @@
+{
+  "stories": [
+    {
+      "id": "Mill_Bridge",
+      "figure": "Miller",
+      "season": null,
+      "steps": [
+        { "skill": "melvorD:Woodcutting", "match": "_Logs$" },
+        { "skill": "melvorD:Mining", "match": "_Ore$" },
+        { "skill": "melvorD:Smithing", "match": "_Bar$" }
+      ],
+      "building": { "cost": [["melvorF:GP", 2000000], ["melvorF:Wood", 20000], ["melvorF:Stone", 20000]] }
+    },
+    {
+      "id": "Great_Anvil",
+      "figure": "Smith",
+      "season": null,
+      "steps": [
+        { "skill": "melvorD:Mining", "match": "_Ore$" },
+        { "skill": "melvorD:Smithing", "match": "_Bar$" },
+        { "skill": "melvorD:Smithing", "match": "^(?!.*_Bar$)" }
+      ],
+      "building": { "cost": [["melvorF:GP", 2000000], ["melvorF:Bar", 20000], ["melvorF:Stone", 20000]] }
+    },
+    {
+      "id": "Herb_Garden",
+      "figure": "Healer",
+      "season": null,
+      "steps": [
+        { "skill": "melvorD:Herblore" },
+        { "skill": "melvorD:Cooking" },
+        { "skill": "melvorD:Crafting" }
+      ],
+      "building": { "cost": [["melvorF:GP", 2000000], ["melvorF:Herbs", 20000], ["melvorF:Planks", 20000]] }
+    },
+    {
+      "id": "Winter_Hearth",
+      "figure": "Tailor",
+      "season": "Winter",
+      "steps": [
+        { "skill": "melvorD:Crafting", "match": "Leather|Dhide" },
+        { "skill": "melvorD:Cooking" },
+        { "skill": "melvorD:Woodcutting", "match": "_Logs$" }
+      ],
+      "building": { "cost": [["melvorF:GP", 2000000], ["melvorF:Coal", 20000], ["melvorF:Stone", 20000]] }
+    },
+    {
+      "id": "Harvest_Pavilion",
+      "figure": "Baker",
+      "season": "Fall",
+      "steps": [
+        { "skill": "melvorD:Fishing" },
+        { "skill": "melvorD:Cooking" },
+        { "skill": "melvorD:Runecrafting", "match": "_Rune$" }
+      ],
+      "building": { "cost": [["melvorF:GP", 2000000], ["melvorF:Food", 20000], ["melvorF:Planks", 20000]] }
+    }
+  ]
+}

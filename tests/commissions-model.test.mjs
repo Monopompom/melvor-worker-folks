@@ -9,6 +9,8 @@ import {
   noteReached, charterDue, guildPackage, CHARTER_TIER, HALL_MAX, HALL_WAGE_DISCOUNT,
   TOWNSFOLK_TIER, TOWNSFOLK_CHANCE, LOCAL_HAPPINESS, townsfolkRoll, runTicksFor, localCooldownFactor,
   FREEDOM_TIER, CHARTERS, SQUARE_MAX, SQUARE_HAPPINESS, SQUARE_EDUCATION,
+  STORY_TIER, STORY_EVERY, storiesFrom, storyOf, createStoryState, normalizeStoryState, stepCandidates, storyDue,
+  storiesOpen, startStory, advanceStory, deedsDue, deedId, storyBuildingId, storyPackage,
 } from '../src/commissions-model.mjs';
 
 const seq = (...values) => { let i = 0; return () => values[i++ % values.length]; };
@@ -329,4 +331,194 @@ test('the Guild Square: a Grasslands building behind Freedom of the Town, +2% ha
   const hallCost = Object.fromEntries(hall.cost[0].cost.map((c) => [c.id, c.quantity]));
   square.cost[0].cost.forEach((c) => assert.equal(c.quantity * 2, hallCost[c.id], c.id));
   assert.equal(square.cost[0].cost.length, hall.cost[0].cost.length);
+});
+
+// ---- stories (Honoured) ----
+
+const STORIES = storiesFrom(JSON.parse(readFileSync(new URL('../data/commissions.json', import.meta.url), 'utf8')));
+const STORY_CANDIDATES = [
+  cand('melvorD:Woodcutting', 'melvorD:Oak_Logs', 10, 4000),
+  cand('melvorD:Mining', 'melvorD:Iron_Ore', 15, 3000),
+  cand('melvorD:Mining', 'melvorD:Rune_Essence', 1, 3000),
+  cand('melvorD:Smithing', 'melvorD:Iron_Bar', 15, 2000),
+  cand('melvorD:Smithing', 'melvorD:Iron_Dagger', 16, 2000),
+  cand('melvorD:Herblore', 'melvorD:Melee_Accuracy_Potion_I', 1, 2000),
+  cand('melvorD:Cooking', 'melvorD:Shrimp', 1, 2000),
+  cand('melvorD:Crafting', 'melvorD:Leather_Gloves', 1, 2000),
+  cand('melvorD:Fishing', 'melvorD:Raw_Shrimp', 1, 2000),
+  cand('melvorD:Runecrafting', 'melvorD:Air_Rune', 1, 2000),
+];
+const storyOpts = (extra = {}) => ({ candidates: STORY_CANDIDATES, stories: STORIES, tier: STORY_TIER, season: 'Spring', rng: seq(0), makeId, ...extra });
+
+test('the five stories read from the data, each three steps with a decoration bill', () => {
+  assert.deepEqual(STORIES.map((s) => s.id), ['Mill_Bridge', 'Great_Anvil', 'Herb_Garden', 'Winter_Hearth', 'Harvest_Pavilion']);
+  STORIES.forEach((s) => {
+    assert.equal(s.steps.length, 3);
+    assert.ok(figureOf(s.figure));
+    assert.ok(s.cost.length > 0);
+  });
+  assert.equal(storyOf(STORIES, 'Winter_Hearth').season, 'Winter');
+  assert.equal(storyOf(STORIES, 'Harvest_Pavilion').season, 'Fall');
+  assert.equal(storyOf(STORIES, 'Mill_Bridge').season, null);
+});
+
+test('a bad story entry is left out', () => {
+  const ok = { id: 'A', figure: 'Miller', season: null, steps: [{ skill: 'x' }], building: { cost: [['melvorF:GP', 1]] } };
+  const list = storiesFrom({ stories: [
+    ok, { ...ok }, { ...ok, id: 'B', figure: 'Nobody' }, { ...ok, id: 'C', season: 'Monsoon' },
+    { ...ok, id: 'D', steps: [{ skill: 'x', match: '(' }] }, { ...ok, id: 'E', building: { cost: [] } }, { ...ok, id: 'F', steps: [] },
+  ] });
+  assert.deepEqual(list.map((s) => s.id), ['A']);
+  assert.deepEqual(storiesFrom(null), []);
+});
+
+test('a step asks only for its skill and its item filter, newest recipes first', () => {
+  const bars = stepCandidates(STORY_CANDIDATES, storyOf(STORIES, 'Great_Anvil').steps[1]);
+  assert.deepEqual(bars.map((c) => c.itemId), ['melvorD:Iron_Bar']);
+  const notBars = stepCandidates(STORY_CANDIDATES, storyOf(STORIES, 'Great_Anvil').steps[2]);
+  assert.deepEqual(notBars.map((c) => c.itemId), ['melvorD:Iron_Dagger']);
+  const ore = stepCandidates(STORY_CANDIDATES, storyOf(STORIES, 'Mill_Bridge').steps[1]);
+  assert.deepEqual(ore.map((c) => c.itemId), ['melvorD:Iron_Ore']);
+});
+
+test('stories start only from Honoured, every fifth new commission', () => {
+  const state = createState();
+  assert.equal(storyDue(state, STORY_TIER - 1), false);
+  state.stories.count = STORY_EVERY - 2;
+  assert.equal(storyDue(state, STORY_TIER), false);
+  state.stories.count = STORY_EVERY - 1;
+  assert.equal(storyDue(state, STORY_TIER), true);
+  assert.equal(storyDue(state, STORY_TIER - 1), false);
+});
+
+test('filling while Honoured: four plain commissions, then a story card', () => {
+  const state = createState();
+  const slots = 4;
+  fill(state, storyOpts(), slots);
+  assert.equal(state.commissions.filter((c) => c.story).length, 0);
+  assert.equal(state.stories.count, 4);
+  state.commissions = [];
+  const added = fill(state, storyOpts(), 1);
+  assert.equal(added.length, 1);
+  assert.deepEqual(added[0].story, { id: 'Mill_Bridge', step: 1 });
+  assert.equal(added[0].figure, 'Miller');
+  assert.equal(added[0].skillId, 'melvorD:Woodcutting');
+  assert.deepEqual(state.stories.active, { id: 'Mill_Bridge', step: 1, folks: [] });
+  assert.equal(state.stories.count, 0);
+});
+
+test('below Honoured the count does not run', () => {
+  const state = createState();
+  fill(state, storyOpts({ tier: STORY_TIER - 1 }), 4);
+  assert.equal(state.stories.count, 0);
+  assert.equal(state.commissions.some((c) => c.story), false);
+});
+
+test('a seasonal story comes only in its season; told stories never again; a busy figure waits', () => {
+  const state = createState();
+  const ids = (o) => storiesOpen(state, storyOpts(o)).map((s) => s.id);
+  assert.deepEqual(ids({ season: 'Spring' }), ['Mill_Bridge', 'Great_Anvil', 'Herb_Garden']);
+  assert.deepEqual(ids({ season: 'Winter' }), ['Mill_Bridge', 'Great_Anvil', 'Herb_Garden', 'Winter_Hearth']);
+  assert.deepEqual(ids({ season: 'Fall' }), ['Mill_Bridge', 'Great_Anvil', 'Herb_Garden', 'Harvest_Pavilion']);
+  state.stories.done.push({ id: 'Mill_Bridge', folks: [], at: null });
+  state.commissions.push({ ...rollCommission({ candidates: STORY_CANDIDATES, rng: seq(0), makeId }), figure: 'Smith' });
+  assert.deepEqual(ids({ season: 'Spring' }), ['Herb_Garden']);
+});
+
+test('delivering a step puts the next in its place; the last finishes the story with its Folks', () => {
+  const state = createState();
+  state.stories.count = STORY_EVERY - 1;
+  fill(state, storyOpts(), 1);
+  const first = state.commissions[0];
+  deliver(first, first.qty);
+  let r = advanceStory(state, first, storyOpts(), 'Ada');
+  assert.equal(r.finished, null);
+  assert.deepEqual(r.next.story, { id: 'Mill_Bridge', step: 2 });
+  assert.equal(r.next.skillId, 'melvorD:Mining');
+  assert.equal(state.commissions[0], r.next);
+  deliver(r.next, r.next.qty);
+  r = advanceStory(state, r.next, storyOpts(), 'Bo');
+  assert.equal(r.next.skillId, 'melvorD:Smithing');
+  assert.equal(r.next.itemId, 'melvorD:Iron_Bar');
+  deliver(r.next, r.next.qty);
+  r = advanceStory(state, r.next, storyOpts(), 'Ada', 1234);
+  assert.equal(r.next, null);
+  assert.equal(r.finished.id, 'Mill_Bridge');
+  assert.equal(state.stories.active, null);
+  assert.deepEqual(state.stories.done, [{ id: 'Mill_Bridge', folks: ['Ada', 'Bo'], at: 1234 }]);
+  assert.deepEqual(deedsDue(state, () => false), ['Mill_Bridge']);
+  assert.deepEqual(deedsDue(state, (id) => id === 'Mill_Bridge'), []);
+  assert.deepEqual(deedsDue(null, () => false), []);
+});
+
+test('a next step with nothing to ask comes when the board next fills', () => {
+  const state = createState();
+  state.stories.count = STORY_EVERY - 1;
+  fill(state, storyOpts(), 1);
+  const first = state.commissions[0];
+  deliver(first, first.qty);
+  const r = advanceStory(state, first, storyOpts({ candidates: STORY_CANDIDATES.filter((c) => c.skillId !== 'melvorD:Mining') }), 'Ada');
+  assert.equal(r.next, null);
+  assert.deepEqual(state.stories.active, { id: 'Mill_Bridge', step: 2, folks: ['Ada'] });
+  assert.equal(storyDue(state, STORY_TIER), true);
+  refresh(state, storyOpts(), 1);
+  assert.deepEqual(state.commissions[0].story, { id: 'Mill_Bridge', step: 2 });
+});
+
+test('a withdrawn step ends the story, which can come back', () => {
+  const state = createState();
+  state.stories.count = STORY_EVERY - 1;
+  fill(state, storyOpts(), 1);
+  const c = state.commissions[0];
+  const { withdrawn } = advance(state, c.deadline + OVERDUE_TICKS);
+  assert.deepEqual(withdrawn, [c]);
+  assert.equal(state.stories.active, null);
+  assert.equal(state.stories.done.length, 0);
+  assert.ok(storiesOpen(state, storyOpts()).some((s) => s.id === 'Mill_Bridge'));
+});
+
+test('stories survive a save; a story card the data no longer has is dropped', () => {
+  const state = createState();
+  state.stories.count = STORY_EVERY - 1;
+  fill(state, storyOpts(), 1);
+  state.stories.done.push({ id: 'Herb_Garden', folks: ['Cy'], at: 5 });
+  const back = normalizeState(JSON.parse(JSON.stringify(state)), STORIES);
+  assert.deepEqual(back.stories, state.stories);
+  assert.deepEqual(back.commissions[0].story, { id: 'Mill_Bridge', step: 1 });
+  const lost = normalizeState(JSON.parse(JSON.stringify(state)), []);
+  assert.equal(lost.commissions.length, 0);
+  assert.deepEqual(lost.stories, createStoryState());
+  // A step asking for another skill than its own is not a story step.
+  const raw = JSON.parse(JSON.stringify(state));
+  raw.commissions[0].skillId = 'melvorD:Mining';
+  assert.equal(normalizeState(raw, STORIES).commissions.length, 0);
+  assert.deepEqual(normalizeStoryState('x'), createStoryState());
+});
+
+test('a story card on the board with no record takes the record; two story cards keep one', () => {
+  const state = createState();
+  state.stories.count = STORY_EVERY - 1;
+  fill(state, storyOpts(), 1);
+  const raw = JSON.parse(JSON.stringify(state));
+  raw.stories.active = null;
+  raw.commissions.push({ ...raw.commissions[0], id: 'dup' });
+  const back = normalizeState(raw, STORIES);
+  assert.equal(back.commissions.length, 1);
+  assert.deepEqual(back.stories.active, { id: 'Mill_Bridge', step: 1, folks: [] });
+});
+
+test('the stories package: a deed and a one-per-town decoration for each, built with the deed', () => {
+  const pkg = storyPackage(STORIES, { Mill_Bridge: { deed: 'Deed', building: 'Bridge' } });
+  assert.equal(pkg.items.length, 5);
+  assert.equal(pkg.items[0].id, deedId('Mill_Bridge'));
+  assert.equal(pkg.items[0].name, 'Deed');
+  const b = pkg.skillData[0].data.buildings;
+  assert.equal(b.length, 5);
+  assert.equal(b[0].id, storyBuildingId('Mill_Bridge'));
+  assert.equal(b[0].name, 'Bridge');
+  assert.equal(b[0].maxUpgrades, 1);
+  assert.equal(b[0].provides[0].happiness, 1);
+  assert.deepEqual(b[0].requirements, [{ type: 'ItemFound', itemID: 'worker_folks:Deed_Mill_Bridge' }]);
+  assert.deepEqual(b[0].cost[0].cost[0], { id: 'melvorF:GP', quantity: 2000000 });
+  assert.equal(b[0].media, 'assets/story_mill_bridge.webp');
 });

@@ -270,6 +270,20 @@ citizens) and costs as much: 100,000,000 GP and 100,000 each of Planks, Stone an
 five; each one cuts every Folk's wages by 1%, less as it runs down, like the town's own buildings. The charter and the Halls
 stay even if your Standing fades.
 
+At Trusted one shop hire in four grew up in your town: a **Townsfolk**, with the **Local** trait
+for good. Its runs to town take half the time, and while your town's happiness is 50% or more its
+cooldown after a strike is halved.
+
+At Honoured the town grants your guild its **Freedom**: the **Guild Square** appears in
+Grasslands, at half the Hall's bill. Build up to five; each gives the town +2% happiness and +2%
+education.
+
+From Honoured, every fifth new commission can also be a **story**: a project of your town in
+three steps, each a commission of its own. Deliver a step and the next takes its place; finish the
+third and the town hands over a deed for the story's own decoration in Township (one per town,
++1% happiness). Five stories, two of them only in their season. The **Town history** keeps the
+stories told and the Folks who worked on them.
+
 Commissions suit cheaper Folks best: a Foreman's hour is worth far more on Work Orders.
 
 ## Gear, pet and relics

@@ -259,6 +259,8 @@ export function install({ hiring, log, tiers }) {
     /** Ends every run now; `reroll()`: a new board, keeping commissions a Folk is on. */
     finishRuns() { hiring.commissions?.finishRuns(); },
     rerollCommissions() { hiring.commissions?.reroll(); },
+    /** The next commission a story's step (Honoured), in place of an untouched one. */
+    story() { return hiring.commissions?.story(); },
     /** What a Folk holds in its room: one row a stack (haul or stock), its work in minutes. */
     room(id) {
       const folk = hiring.crew.byId(ref(id));
@@ -289,6 +291,6 @@ export function install({ hiring, log, tiers }) {
     tiers: tiers.slice(),
   };
   globalThis.workerFolksDev = api;
-  log('dev commands (a Folk = its row in list(), its name or its id): workerFolksDev.spawn(tier, name?) | fire(id) | assign(id, skillId) | strike(id, debt?) | debt(id, gp?) | cooldown(id, ticks) | reset(id) | hp(id, hp) | kill(id) | thaw(slot?) | loadout(id) | gear(id, skillId?, {replace, qty}) | reserve() | mastery(id, level) | poolXP(xp) | list() | clear() | dump() | load(root) | shiftSlots(n) | delegated() | pet() | relics(n) | orders() | orderClock(hours) | commissions() | commissionClock(hours) | finishRuns() | rerollCommissions() | room(id) | ownStock(id, on) | restock(id, actions?) | bankFull(on)');
+  log('dev commands (a Folk = its row in list(), its name or its id): workerFolksDev.spawn(tier, name?) | fire(id) | assign(id, skillId) | strike(id, debt?) | debt(id, gp?) | cooldown(id, ticks) | reset(id) | hp(id, hp) | kill(id) | thaw(slot?) | loadout(id) | gear(id, skillId?, {replace, qty}) | reserve() | mastery(id, level) | poolXP(xp) | list() | clear() | dump() | load(root) | shiftSlots(n) | delegated() | pet() | relics(n) | orders() | orderClock(hours) | commissions() | commissionClock(hours) | finishRuns() | rerollCommissions() | story() | room(id) | ownStock(id, on) | restock(id, actions?) | bankFull(on)');
   return api;
 }

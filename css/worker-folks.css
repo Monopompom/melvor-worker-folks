@@ -549,6 +549,11 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
   .wf-comm .wf-order-head .font-w600 { font-size: 0.9rem; }
 }
 .wf-comm-line { font-style: italic; }
+/* Story steps (H4): a ribbon with the story and its step, an amber edge on the card; the Town history's rows. */
+.wf-comm-story { font-size: 0.8rem; font-weight: 600; color: var(--bs-warning, #e69721); gap: 2px; }
+.wf-order.wf-comm-is-story { box-shadow: inset 3px 0 0 #e69721; }
+.wf-history-row { gap: 4px; margin-bottom: 6px; padding: 8px; }
+.wf-history-img { width: 56px; height: 56px; object-fit: contain; flex: none; }
 .wf-comm .wf-comm-held { opacity: 0.45; }
 .wf-comm-foot { gap: 6px; margin-top: auto; padding-top: 8px; }
 .wf-comm-folk { gap: 8px; width: 100%; }

@@ -19,7 +19,7 @@ const CHECK_TICKS = 20;
 /** How often the board looks whether the town still owes the charter (every 10 s). */
 const CHARTER_CHECK_TICKS = 200;
 
-export function install(ctx, { getHiring, model, resume, time, numbers, tips, marquee, popupDidRender, log }) {
+export function install(ctx, { getHiring, model, stories = [], resume, time, numbers, tips, marquee, popupDidRender, log }) {
   let hiring;
   let state = null;
   let ticks = 0;
@@ -70,6 +70,8 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, ma
     townshipLevel: township()?.level ?? 1,
     stock: Object.fromEntries(model.FIGURES.map((f) => [f.resource, resourceOf(f.resource)?.amount ?? 0])),
     season: township()?.townData?.season?.localID ?? null,
+    tier: tier(),
+    stories,
     makeId,
   });
   const fillNow = () => {
@@ -105,7 +107,19 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, ma
       log(`${ch.itemId} given`);
       markDirty();
     }
+    // A finished story's deed, likewise once and again if it was never found.
+    for (const id of model.deedsDue(state, (storyId) => found(charterItem(model.deedId(storyId))))) {
+      const item = charterItem(model.deedId(id));
+      if (item === undefined || buildingOf(model.storyBuildingId(id)) === undefined) continue;
+      try {
+        game.bank.addItem(item, 1, true, true, true, true, 'worker_folks.Commissions');
+      } catch (err) { log(`deed ${id} not given`, err); continue; }
+      notify('success', templateLangString('MOD_WF_STORY_DEED_GIVEN', { story: storyTitle(id), building: getLangString(`MOD_WF_STORY_${id}_BUILDING`) }), item.media);
+      log(`deed ${id} given`);
+      markDirty();
+    }
   };
+  const storyTitle = (id) => getLangString(`MOD_WF_STORY_${id}_TITLE`);
   /** Guild Squares built in Grasslands and what they give the town now (efficiency counted), or null without them. */
   const squares = () => {
     const square = buildingOf(model.SQUARE_ID);
@@ -223,9 +237,20 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, ma
       const gives = id === 'Trusted' ? ` ${getLangString('MOD_WF_COMM_TIER_GIVES_Trusted')}` : '';
       notify('success', `${templateLangString('MOD_WF_COMM_TIER_UP', { tier: getLangString(`MOD_WF_STANDING_${id}`) })}${gives}`, township()?.media);
     }
-    grantCharter();
     hiring.events.emit('commissionDelivered', { commission: c, folk, reward: { ...p, resources: added, xp }, offline: !online() });
     log(`commission delivered: ${c.id} ${c.figure} ${c.itemId} ×${c.qty}`, p);
+    if (c.story !== undefined) {
+      // The next step takes the card's place; the last one finishes the story and the town hands over its deed.
+      const r = model.advanceStory(state, c, rollOpts(), folk?.name ?? null, Date.now());
+      if (r.finished !== null) {
+        notify('success', templateLangString('MOD_WF_STORY_FINISHED', { story: storyTitle(r.finished.id), line: getLangString(`MOD_WF_STORY_${r.finished.id}_DONE`) }), media(model.storyMedia(r.finished.id)));
+        log(`story finished: ${r.finished.id}`);
+      } else {
+        const step = state.stories.active?.step ?? c.story.step + 1;
+        notify('success', templateLangString('MOD_WF_STORY_NEXT', { story: storyTitle(c.story.id), step: full(step), steps: full(model.storyOf(stories, c.story.id)?.steps.length ?? 3) }), portraitOf(c.figure));
+      }
+    }
+    grantCharter();
     markDirty();
   };
 
@@ -241,6 +266,7 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, ma
     const key = due <= 0 ? 'MOD_WF_COMM_WITHDRAWN_NONE' : paid > 0 ? 'MOD_WF_COMM_WITHDRAWN' : 'MOD_WF_COMM_WITHDRAWN_LOST';
     notify('error', templateLangString(key, { figure: figureName(c.figure), what: askText(c), paid: resourceText(c.resourceId, paid), lost: resourceText(c.resourceId, lost) }));
     if (paid > 0 && lost > 0) notify('error', templateLangString('MOD_WF_COMM_STORAGE_FULL', { lost: resourceText(c.resourceId, lost) }));
+    if (c.story !== undefined) notify('error', templateLangString('MOD_WF_STORY_ENDED', { story: storyTitle(c.story.id), figure: figureName(c.figure) }));
     hiring.events.emit('commissionWithdrawn', { commission: c, folk, offline: !online() });
     hiring.renderQueue.folks = true;
     markDirty();
@@ -435,7 +461,7 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, ma
 
   const openHelp = () => {
     const body = el('div', 'text-center wf-help-body');
-    for (const k of [1, 2, 3]) {
+    for (const k of [1, 2, 3, 4]) {
       const b = el('div', 'wf-band');
       b.append(el('div', 'wf-help-head', getLangString(`MOD_WF_COMM_HELP_${k}_HEAD`)));
       getLangString(`MOD_WF_COMM_HELP_${k}`).split(/(?<=[.!?])\s+/).filter(Boolean).forEach((l) => b.append(el('p', 'wf-help-p', l)));
@@ -451,6 +477,43 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, ma
       customClass: typeof createSwalCustomClass === 'function' ? createSwalCustomClass(cls) : cls,
     });
   };
+
+  /** The Town history: the stories told, with the Folks who worked on them, and how many are still to come. */
+  const openHistory = () => {
+    const body = el('div', 'text-left wf-help-body');
+    const done = state?.stories.done ?? [];
+    const active = state?.stories.active ?? null;
+    body.append(el('p', 'wf-subtle text-center wf-help-p', templateLangString('MOD_WF_STORY_HISTORY_COUNT', { told: full(done.length), all: full(stories.length) })));
+    if (active !== null) {
+      const b = el('div', 'wf-band d-flex align-items-center wf-history-row');
+      b.append(img(portraitOf(model.storyOf(stories, active.id)?.figure ?? 'Miller'), 'wf-comm-portrait mr-2'));
+      const words = el('div', 'wf-min0');
+      words.append(el('div', 'font-w600', storyTitle(active.id)),
+        el('small', 'wf-subtle d-block', templateLangString('MOD_WF_STORY_HISTORY_ACTIVE', { step: full(active.step), steps: full(model.storyOf(stories, active.id)?.steps.length ?? 3) })));
+      b.append(words);
+      body.append(b);
+    }
+    [...done].reverse().forEach((d) => {
+      const b = el('div', 'wf-band d-flex align-items-center wf-history-row');
+      b.append(img(media(model.storyMedia(d.id)), 'wf-history-img mr-2'));
+      const words = el('div', 'wf-min0');
+      words.append(el('div', 'font-w600', storyTitle(d.id)), el('small', 'd-block', getLangString(`MOD_WF_STORY_${d.id}_HISTORY`)));
+      if (d.folks.length > 0) words.append(el('small', 'wf-subtle d-block', templateLangString('MOD_WF_STORY_HISTORY_FOLKS', { names: d.folks.join(', ') })));
+      b.append(words);
+      body.append(b);
+    });
+    if (done.length === 0 && active === null) body.append(el('p', 'wf-subtle text-center wf-help-p', getLangString('MOD_WF_STORY_HISTORY_NONE')));
+    const cls = { popup: 'wf-ui', confirmButton: 'btn btn-success m-1' };
+    SwalLocale.fire({
+      didRender: popupDidRender,
+      title: getLangString('MOD_WF_STORY_HISTORY_TITLE'),
+      width: '34rem',
+      html: body,
+      confirmButtonText: getLangString('MOD_WF_BUTTON_GOT_IT'),
+      customClass: typeof createSwalCustomClass === 'function' ? createSwalCustomClass(cls) : cls,
+    });
+  };
+  let historyButton = null;
 
   const wire = () => {
     if (block !== null || !exists()) return;
@@ -472,8 +535,16 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, ma
     head.append(help);
     const right = el('div', 'ml-auto d-flex align-items-center wf-dash-right');
     standingEl = el('span', 'badge badge-info wf-comm-standing');
+    historyButton = el('button', 'btn btn-sm btn-outline-info ml-2 d-none wf-comm-history');
+    historyButton.type = 'button';
+    const book = el('i', 'fa fa-book-open');
+    book.setAttribute('aria-hidden', 'true');
+    historyButton.append(book);
+    historyButton.setAttribute('aria-label', getLangString('MOD_WF_STORY_HISTORY_TITLE'));
+    tips?.set(historyButton, getLangString('MOD_WF_STORY_HISTORY_TITLE'));
+    historyButton.addEventListener('click', openHistory);
     clock = el('span', 'wf-subtle wf-orders-clock ml-2');
-    right.append(standingEl, clock);
+    right.append(standingEl, historyButton, clock);
     head.append(right);
     grid = el('div', 'wf-orders-grid');
     content.append(head, grid);
@@ -503,9 +574,22 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, ma
     const badgeCls = c.state === 'done' ? 'badge-success' : c.state === 'withdrawn' ? 'badge-secondary' : c.late ? 'badge-warning' : 'badge-info';
     top.append(el('span', `badge ${badgeCls} wf-order-state`, getLangString(stateKey)));
     card.append(top);
+    // A story step: the story's name and the step on a ribbon, and the story's own line for the step in place of the
+    // figure's everyday asking line.
+    if (c.story !== undefined) {
+      const steps = model.storyOf(stories, c.story.id)?.steps.length ?? 3;
+      const ribbon = el('div', 'd-flex align-items-center mt-1 wf-comm-story');
+      const book = el('i', 'fa fa-book-open mr-1');
+      book.setAttribute('aria-hidden', 'true');
+      ribbon.append(book, marquee('span', 'wf-min0 flex-fill', templateLangString('MOD_WF_STORY_RIBBON', { story: storyTitle(c.story.id), step: full(c.story.step), steps: full(steps) })));
+      tips?.set(ribbon, getLangString('MOD_WF_STORY_RIBBON_TIP'));
+      card.append(ribbon);
+    }
+    card.classList.toggle('wf-comm-is-story', c.story !== undefined);
     // The figure's asking line on its own row under the head, the card's full width (a narrow column beside the
     // portrait wrapped it to five lines).
-    card.append(el('small', 'wf-subtle d-block mt-1 wf-comm-line', line(c, 'ASK', c.line)));
+    card.append(el('small', 'wf-subtle d-block mt-1 wf-comm-line', c.story !== undefined
+      ? getLangString(`MOD_WF_STORY_${c.story.id}_STEP_${c.story.step}`) : line(c, 'ASK', c.line)));
 
     const ask = el('div', 'd-flex align-items-center mt-2 font-w600');
     ask.append(img(itemOf(c.itemId)?.media, 'skill-icon-xs mr-1'), marquee('span', 'wf-min0 flex-fill', askText(c)));
@@ -632,7 +716,7 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, ma
     tier: tier(),
     points: Math.floor(state?.standing.points ?? 0),
     crew: hiring.crew.all.map((f) => [f.id, f.skillId]),
-    c: state?.commissions.map((c) => [c.id, c.delivered, c.state, c.late, c.folkId, Math.floor(model.deadlineLeft(c) / 72000),
+    c: state?.commissions.map((c) => [c.id, c.story?.step ?? 0, c.delivered, c.state, c.late, c.folkId, Math.floor(model.deadlineLeft(c) / 72000),
       c.folkId === null ? 0 : (hiring.room?.townQty(byId(c.folkId), c.itemIds) ?? 0)]) ?? null,
     runs: state === null ? null : Object.entries(state.runs).map(([id, r]) => [id, Math.floor(r.ticks / 1200)]),
     room: state?.commissions.some((c) => c.state === 'open' && storageFree() < Math.floor(model.payout(c).resources)) ?? false,
@@ -669,6 +753,8 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, ma
       lastClockText = text;
     }
     standingEl.classList.toggle('d-none', !on);
+    // The Town history from Honoured (stories), or once a story was told.
+    historyButton?.classList.toggle('d-none', !on || (state.reached < model.STORY_TIER && state.stories.done.length === 0));
     if (!on) return;
     const points = state.standing.points;
     const next = model.nextTierPoints(points);
@@ -762,6 +848,18 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, ma
     },
     /** Dev aid: a run that ends now. */
     finishRuns() { if (state !== null) Object.keys(state.runs).forEach(finishRun); },
+    /** Dev aid: the next new commission is a story (an untouched plain one makes room for it); Honoured needed. */
+    story() {
+      if (state === null || !isOpen()) return null;
+      state.stories.count = model.STORY_EVERY - 1;
+      if (state.commissions.length >= slots()) {
+        const i = state.commissions.findIndex((c) => c.story === undefined && (c.folkId === null || c.state !== 'open'));
+        if (i >= 0) state.commissions.splice(i, 1);
+      }
+      fillNow();
+      markDirty();
+      return state.commissions.find((c) => c.story !== undefined && c.state === 'open') ?? null;
+    },
     /** Dev aid: a new board now. */
     reroll() { if (state !== null && isOpen()) { state.commissions = state.commissions.filter((c) => c.folkId !== null); model.fill(state, rollOpts(), slots()); markDirty(); } },
   };
@@ -777,7 +875,7 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, ma
 
   ctx.onCharacterLoaded(() => {
     const saved = hiring.crew.commissions;
-    state = saved === null ? null : model.normalizeState(saved);
+    state = saved === null ? null : model.normalizeState(saved, stories);
     hiring.crew.commissions = state;
     // A commission for a Folk no longer hired, or no longer on its skill, waits for another.
     state?.commissions.forEach((c) => {

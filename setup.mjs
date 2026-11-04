@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-11-04.177';
+export const BUILD = '2026-11-04.178';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -202,6 +202,20 @@ export async function setup(ctx) {
     };
     await ctx.gameData.addPackage({ $schema: '', namespace: 'worker_folks', data: commissionRules.guildPackage(guildText) });
   }
+  // Stories (Honoured): the town's projects in three commissions; each finished one hands over a deed that builds its
+  // decoration in Township.
+  let stories = [];
+  try {
+    stories = commissionRules.storiesFrom(await ctx.loadData('data/commissions.json'));
+  } catch (err) { log('stories not loaded', err); }
+  if (hasFull && stories.length > 0) {
+    const storyText = Object.fromEntries(stories.map((st) => [st.id, {
+      deed: getLangString(`MOD_WF_STORY_${st.id}_DEED`),
+      deedDesc: getLangString(`MOD_WF_STORY_${st.id}_DEED_DESC`),
+      building: getLangString(`MOD_WF_STORY_${st.id}_BUILDING`),
+    }]));
+    await ctx.gameData.addPackage({ $schema: '', namespace: 'worker_folks', data: commissionRules.storyPackage(stories, storyText) });
+  }
   Object.entries(gearData.LANG.items).forEach(([id, keys]) => {
     const item = game.items.getObjectByID(`worker_folks:${id}`);
     if (item === undefined) return;
@@ -394,6 +408,7 @@ export async function setup(ctx) {
   commissions.install(ctx, {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     model: commissionRules,
+    stories,
     resume,
     time,
     numbers,
