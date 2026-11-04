@@ -190,12 +190,12 @@ skip the cooldown.
 Hiring gains XP for every hour your Folks work, by tier: Trainee 60, Apprentice 140,
 Journeyman 220, Master 380, Foreman 600 (failed actions count, as they do for wages; the rate
 is a setting). It shows as a "+N Hiring XP" notification like any other skill; delivered Work
-Orders pay more. Open
+Orders pay more, Township Commissions a little. Open
 **View Milestones** on the Hiring page for the full list. The levels unlock management
 features: the Payroll Reserve at 5 (24 h of the whole crew's wages, growing to 72 h at 35,
 7 days at 65 and 30 days at 95), the Work Orders board at 8 (more orders at 30 and 70, the
 reroll at 50), promotions at 10, forgetting a trait at 15, Licences at 20 / 40 / 60 / 80, the
-apology bonus at 25, half the firing severance at 45, Summoning marks for Folks at 50,
+apology bonus at 25, Township Commissions at 30, half the firing severance at 45, Summoning marks for Folks at 50,
 automatic restart of a Folk's skill after a settlement at 55, cheaper Overtime (×1.5 wages)
 at 85, no firing severance at 90, a free Shift Slot and a +20% Foreman crew bonus cap at 99
 and, with Throne of the Herald, -10%
@@ -229,6 +229,48 @@ delivered order's place stays empty until the refresh. Hiring 8 gives 2 Small or
 with Medium ones, 70 four with Large ones; from 50 a **Reroll** (1,000,000 GP) replaces every
 order nobody has started. Delivered and expired orders while you were away show in the Welcome
 Back summary. The board is a block on the Hiring page you can move and fold like the Overview.
+
+## Township Commissions
+
+From Hiring 30, once your town is founded in Township, the people of your town bring their
+requests to your guild. The **Township Commissions** board on the Hiring page shows three of
+them, four from Trusted Standing. Each comes from one figure of the town with a trade of its own:
+the Miller (Woodcutting), Mason (Mining), Smith (Smithing), Baker (Cooking or Fishing), Healer
+(Herblore), Tailor (Crafting), Fletcher (Fletching) and Runewright (Runecrafting). It asks for
+one item worth about 8 to 24 hours of one Folk's work, with a deadline.
+
+**Send** the Folk that works that skill (one commission per Folk). From then on what it makes of
+that item goes to its room instead of your bank. When the room holds the rest, or has no space
+for one more action, the Folk carries the load to town: 45 minutes of game time without work,
+its wages still running. **Recall** takes the Folk off the commission; what it made and did not
+carry yet goes to your bank.
+
+A delivered commission pays, never in GP:
+
+- **Township resources** of the figure's trade (Wood, Stone, Bar, Food, Potions, Clothing,
+  Planks or Rune Essence): what Township's own Casual Tasks pay at your Township level, ×1.25
+  for every 8 hours asked. Only what your town's storage takes is kept; the card warns you
+  first when the storage is too full.
+- **Town Standing**, one point per hour of work asked.
+- **Hiring XP**: a fortieth of a level's worth per 8 hours, at your Hiring level when it is
+  delivered.
+
+Late (past the deadline) it still counts for one more day at half the resources and four fifths
+of the Standing. After that the figure withdraws and pays for what came, without the bonus,
+Standing or Hiring XP. Every 24 hours of game time, offline included, delivered and withdrawn
+commissions go and new ones come.
+
+**Town Standing** opens the town's rewards: **Known** at 80 points, **Trusted** at 300 (a fourth
+commission on the board) and **Honoured** at 800. After three days without a delivery it fades
+by 2% a day.
+
+At Known the town hands your guild its **Guild Charter**: the **Guild Hall** appears in
+Township's Grasslands. It is a tier 5 building like the Town Hall (Township 80 and 40,000
+citizens) and costs as much: 100,000,000 GP and 100,000 each of Planks, Stone and Bar. Build up to
+five; each one cuts every Folk's wages by 1%, less as it runs down, like the town's own buildings. The charter and the Halls
+stay even if your Standing fades.
+
+Commissions suit cheaper Folks best: a Foreman's hour is worth far more on Work Orders.
 
 ## Gear, pet and relics
 
