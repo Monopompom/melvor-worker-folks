@@ -16,6 +16,8 @@
 const CONTAINER_ID = 'worker-folks-container';
 export const BLOCK_ID = 'worker-folks-commissions';
 const CHECK_TICKS = 20;
+/** How often the board looks whether the town still owes the charter (every 10 s). */
+const CHARTER_CHECK_TICKS = 200;
 
 export function install(ctx, { getHiring, model, resume, time, numbers, tips, popupDidRender, log }) {
   let hiring;
@@ -79,6 +81,56 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, po
     if (model.fill(state, rollOpts(), slots()).length > 0) markDirty();
   };
 
+  // ---- the Guild Charter (Known) -----------------------------------------------------------------------------------
+
+  const charterItem = () => game.items.getObjectByID(`worker_folks:${model.CHARTER_ID}`);
+  const hallOf = () => township()?.buildings?.getObjectByID(`worker_folks:${model.HALL_ID}`);
+  const charterFound = () => {
+    const item = charterItem();
+    try { return item !== undefined && game.stats.itemFindCount(item) > 0; } catch { return false; }
+  };
+  /**
+   * The town hands over the charter once Known is reached, and again if it was never found (lost to a full bank in an
+   * older build, say). Bank space or not: it is one item, and Township's Guild Hall asks for it.
+   */
+  const grantCharter = () => {
+    const item = charterItem();
+    if (item === undefined || hallOf() === undefined || !model.charterDue(state, charterFound())) return;
+    try {
+      game.bank.addItem(item, 1, true, true, true, true, 'worker_folks.Commissions');
+    } catch (err) { log('charter not given', err); return; }
+    notify('success', getLangString('MOD_WF_COMM_CHARTER_GIVEN'), item.media);
+    log('Guild Charter given');
+    markDirty();
+  };
+  /** Guild Halls built in Grasslands and the wage relief they give now (efficiency counted), or null without them. */
+  const halls = () => {
+    const hall = hallOf();
+    const biome = township()?.biomes?.getObjectByID(model.HALL_BIOME);
+    if (hall === undefined || biome === undefined) return null;
+    let built = 0;
+    let relief = 0;
+    try {
+      built = biome.getBuildingCount(hall);
+      relief = built > 0 ? Math.max(1, built * (biome.getBuildingEfficiency(hall) / 100)) * model.HALL_WAGE_DISCOUNT : 0;
+    } catch { return null; }
+    return { built, relief: Math.round(relief * 10) / 10 };
+  };
+  /**
+   * Township recomputes the player's modifiers only on some events (a season change, worship), not when a building is
+   * built, destroyed or wears down, so a new Hall's wage relief would wait for an unrelated stat change. When the Halls
+   * change, recompute once. The first check after load only records them: loading computes every stat already.
+   */
+  let hallKey;
+  const syncHalls = () => {
+    const h = halls();
+    const key = h === null ? '' : `${h.built}:${h.relief}`;
+    if (hallKey !== undefined && key !== hallKey) {
+      try { township().computeProvidedStats(true); } catch (err) { log('hall stats not updated', err); }
+    }
+    hallKey = key;
+  };
+
   const notify = (kind, text, icon) => {
     if (!online()) return;
     if (kind === 'error') game.notifications.createErrorNotification('worker_folks:commission', text);
@@ -113,6 +165,7 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, po
     const p = model.payout(c);
     const added = addResources(c.resourceId, p.resources);
     const tiers = model.gainStanding(state.standing, p.standing);
+    model.noteReached(state);
     const xp = Math.max(1, Math.ceil(p.xpLevels * xpToNext()));
     const turn = hiring.folkTurn;
     hiring.folkTurn = false;
@@ -125,6 +178,7 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, po
     notify('success', templateLangString('MOD_WF_COMM_DELIVERED', { figure: figureName(c.figure), name: folk?.name ?? '', what: askText(c), line: thanks, rewards: parts.join(', ') }), portraitOf(c.figure));
     if (added < p.resources) notify('error', templateLangString('MOD_WF_COMM_STORAGE_FULL', { lost: resourceText(c.resourceId, p.resources - added) }));
     if (tiers.after > tiers.before) notify('success', templateLangString('MOD_WF_COMM_TIER_UP', { tier: getLangString(`MOD_WF_STANDING_${model.TIERS[tiers.after].id}`) }), township()?.media);
+    grantCharter();
     hiring.events.emit('commissionDelivered', { commission: c, folk, reward: { ...p, resources: added, xp }, offline: !online() });
     log(`commission delivered: ${c.id} ${c.figure} ${c.itemId} ×${c.qty}`, p);
     markDirty();
@@ -274,6 +328,10 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, po
       ids.forEach(startRun);
     }
     if (ticks % CHECK_TICKS === 0 && state.commissions.length < slots()) fillNow();
+    if (ticks % CHARTER_CHECK_TICKS === 0) {
+      grantCharter();
+      syncHalls();
+    }
   });
 
   // ---- the card line -----------------------------------------------------------------------------------------------
@@ -522,6 +580,7 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, po
     tips?.sweep?.();
   };
 
+  let lastHallLine = null;
   const drawHead = () => {
     const on = isOpen() && state !== null;
     const text = on ? templateLangString('MOD_WF_COMM_REFRESH', { time: time.shortTime(model.ticksLeft(state) * TICK_INTERVAL) }) : '';
@@ -536,9 +595,12 @@ export function install(ctx, { getHiring, model, resume, time, numbers, tips, po
     const label = templateLangString(next === null ? 'MOD_WF_COMM_STANDING_TOP' : 'MOD_WF_COMM_STANDING', {
       tier: getLangString(`MOD_WF_STANDING_${model.TIERS[tier()].id}`), points: n(points), next: next === null ? '' : n(next),
     });
-    if (standingEl.textContent !== label) {
+    const h = state.reached >= model.CHARTER_TIER ? halls() : null;
+    const hallLine = h === null ? '' : templateLangString('MOD_WF_COMM_HALLS', { built: full(h.built), max: full(model.HALL_MAX), relief: h.relief });
+    if (standingEl.textContent !== label || hallLine !== lastHallLine) {
       standingEl.textContent = label;
-      tips?.set(standingEl, [getLangString('MOD_WF_COMM_STANDING_TIP')]);
+      lastHallLine = hallLine;
+      tips?.set(standingEl, [getLangString('MOD_WF_COMM_STANDING_TIP'), ...(hallLine === '' ? [] : [hallLine])]);
     }
   };
 

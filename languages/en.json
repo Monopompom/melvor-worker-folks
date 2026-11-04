@@ -631,7 +631,7 @@
   "MOD_WF_COMM_EMPTY": "No one is asking. The board fills again at the next refresh.",
   "MOD_WF_COMM_STANDING": "${tier} · ${points} / ${next}",
   "MOD_WF_COMM_STANDING_TOP": "${tier} · ${points}",
-  "MOD_WF_COMM_STANDING_TIP": "Town Standing: what your town thinks of your guild. Every delivered commission adds to it, a late one less. Known at 40, Trusted at 150 (a fourth commission), Honoured at 400. After three days without a delivery it fades by 2% a day.",
+  "MOD_WF_COMM_STANDING_TIP": "Town Standing: what your town thinks of your guild. Every delivered commission adds to it, a late one less. Known at 40 (the Guild Charter, for Township’s Guild Hall), Trusted at 150 (a fourth commission), Honoured at 400. After three days without a delivery it fades by 2% a day; the charter and the Halls stay.",
   "MOD_WF_STANDING_Strangers": "Strangers",
   "MOD_WF_STANDING_Known": "Known",
   "MOD_WF_STANDING_Trusted": "Trusted",
@@ -678,7 +678,7 @@
   "MOD_WF_COMM_HELP_2_HEAD": "What it pays",
   "MOD_WF_COMM_HELP_2": "Township resources of the figure’s trade: what the town’s own tasks pay at your Township level, ×1.25 for every 8 hours asked, as far as the town’s storage takes them. Town Standing and Hiring XP too. Past the deadline it pays half the resources and less Standing. A day later the figure withdraws and pays only for what came.",
   "MOD_WF_COMM_HELP_3_HEAD": "The board",
-  "MOD_WF_COMM_HELP_3": "Three commissions, four from Trusted Standing, one per Folk. Every 24 hours of game time, offline included, delivered and withdrawn ones go and new ones come. Standing fades by 2% a day after three days without a delivery.",
+  "MOD_WF_COMM_HELP_3": "Three commissions, four from Trusted Standing, one per Folk. Every 24 hours of game time, offline included, delivered and withdrawn ones go and new ones come. At Known the town gives your guild its charter: build the Guild Hall in Township’s Grasslands, up to five, each -1% Folk wages while kept repaired. Standing fades by 2% a day after three days without a delivery; the charter and the Halls stay.",
   "MOD_WF_FIGURE_Miller": "Miller",
   "MOD_WF_FIGURE_Miller_ASK_1": "The wheel housing has rotted through. I need timber before the river rises.",
   "MOD_WF_FIGURE_Miller_ASK_2": "Winter grinds slow without dry wood for the kiln.",
@@ -758,5 +758,10 @@
   "MOD_WF_COMM_REWARD_LOST": "${qty} ${resource} lost: storage full",
   "MOD_WF_COMM_REWARD_LOST_TIP": "Your town’s storage was full when this was paid; what found no room was lost. Build storage in Township to keep the next reward.",
   "MOD_WF_COMM_REWARD_ROOM": "Your town’s storage has room for ${free} more now: the rest of this reward would be lost.",
+  "MOD_WF_COMM_CHARTER_GIVEN": "Your town counts your guild as Known and hands you its Guild Charter. Build the Guild Hall in Township’s Grasslands: each one -1% Folk wages, up to five.",
+  "MOD_WF_COMM_HALLS": "Guild Halls: ${built} / ${max} built in Grasslands, -${relief}% Folk wages now.",
+  "MOD_WF_ITEM_Guild_Charter": "Guild Charter",
+  "MOD_WF_ITEM_Guild_Charter_DESC": "Your town’s word that your guild belongs here, given at Known Town Standing. Township’s Guild Hall asks for it: build it in Grasslands, each one -1% Folk wages, up to five.",
+  "MOD_WF_BUILDING_Guild_Hall": "Guild Hall",
   "MOD_WF_COMM_REWARD_ROOM_NONE": "Your town’s storage is full now: this reward would be lost. Build storage in Township before it is paid."
 }

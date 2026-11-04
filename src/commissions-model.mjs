@@ -204,7 +204,7 @@ export function rollCommission({ candidates, townshipLevel = 1, stock = {}, seas
 }
 
 export function createState() {
-  return { commissions: [], ticks: 0, standing: { points: 0, idle: 0 }, runs: {}, delivered: 0 };
+  return { commissions: [], ticks: 0, standing: { points: 0, idle: 0 }, runs: {}, delivered: 0, reached: 0 };
 }
 
 const normalizePaid = (raw) => (isObject(raw) && Number.isFinite(raw.resources) && Number.isFinite(raw.standing)
@@ -275,12 +275,15 @@ export function normalizeState(raw) {
     }
   }
   const s = isObject(raw.standing) ? raw.standing : {};
+  const points = Number.isFinite(s.points) && s.points > 0 ? s.points : 0;
   return {
     commissions,
     ticks: clampCount(raw.ticks, REFRESH_TICKS),
-    standing: { points: Number.isFinite(s.points) && s.points > 0 ? s.points : 0, idle: isCount(s.idle) ? s.idle : 0 },
+    standing: { points, idle: isCount(s.idle) ? s.idle : 0 },
     runs,
     delivered: isCount(raw.delivered) ? raw.delivered : 0,
+    // The highest tier ever held (what a tier gave stays through fading); older saves start from the tier held now.
+    reached: Math.max(isCount(raw.reached) && raw.reached < TIERS.length ? raw.reached : 0, tierOf(points)),
   };
 }
 
@@ -382,6 +385,14 @@ export function proRata(c) {
   return { resources: Math.floor((c.resources * (c.delivered / c.qty)) / BONUS) };
 }
 
+/** Notes the tier held now as reached; returns whether it is a new highest. */
+export function noteReached(state) {
+  const now = tierOf(state.standing.points);
+  if (now <= state.reached) return false;
+  state.reached = now;
+  return true;
+}
+
 /** Adds Standing; returns { before, after } as tiers. A delivery also resets the fading clock. */
 export function gainStanding(standing, points) {
   const before = tierOf(standing.points);
@@ -403,4 +414,69 @@ export function runDue({ townQty, remaining: rest, usedMs, capMs, nextMs }) {
 export function runsLeft({ rest, perRunQty }) {
   if (!(rest > 0)) return 0;
   return perRunQty > 0 ? Math.max(1, Math.ceil(rest / perRunQty)) : 1;
+}
+
+// ---- the Guild Charter and the Guild Hall (Known) -----------------------------------------------------------------
+
+/**
+ * Known gives the Guild Charter, an item; Township's Guild Hall asks for it (the game's buildings take only its fixed
+ * requirement kinds, and "item found" is one). Each Hall built in Grasslands lowers Folk wages by 1%, up to five,
+ * through the same modifier as the other reliefs (none over 10%); a run-down Hall gives less, as the town's own do.
+ */
+export const CHARTER_TIER = 1;
+export const CHARTER_ID = 'Guild_Charter';
+export const HALL_ID = 'Guild_Hall';
+export const HALL_MAX = 5;
+export const HALL_WAGE_DISCOUNT = 1;
+/** Township tier 2: Township level 15, as the town's own second-tier buildings. */
+export const HALL_TIER = 2;
+export const HALL_BIOME = 'melvorF:Grasslands';
+/** Per Hall, a tuning figure: about a Market's bill, in the trades the guild works for (Planks, Stone, Bar). */
+export const HALL_COST = Object.freeze([['melvorF:GP', 25000], ['melvorF:Planks', 4000], ['melvorF:Stone', 4000], ['melvorF:Bar', 2000]]);
+
+/** Whether the town owes the guild its charter: Known reached once, the charter never found. */
+export function charterDue(state, found) {
+  return state !== null && state !== undefined && state.reached >= CHARTER_TIER && !found;
+}
+
+/**
+ * The data package for the charter and the Hall (only with Township's biomes loaded). `text`: { charter, charterDesc,
+ * hall } names, set again from the language file after loading.
+ */
+export function guildPackage(text = {}) {
+  const ns = (id) => `worker_folks:${id}`;
+  return {
+    items: [{
+      itemType: 'Item',
+      id: CHARTER_ID,
+      name: text.charter ?? 'Guild Charter',
+      category: 'Hiring',
+      type: 'Misc',
+      media: 'assets/guild_charter.webp',
+      ignoreCompletion: true,
+      obtainFromItemLog: false,
+      golbinRaidExclusive: false,
+      sellsFor: 0,
+      customDescription: text.charterDesc ?? '',
+    }],
+    skillData: [{
+      skillID: 'melvorD:Township',
+      data: {
+        buildings: [{
+          id: HALL_ID,
+          name: text.hall ?? 'Guild Hall',
+          media: 'assets/guild_hall.webp',
+          tier: HALL_TIER,
+          cost: [{ biomeID: HALL_BIOME, cost: HALL_COST.map(([id, quantity]) => ({ id, quantity })) }],
+          provides: [{ biomeID: HALL_BIOME, population: 0, happiness: 0, education: 0, storage: 0, resources: [] }],
+          biomes: [HALL_BIOME],
+          maxUpgrades: HALL_MAX,
+          modifiers: { [ns('folkWageDiscount')]: HALL_WAGE_DISCOUNT },
+          requirements: [{ type: 'ItemFound', itemID: ns(CHARTER_ID) }],
+          canDegrade: true,
+        }],
+        buildingDisplayOrder: [{ insertAt: 'After', afterID: 'melvorF:Town_Hall', ids: [ns(HALL_ID)] }],
+      },
+    }],
+  };
 }

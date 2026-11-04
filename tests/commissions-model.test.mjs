@@ -6,6 +6,7 @@ import {
   figureOf, tierOf, nextTierPoints, slotsFor, resourceScale, niceQuantity, quantityFor, rewardFor, figureWeight,
   candidatePool, rollCommission, createState, normalizeCommission, normalizeState, fill, refresh, advance, fade,
   ticksLeft, deadlineLeft, commissionOf, remaining, deliver, payout, proRata, gainStanding, runDue, runsLeft,
+  noteReached, charterDue, guildPackage, CHARTER_TIER, HALL_MAX, HALL_WAGE_DISCOUNT,
 } from '../src/commissions-model.mjs';
 
 const seq = (...values) => { let i = 0; return () => values[i++ % values.length]; };
@@ -226,4 +227,49 @@ test('what a commission paid keeps what a full storage turned away (none in olde
   assert.deepEqual(normalizeCommission({ ...done, paid: { resources: 500, standing: 20 } }).paid, { resources: 500, lost: 0, standing: 20, late: false });
   assert.equal(normalizeCommission({ ...done, paid: { resources: 500, lost: -3, standing: 20 } }).paid.lost, 0);
   assert.equal(normalizeCommission({ ...done, paid: { lost: 5 } }).paid, null);
+});
+
+test('the highest tier reached stays through fading; older saves start from the tier held now', () => {
+  const state = createState();
+  assert.equal(state.reached, 0);
+  gainStanding(state.standing, 45);
+  assert.equal(noteReached(state), true);
+  assert.equal(state.reached, CHARTER_TIER);
+  assert.equal(noteReached(state), false, 'no news the second time');
+  fade(state.standing, DAY_TICKS * 40);
+  assert.ok(state.standing.points < 40);
+  noteReached(state);
+  assert.equal(state.reached, CHARTER_TIER, 'fading takes no reached tier away');
+  assert.equal(normalizeState({ standing: { points: 160 } }).reached, 2, 'an older save: Trusted held, so Trusted reached');
+  assert.equal(normalizeState({ standing: { points: 10 }, reached: 1 }).reached, 1);
+  assert.equal(normalizeState({ standing: { points: 10 }, reached: 99 }).reached, 0, 'junk reached: from points');
+  assert.equal(normalizeState({ standing: { points: 10 }, reached: 3 }).reached, 3);
+});
+
+test('the charter is owed from Known until it is found', () => {
+  assert.equal(charterDue(null, false), false);
+  assert.equal(charterDue({ reached: 0 }, false), false);
+  assert.equal(charterDue({ reached: 1 }, false), true);
+  assert.equal(charterDue({ reached: 3 }, true), false);
+});
+
+test('the guild package: a charter item and a Grasslands Hall that asks for it, five at most, -1% wages each', () => {
+  const pkg = guildPackage({ charter: 'C', charterDesc: 'D', hall: 'H' });
+  const [item] = pkg.items;
+  assert.equal(item.id, 'Guild_Charter');
+  assert.equal(item.name, 'C');
+  assert.equal(item.customDescription, 'D');
+  assert.equal(item.sellsFor, 0);
+  const ts = pkg.skillData[0];
+  assert.equal(ts.skillID, 'melvorD:Township');
+  const [hall] = ts.data.buildings;
+  assert.equal(hall.name, 'H');
+  assert.equal(hall.maxUpgrades, HALL_MAX);
+  assert.deepEqual(hall.biomes, ['melvorF:Grasslands']);
+  assert.deepEqual(hall.modifiers, { 'worker_folks:folkWageDiscount': HALL_WAGE_DISCOUNT });
+  assert.ok(HALL_MAX * HALL_WAGE_DISCOUNT <= 10, 'no wage relief source over 10%');
+  assert.deepEqual(hall.requirements, [{ type: 'ItemFound', itemID: 'worker_folks:Guild_Charter' }]);
+  assert.equal(hall.cost[0].biomeID, 'melvorF:Grasslands');
+  assert.ok(hall.cost[0].cost.every((c) => c.quantity > 0 && c.id.startsWith('melvorF:')));
+  assert.deepEqual(ts.data.buildingDisplayOrder, [{ insertAt: 'After', afterID: 'melvorF:Town_Hall', ids: ['worker_folks:Guild_Hall'] }]);
 });
