@@ -568,6 +568,9 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
    folded, the Payroll mini bar. */
 #worker-folks-overview > .wf-dash-content { padding: 16px !important; }
 .wf-dash-right { gap: 12px; min-width: 0; }
+/* The commissions' badge, Town history button and clock: on a phone the clock takes a line of its own (at 375px the
+   three on one line ran 49px past the screen). */
+#worker-folks-commissions .wf-dash-right { flex-wrap: wrap; row-gap: 6px; }
 .wf-dash-pill { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--wf-line); font-size: 0.9rem; white-space: nowrap; }
 /* Beside the title the pill stays one row: a long text wraps inside its span, the bar and percentage stay on its
    right. A wrapping flex box is sized short of its content in Chrome (415px for ~487px), which put "0%" on a line of
