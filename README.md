@@ -357,12 +357,36 @@ explaining why, and registers nothing; disable one of the two in the Mod Manager
 Other mods' custom skills get a Worker box where their skill follows the game's skill
 classes. Mods that only add items, modifiers or UI are unaffected.
 
+## Backups
+
+At the foot of the Hiring page, **Back up Worker Folks** makes a code to copy or download: your
+Hiring level, XP, mastery and relics, every Folk with its gear, room, place and wages, the Payroll
+Reserve, Work Orders, Township Commissions, Worker Folks' items in your bank and worn, its shop
+purchases, its Township buildings, its pet and your settings. Keep it somewhere safe: the game
+drops all of that the first time it saves while the mod is off.
+
+**Restore Worker Folks** takes a pasted code or the file. It shows what the backup holds, what it
+replaces and what comes back, and asks before it changes anything; then it writes the backup back,
+saves and reloads the game.
+
+- Items, purchases, buildings and the pet come back up to the backup's count.
+- Gear or stacks your Folks held in the backup and you moved to the bank since come out of the bank
+  again, and what your crew holds now beyond the backup's goes to the bank, so a restore never
+  doubles anything.
+- If your crew is still here (Hiring XP not below the backup's), the Work Orders and Township
+  Commissions on the board stay as they are now, so nothing finished since is paid twice.
+- Food, wages and stock your Folks used up since the backup are not given back.
+- A backup from another character or game mode can be restored; the popup says so first.
+
+Other mods can carry this backup inside their own through Worker Folks' API (version 8) and
+restore both at once.
+
 ## Removing the mod
 
 Your save stays loadable without the mod, but the game drops everything the mod added the
 first time it saves without it: your Hiring level, your Folks, Licences, Shift Slots, the
 Payroll Reserve and anything Worker Folks added to your bank. Turning the mod back on later
-starts Hiring from scratch.
+starts Hiring from scratch, unless you restore a backup (see Backups above).
 
 Before removing it: open each Folk's **Gear** and take its items back (or Fire the Folk,
 which returns them while your bank has space), and stop every Folk. A skill a Folk was working when you saved may
