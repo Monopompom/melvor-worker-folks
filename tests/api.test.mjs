@@ -252,7 +252,7 @@ test('api v6: hirePrice and hire on the Shop\'s terms (licence, a free slot, the
   const moves = [];
   hiring.events.on('folkMoved', (e) => moves.push(e));
   const api = createApi({ getHiring: () => hiring, model, pricing });
-  assert.equal(api.version, 7);
+  assert.ok(api.version >= 6);
   assert.equal(api.hirePrice('Newbie'), 1000000);
   assert.equal(api.hirePrice('Captain'), undefined);
   assert.deepEqual(api.hire('Captain'), { refused: 'tier' });
@@ -336,7 +336,7 @@ test('api v7: canHire says why a hire would be refused, and at what price', asyn
   hiring.folkCap = 1;
   hiring.game = { gp: { amount: 100, remove() {} } };
   const api = createApi({ getHiring: () => hiring, model, pricing });
-  assert.equal(api.version, 7);
+  assert.ok(api.version >= 7);
   assert.deepEqual(api.canHire('Captain'), { ok: false, refused: 'tier' });
   assert.deepEqual(api.canHire('Newbie', { share: 0.5 }), { ok: false, refused: 'licence', price: 500000 });
   licences.add('Newbie');
@@ -345,4 +345,40 @@ test('api v7: canHire says why a hire would be refused, and at what price', asyn
   assert.deepEqual(api.canHire('Newbie', { share: 0.5 }), { ok: true, price: 500000 });
   hiring.crew.hire('Junior');
   assert.deepEqual(api.canHire('Newbie'), { ok: false, refused: 'full', price: 1000000 });
+});
+
+test('api v8: backup, restorePlan and restore go to the backup module, with the code as given', async () => {
+  const { hiring } = makeHiring();
+  const calls = [];
+  const module = {
+    backup: async () => { calls.push(['backup']); return { ok: true, code: 'FOLKS-BACKUP:j:x', summary: {} }; },
+    restorePlan: async (code) => { calls.push(['restorePlan', code]); return { ok: true }; },
+    restore: async (code) => { calls.push(['restore', code]); return { ok: true }; },
+  };
+  const api = createApi({ getHiring: () => hiring, model, getBackup: () => module });
+  assert.ok(api.version >= 8);
+  assert.equal((await api.backup()).code, 'FOLKS-BACKUP:j:x');
+  assert.deepEqual(await api.restorePlan('FOLKS-BACKUP:z:abc'), { ok: true });
+  assert.deepEqual(await api.restore('FOLKS-BACKUP:z:abc'), { ok: true });
+  assert.deepEqual(calls, [['backup'], ['restorePlan', 'FOLKS-BACKUP:z:abc'], ['restore', 'FOLKS-BACKUP:z:abc']]);
+});
+
+test('api v8: without the backup module, with the mod off or before the skill exists, every backup call is unavailable', async () => {
+  const { hiring } = makeHiring();
+  const unavailable = { ok: false, why: 'unavailable' };
+  for (const api of [
+    createApi({ getHiring: () => hiring, model }),
+    createApi({ getHiring: () => hiring, model, getBackup: () => undefined }),
+    createApi({ getHiring: () => undefined, model, getBackup: () => ({ backup: async () => ({ ok: true }) }) }),
+  ]) {
+    assert.deepEqual(await api.backup(), unavailable);
+    assert.deepEqual(await api.restorePlan('FOLKS-BACKUP:j:x'), unavailable);
+    assert.deepEqual(await api.restore('FOLKS-BACKUP:j:x'), unavailable);
+  }
+  // A module found later (it loads after the API is made) is used from then on.
+  let module;
+  const api = createApi({ getHiring: () => hiring, model, getBackup: () => module });
+  assert.deepEqual(await api.backup(), unavailable);
+  module = { backup: async () => ({ ok: true, code: 'c' }) };
+  assert.equal((await api.backup()).code, 'c');
 });

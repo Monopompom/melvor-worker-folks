@@ -3,7 +3,7 @@
 // Pure: the Hiring skill and the Folk model are injected (mod modules cannot import their siblings).
 
 /** Bumped when something here changes in a way a caller must know about. Voyage refuses an older one. */
-export const API_VERSION = 7;
+export const API_VERSION = 8;
 /** The least of the hire price an outside hire pays (v7): a bargain, never a free Folk. */
 export const HIRE_SHARE_MIN = 0.25;
 
@@ -81,7 +81,7 @@ function viewPayload(payload, view) {
  * qualificationLowering }); rules() hands them on only when given, so a caller tells an older Worker Folks by their
  * absence.
  */
-export function createApi({ getHiring, model, pricing, rules, version = API_VERSION }) {
+export function createApi({ getHiring, model, pricing, rules, getBackup, version = API_VERSION }) {
   const { normalizePlace, TRAVEL } = model;
   const hiring = () => getHiring();
   const view = (folk) => folkView(folk, hiring().statusOf(folk), hiring().health?.maxHpOf(folk), hiring().portrait?.(folk.tier));
@@ -106,6 +106,13 @@ export function createApi({ getHiring, model, pricing, rules, version = API_VERS
     // crewChanged, redraw every skill's Worker box. What shows a Folk's place or its refusals listens to folkMoved.
     hiring().invalidateFolkTable?.(folk);
     hiring().events.emit('folkMoved', { folk, from: placeCopy(from.place), fromTravel: from.travel });
+  };
+  /** The backup's calls (v8) go to its module, loaded after this API is made; without it: 'unavailable'. */
+  const UNAVAILABLE = Object.freeze({ ok: false, why: 'unavailable' });
+  const backupCall = async (name, arg) => {
+    const b = getBackup?.();
+    if (typeof b?.[name] !== 'function' || hiring() === undefined) return UNAVAILABLE;
+    return b[name](arg);
   };
   return Object.freeze({
     version,
@@ -273,6 +280,27 @@ export function createApi({ getHiring, model, pricing, rules, version = API_VERS
       }
       return Object.freeze({ folk: view(folk), price });
     },
+    /**
+     * Worker Folks' backup (v8), for one backup of Worker Folks and the caller's mod. `backup()` resolves to
+     * { ok: true, code, summary }: the FOLKS-BACKUP code, versioned on its own, to carry unchanged; `summary` is
+     * { name, at, mod, build, mode, level, folks, itemKinds, buys, buildings, pets }.
+     */
+    backup: () => backupCall('backup'),
+    /**
+     * What restoring `code` would do now (v8): { ok: true, summary, keepsBoards, replaces, sections }. `sections` are
+     * Worker Folks' confirm bands, [{ head, warn, body }], each body line a text, { html } (escaped already) or
+     * { rows: [[label, value, media?]] }; `warn` marks what is lost; `replaces` is true when any band warns;
+     * `keepsBoards` when the crew lived on and keeps its Work Orders and commissions. Refused: { ok: false, why }, why
+     * 'empty' | 'notCode' | 'voyage' | 'broken' | 'checksum' | 'format' | 'newer' | 'record' | 'cantUnzip' |
+     * 'unavailable'.
+     */
+    restorePlan: (code) => backupCall('restorePlan', code),
+    /**
+     * Restores `code` (v8) with no save and no reload, the game loop stopped: restore Worker Folks first, then the
+     * caller's own part, then save and reload once. { ok: true, summary } or { ok: false, why } as restorePlan's, or
+     * 'failed': it broke part way and nothing was saved, so reload without saving.
+     */
+    restore: (code) => backupCall('restore', code),
     /** Asks for the guarded buttons and the Shop's lines to be drawn again (call after the player moves). */
     refresh: () => hiring().refreshGuarded(),
   });

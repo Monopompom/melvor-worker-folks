@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-11-05.180';
+export const BUILD = '2026-11-05.185';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -152,7 +152,9 @@ export async function setup(ctx) {
   }).add();
   await ctx.gameData.addPackage('data/hiring.json');
   // 3b. The API other mods read as mod.api.worker_folks (Voyage, phase 6): Folks, places, events, guards.
-  ctx.api(apiModule.createApi({ getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'), model: folkModel, pricing,
+  // The backup's calls (v8) reach its module through `backupApi`, set in step 12.
+  let backupApi;
+  ctx.api(apiModule.createApi({ getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'), model: folkModel, pricing, getBackup: () => (state.disabled ? undefined : backupApi),
     rules: { promotion: { level: milestones.PROMOTION_LEVEL, mastery: promotion.MASTERY_GATE, costRate: promotion.PROMOTION_COST_RATE }, slotCaps: pricing.SHIFT_SLOT_CAP,
       tiers: { hireBase: pricing.HIRE_BASE_PRICE, wages: wages.WAGE_PER_HOUR, produceRates: produceRate.RATE_BY_TIER,
         hiringXPPerHour: milestones.HIRING_XP_PER_HOUR, qualification: qualificationRules.QUALIFICATION_LEVELS },
@@ -416,6 +418,24 @@ export async function setup(ctx) {
     marquee: marqueeLine,
     popupDidRender,
     log,
+  });
+
+  // 12. Backups (the user, 5 Nov 2026): Back up and Restore at the Hiring page's foot, by hand only. A failure: no buttons.
+  let backup;
+  try {
+    backup = (await ctx.loadModule('src/backup.mjs')).install(ctx, {
+      getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+      B: await ctx.loadModule('src/backup-model.mjs'),
+      folkModel,
+      BUILD,
+      popupDidRender,
+      log,
+    });
+  } catch (err) { console.error('[Worker Folks] backups failed to load; the rest runs', err); }
+  backupApi = backup?.api;
+  ctx.onInterfaceReady(() => {
+    if (state.disabled || backup === undefined) return;
+    try { backup.mount(tips); } catch (err) { console.error('[Worker Folks] backup buttons failed', err); }
   });
 
   ctx.onCharacterLoaded(() => {

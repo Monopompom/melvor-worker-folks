@@ -197,6 +197,18 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 .wf-help-table tr + tr td { border-top: 1px solid var(--wf-row-line); }
 /* An amount column lines up on its right edge, its head too (the user, build .112). */
 .wf-help-table th.wf-num, .wf-help-table td.wf-num { text-align: right; padding-right: 0; }
+/* Back up and Restore (the user, 5 Nov 2026), under everything; the code's box in their popups, as Voyage's. A band
+   about what a restore loses has the amber edge. */
+.wf-backup-foot { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 4px 0 12px; }
+.wf-backup-foot .btn { min-height: 36px; }
+.wf-band-warn { box-shadow: inset 3px 0 0 var(--wf-edge-debt); }
+.wf-backup-code { font-family: monospace; font-size: .9rem; line-height: 1.35; word-break: break-all; resize: vertical; margin-top: 8px; min-height: 40px; }
+.wf-backup-acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 8px; }
+.wf-backup-acts .btn { min-height: 40px; min-width: 120px; display: inline-flex; align-items: center; justify-content: center; }
+.wf-help-body .wf-backup-note { display: block; font-size: .9rem; margin-top: 8px; min-height: 1.35em; }
+.wf-backup-foot-line { margin: 12px 0 0; text-align: center; }
+.wf-backup-rows td img { width: 20px; height: 20px; margin-right: 6px; vertical-align: middle; }
+.wf-backup-rows td:first-child { color: var(--wf-head); font-weight: 600; }
 /* A band's own heading (Mastery perks), as the Overview's and the help popups' (scan A-31). */
 .wf-band-head { color: var(--wf-head); font-weight: 600; }
 .wf-card-portrait { width: 64px; height: 64px; border-radius: 6px; object-fit: contain; }
