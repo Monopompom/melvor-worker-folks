@@ -7,17 +7,21 @@ export const QUALIFICATION_LEVELS = { Newbie: 10, Junior: 30, Middle: 50, Senior
 /** From this Folk mastery level on, the Folk needs the level of the tier below its own (never below Newbie's). */
 export const LOWERING_MASTERY = 50;
 
-/** The level a Folk needs from you: `{ level, lowered }`, lowered when its mastery took a tier off. */
-export function requirement({ tier, masteryLevel = 1 }) {
+/**
+ * The level a Folk needs from you: `{ level, lowered }`, lowered when its mastery or `tiersOff` (the Union Charter, a
+ * Guild Heirloom) took a tier off. Each takes one; never below a Trainee's.
+ */
+export function requirement({ tier, masteryLevel = 1, tiersOff = 0 }) {
   const index = TIERS.indexOf(tier);
   if (index < 0) throw new Error(`Unknown tier: ${tier}`);
-  const lowered = index > 0 && masteryLevel >= LOWERING_MASTERY;
-  return { level: QUALIFICATION_LEVELS[TIERS[lowered ? index - 1 : index]], lowered };
+  const off = (masteryLevel >= LOWERING_MASTERY ? 1 : 0) + Math.max(0, Math.floor(Number(tiersOff) || 0));
+  const at = Math.max(0, index - off);
+  return { level: QUALIFICATION_LEVELS[TIERS[at]], lowered: at < index };
 }
 
 /** `{ level, lowered, now, ok }` for a Folk of `tier` on a skill where you are at `playerLevel`. */
-export function check({ tier, masteryLevel = 1, playerLevel }) {
-  const { level, lowered } = requirement({ tier, masteryLevel });
+export function check({ tier, masteryLevel = 1, tiersOff = 0, playerLevel }) {
+  const { level, lowered } = requirement({ tier, masteryLevel, tiersOff });
   const now = Math.max(0, Math.floor(playerLevel));
   return { level, lowered, now, ok: now >= level };
 }

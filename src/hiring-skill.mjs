@@ -918,9 +918,10 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       list.querySelectorAll(`mastery-display[data-action-id="${action.id}"]`).forEach((display) => display.updateValues(progress));
     }
 
-    /** What the Folk's earned traits add up to (nothing before the traits slice is in). */
+    /** What the Folk's earned traits and worn Guild Heirlooms add up to. */
     traitEffects(folk) {
-      return this.traits?.effectsOf(folk) ?? { interval: 0, xp: 0, preservation: 0, doubling: 0, masteryXP: 0, wageFactor: 1, overtimeWageFactor: 1, graceFactor: 1, cooldownFactor: 1, neverStrikes: false };
+      const traits = this.traits?.effectsOf(folk) ?? { interval: 0, xp: 0, preservation: 0, doubling: 0, masteryXP: 0, wageFactor: 1, overtimeWageFactor: 1, graceFactor: 1, cooldownFactor: 1, neverStrikes: false };
+      return this.heirlooms?.addTo(folk, traits) ?? traits;
     }
 
     // Hooks read by payroll.mjs and acting.mjs

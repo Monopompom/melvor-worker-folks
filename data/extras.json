@@ -4,6 +4,21 @@
   "data": {
     "modifiers": [
       {
+        "id": "heirloomFind",
+        "allowedScopes": [
+          {
+            "scopes": {},
+            "descriptions": [
+              {
+                "text": "+${value}% Guild Heirloom find chance",
+                "includeSign": false,
+                "lang": "MOD_WF_MODIFIER_heirloomFind"
+              }
+            ]
+          }
+        ]
+      },
+      {
         "id": "folkFreeOvertime",
         "allowedScopes": [
           {

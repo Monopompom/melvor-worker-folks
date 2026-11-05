@@ -44,3 +44,12 @@ test('the card lists the qualification perk at the lowering mastery level', () =
   const levels = LEVEL_MILESTONES.map(([at]) => at);
   assert.deepEqual(levels, [...levels].sort((a, b) => a - b));
 });
+
+test('the Union Charter takes one tier off, on top of mastery 50, never below a Newbie', () => {
+  assert.deepEqual(requirement({ tier: 'Expert', tiersOff: 1 }), { level: 70, lowered: true });
+  assert.deepEqual(requirement({ tier: 'Expert', masteryLevel: LOWERING_MASTERY, tiersOff: 1 }), { level: 50, lowered: true });
+  assert.deepEqual(requirement({ tier: 'Junior', masteryLevel: LOWERING_MASTERY, tiersOff: 1 }), { level: 10, lowered: true });
+  assert.deepEqual(requirement({ tier: 'Newbie', tiersOff: 1 }), { level: 10, lowered: false });
+  assert.equal(check({ tier: 'Senior', tiersOff: 1, playerLevel: 50 }).ok, true);
+  assert.equal(check({ tier: 'Senior', tiersOff: 0, playerLevel: 50 }).ok, false);
+});

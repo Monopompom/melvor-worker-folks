@@ -91,7 +91,9 @@ export function install(ctx, { getHiring, rate, createTablePool, log }) {
     const tier = rate.tierModifiers(folk.tier, { preservationDisabled: !!game.currentGamemode.disablePreservation });
     const perk = hiring.perksOf?.(folk) ?? { skillXP: 0, intervalPercent: 0 };
     // Earned traits: Specialist only in its own skill, Night Owl only while the player fights.
-    const trait = hiring.traits?.effectsOf(folk, skill.id) ?? { interval: 0, xp: 0, preservation: 0, doubling: 0 };
+    // Worn Guild Heirlooms add to the trait line (they have no game modifiers: the item would work for the player too).
+    const traits = hiring.traits?.effectsOf(folk, skill.id) ?? { interval: 0, xp: 0, preservation: 0, doubling: 0 };
+    const trait = hiring.heirlooms?.addTo(folk, traits) ?? traits;
     // The Steward (worn by the player, src/steward.mjs) gives every Folk a share more skill XP.
     const stewardXP = hiring.playerModifier?.('folkSkillXP') ?? 0;
     const bonusXP = tier.skillXP + rate.crewBonus(workingExperts(folk), hiring.levels?.crewBonusMax()) + perk.skillXP + trait.xp + stewardXP;

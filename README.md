@@ -61,7 +61,7 @@ expansions you own.
 A Folk works a skill only once your own level in it is high enough for its tier: 10 for a
 Trainee, 30 for an Apprentice, 50 for a Journeyman, 70 for a Master and 90 for a Foreman
 (Alt. Magic uses your Magic level). From the Folk's mastery 50 the level of the tier below
-is enough. In the Worker box a Folk you don't qualify for is greyed out with the level it
+is enough, and a Folk wearing the Union Charter (a Guild Heirloom) takes one tier more off. In the Worker box a Folk you don't qualify for is greyed out with the level it
 needs; one that already holds the skill waits, and its card and the Worker box say why. A
 Folk that stops qualifying while it works (after a promotion, say) stops, keeps its skill
 and starts again once you reach the level. The **Qualification** setting (Hiring section,
@@ -285,6 +285,27 @@ third and the town hands over a deed for the story's own decoration in Township 
 stories told and the Folks who worked on them.
 
 Commissions suit cheaper Folks best: a Foreman's hour is worth far more on Work Orders.
+
+### Guild Heirlooms
+
+Once a Guild Hall stands, every action of an Apprentice or higher may turn up a **Guild Heirloom**:
+one in 500,000 actions, raised by 20% for each Guild Hall and 10% for each Guild Square and story
+decoration (a full town: three times as often). There are six, and you hold at most one of each: a find
+is always one that is in neither your bank, nor a Folk's gear, nor your own equipment. One you lose (say, with a Folk
+fired when your bank is full) or sell can turn up again. They are found only, never sold in the Shop. Each is worn by a Folk in its own
+slot and works for that Folk alone (you get nothing from wearing one):
+
+| Heirloom | Slot (from) | For the Folk wearing it |
+|---|---|---|
+| Golden Hardhat | Head (Apprentice) | +15% mastery XP |
+| Lucky Apron | Torso (Apprentice) | +4% chance to double items |
+| Guild Ledger | Legs (Apprentice) | -15% wage |
+| Union Charter | Feet (Apprentice) | needs your level of the tier below its own (one more with mastery 50) |
+| Foreman's Whistle | Neck (Journeyman) | -5% action interval |
+| Timekeeper's Bell | Ring (Journeyman) | -30% strike cooldown |
+
+A find shows its popup even with "Hide Folks' gain popups" on. The Town Standing tooltip counts the
+heirlooms you hold.
 
 ## Gear, pet and relics
 

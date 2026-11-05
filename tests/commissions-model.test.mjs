@@ -6,7 +6,7 @@ import {
   figureOf, tierOf, nextTierPoints, slotsFor, resourceScale, niceQuantity, quantityFor, rewardFor, figureWeight,
   candidatePool, rollCommission, createState, normalizeCommission, normalizeState, fill, refresh, advance, fade,
   ticksLeft, deadlineLeft, commissionOf, remaining, deliver, payout, proRata, gainStanding, runDue, runsLeft,
-  noteReached, charterDue, guildPackage, CHARTER_TIER, HALL_MAX, HALL_WAGE_DISCOUNT,
+  noteReached, charterDue, guildPackage, CHARTER_TIER, HALL_MAX, HALL_WAGE_DISCOUNT, HALL_HEIRLOOM_FIND, SQUARE_HEIRLOOM_FIND, STORY_HEIRLOOM_FIND,
   TOWNSFOLK_TIER, TOWNSFOLK_CHANCE, LOCAL_HAPPINESS, townsfolkRoll, runTicksFor, localCooldownFactor,
   FREEDOM_TIER, CHARTERS, SQUARE_MAX, SQUARE_HAPPINESS, SQUARE_EDUCATION,
   STORY_TIER, STORY_EVERY, storiesFrom, storyOf, createStoryState, normalizeStoryState, stepCandidates, storyDue,
@@ -257,7 +257,7 @@ test('the charter is owed from Known until it is found', () => {
   assert.equal(charterDue({ reached: 3 }, true), false);
 });
 
-test('the guild package: a charter item and a Grasslands Hall that asks for it, five at most, -1% wages each', () => {
+test('the guild package: a charter item and a Grasslands Hall that asks for it, five at most, -1% wages and +20% heirloom finds each', () => {
   const pkg = guildPackage({ charter: 'C', charterDesc: 'D', hall: 'H' });
   const [item] = pkg.items;
   assert.equal(item.id, 'Guild_Charter');
@@ -270,7 +270,7 @@ test('the guild package: a charter item and a Grasslands Hall that asks for it, 
   assert.equal(hall.name, 'H');
   assert.equal(hall.maxUpgrades, HALL_MAX);
   assert.deepEqual(hall.biomes, ['melvorF:Grasslands']);
-  assert.deepEqual(hall.modifiers, { 'worker_folks:folkWageDiscount': HALL_WAGE_DISCOUNT });
+  assert.deepEqual(hall.modifiers, { 'worker_folks:folkWageDiscount': HALL_WAGE_DISCOUNT, 'worker_folks:heirloomFind': HALL_HEIRLOOM_FIND });
   assert.ok(HALL_MAX * HALL_WAGE_DISCOUNT <= 10, 'no wage relief source over 10%');
   assert.deepEqual(hall.requirements, [{ type: 'ItemFound', itemID: 'worker_folks:Guild_Charter' }]);
   assert.equal(hall.cost[0].biomeID, 'melvorF:Grasslands');
@@ -324,7 +324,7 @@ test('the Guild Square: a Grasslands building behind Freedom of the Town, +2% ha
   assert.equal(square.maxUpgrades, SQUARE_MAX);
   assert.equal(square.tier, hall.tier);
   assert.deepEqual(square.biomes, ['melvorF:Grasslands']);
-  assert.equal(square.modifiers, undefined, 'the town\'s own stats, no player modifier');
+  assert.deepEqual(square.modifiers, { 'worker_folks:heirloomFind': SQUARE_HEIRLOOM_FIND }, 'the town\'s own stats and the heirloom find chance');
   assert.deepEqual(square.provides, [{ biomeID: 'melvorF:Grasslands', population: 0, happiness: SQUARE_HAPPINESS, education: SQUARE_EDUCATION, storage: 0, resources: [] }]);
   assert.equal(SQUARE_MAX * SQUARE_HAPPINESS, 10);
   assert.deepEqual(square.requirements, [{ type: 'ItemFound', itemID: 'worker_folks:Freedom_of_the_Town' }]);
@@ -521,4 +521,9 @@ test('the stories package: a deed and a one-per-town decoration for each, built 
   assert.deepEqual(b[0].requirements, [{ type: 'ItemFound', itemID: 'worker_folks:Deed_Mill_Bridge' }]);
   assert.deepEqual(b[0].cost[0].cost[0], { id: 'melvorF:GP', quantity: 2000000 });
   assert.equal(b[0].media, 'assets/story_mill_bridge.webp');
+  assert.ok(b.every((x) => x.modifiers['worker_folks:heirloomFind'] === STORY_HEIRLOOM_FIND));
+});
+
+test('a full town raises the heirloom find chance by 200%: five Halls, five Squares, five stories', () => {
+  assert.equal(HALL_MAX * HALL_HEIRLOOM_FIND + SQUARE_MAX * SQUARE_HEIRLOOM_FIND + STORIES.length * STORY_HEIRLOOM_FIND, 200);
 });

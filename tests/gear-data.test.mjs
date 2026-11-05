@@ -131,7 +131,7 @@ test('Ancient Relics: five drops plus the master relic, numbered, fixed chance, 
   // the master relic is a rule change (free overtime, declared in this package) plus a modest combat stat
   assert.equal(relics.HiringMasterRelic.modifiers['worker_folks:folkFreeOvertime'], 1);
   assert.equal(relics.HiringMasterRelic.modifiers.minHitBasedOnMaxHit, 5);
-  assert.deepEqual(data.modifiers.map((m) => m.id), ['folkFreeOvertime']);
+  assert.deepEqual(data.modifiers.map((m) => m.id), ['heirloomFind', 'folkFreeOvertime']);
   // wage sources stay modest: no single relic or item cuts more than 15%
   data.ancientRelics.forEach((r) => assert.ok((r.modifiers['worker_folks:folkWageDiscount'] ?? 0) <= 10, r.id));
   data.items.forEach((i) => assert.ok((i.modifiers?.['worker_folks:folkWageDiscount'] ?? 0) <= 10, i.id));

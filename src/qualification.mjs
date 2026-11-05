@@ -8,11 +8,14 @@ export function install(ctx, { getHiring, model, log }) {
   let hiring;
   /** Folks stopped while the save loaded: their notices wait for the interface (offline progress runs between). */
   let stoppedOnLoad = [];
+  let interfaceReady = false;
   const section = ctx.settings.section('Hiring');
   const enabled = () => section.get('qualification') !== false;
 
   /** `{ level, lowered, now, ok }` for this Folk on this skill (as `tier` when given: a promotion's preview). */
-  const checkOf = (folk, skill, tier = folk.tier) => model.check({ tier, masteryLevel: hiring.masteryLevelOf(folk), playerLevel: skill.level });
+  const checkOf = (folk, skill, tier = folk.tier) => model.check({
+    tier, masteryLevel: hiring.masteryLevelOf(folk), tiersOff: hiring.heirlooms?.tiersOff(folk) ?? 0, playerLevel: skill.level,
+  });
 
   /** Why this Folk may not work this skill ('' = it may). */
   const reasonFor = (folk, skill, tier = folk.tier) => {
@@ -89,8 +92,15 @@ export function install(ctx, { getHiring, model, log }) {
     stoppedOnLoad = stopUnqualified();
     // A promotion can lift a working Folk's requirement past your level (the Promote popup said so first).
     hiring.events.on('folkPromoted', ({ folk }) => stopUnqualified((f) => f === folk).forEach(notify));
+    // Taking the Union Charter off can do the same (a load's loadout check runs before the interface: its notices wait).
+    hiring.events.on('loadoutChanged', ({ folk }) => {
+      const stopped = stopUnqualified((f) => f === folk);
+      if (interfaceReady) stopped.forEach(notify);
+      else stoppedOnLoad.push(...stopped);
+    });
   });
   ctx.onInterfaceReady(() => {
+    interfaceReady = true;
     stoppedOnLoad.forEach(notify);
     stoppedOnLoad = [];
   });

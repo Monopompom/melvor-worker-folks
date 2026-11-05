@@ -150,6 +150,16 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
     notify('success', templateLangString('MOD_WF_COMM_TOWNSFOLK_HIRED', { name: folk.name }), media('assets/town_badge.webp'));
     hiring.renderQueue.folks = true;
   };
+  /** With a Hall built: how many Guild Heirlooms the guild holds and what the town makes of the find chance. */
+  const heirloomLine = (h) => {
+    const hl = hiring.heirlooms;
+    if (h === null || h.built <= 0 || hl === undefined) return [];
+    const total = hl.total();
+    const heldCount = total - hl.missing().length;
+    const mult = Math.round(hl.multiplier() * 100) / 100;
+    return [templateLangString(heldCount >= total ? 'MOD_WF_COMM_HEIRLOOMS_ALL' : 'MOD_WF_COMM_HEIRLOOMS', { held: full(heldCount), total: full(total), mult: `${mult}` })];
+  };
+
   /** Guild Halls built in Grasslands and the wage relief they give now (efficiency counted), or null without them. */
   const halls = () => {
     const hall = hallOf();
@@ -769,6 +779,7 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
     const lines = [
       ...(h === null ? [] : [templateLangString('MOD_WF_COMM_HALLS', { built: full(h.built), max: full(model.HALL_MAX), relief: h.relief })]),
       ...(sq === null ? [] : [templateLangString('MOD_WF_COMM_SQUARES', { built: full(sq.built), max: full(model.SQUARE_MAX), happiness: sq.happiness, education: sq.education })]),
+      ...heirloomLine(h),
     ];
     const hallLine = lines.join('\n');
     if (standingEl.textContent !== label || hallLine !== lastHallLine) {

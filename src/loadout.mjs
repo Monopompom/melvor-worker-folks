@@ -83,7 +83,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
       return game.bank.filterItems((bankItem) => {
         const item = bankItem.item;
         if (!fits(item, slotId) || !rules.isFolkGear(item.id)) return false;
-        // A bag helps every Folk: it sizes the room, whatever the skill.
+        // A bag or an heirloom helps every Folk, whatever the skill.
         if (showAll || rules.isFolkOwnItem(item.id)) return true;
         return skill === undefined ? api.isSkilling(item, slotId) : api.helpsSkill(item, skill);
       });
@@ -223,7 +223,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
           lines.push({ text, isNegative });
         });
       });
-      return lines;
+      return [...lines, ...(hiring.heirlooms?.lines(folk) ?? [])];
     },
     /** Filled / open slots, worn items and the ones that ran out (card button, Worker popup). */
     summary(folk) {

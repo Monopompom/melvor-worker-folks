@@ -42,11 +42,14 @@ export function slotLayout(tier, { hasAoD = false, hasItA = false } = {}) {
 /**
  * Hiring gear (the mod's own items: outfit, capes, Lesser Relic) is worn by the player; its
  * modifiers are read from the player's table and its charges spent there, so a Folk can never
- * hold it. Everything else may go into a loadout. The bags (build .152) are the exception: made for a Folk's Cape
- * slot, they size its room and do nothing for the player.
+ * hold it. Everything else may go into a loadout. The bags (build .152) and the Guild Heirlooms are the exception:
+ * made for a Folk's slots, they work through the slot they sit in and do nothing for the player.
  */
 export const OWN_NAMESPACE = 'worker_folks';
-export const FOLK_OWN_ITEMS = Object.freeze(['Folk_Satchel', 'Folk_Pack', 'Folk_Frame_Pack']);
+export const FOLK_OWN_ITEMS = Object.freeze([
+  'Folk_Satchel', 'Folk_Pack', 'Folk_Frame_Pack',
+  'Golden_Hardhat', 'Lucky_Apron', 'Guild_Ledger', 'Union_Charter', 'Foremans_Whistle', 'Timekeepers_Bell',
+]);
 export function isFolkOwnItem(itemId, ownNamespace = OWN_NAMESPACE) {
   return typeof itemId === 'string' && FOLK_OWN_ITEMS.some((id) => itemId === `${ownNamespace}:${id}`);
 }

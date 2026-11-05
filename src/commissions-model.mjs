@@ -492,6 +492,8 @@ export function runsLeft({ rest, perRunQty }) {
 export const STORY_TIER = 3;
 export const STORY_EVERY = 5;
 export const STORY_HAPPINESS = 1;
+/** Each story decoration raises the Guild Heirloom find chance by this percent. */
+export const STORY_HEIRLOOM_FIND = 10;
 export const STORY_BUILDING_TIER = 2;
 export const SEASONS = Object.freeze(['Spring', 'Summer', 'Fall', 'Winter']);
 /** The history keeps the names of up to this many Folks per story. */
@@ -683,6 +685,7 @@ export function storyPackage(stories, text = {}) {
           provides: [{ biomeID: HALL_BIOME, population: 0, happiness: STORY_HAPPINESS, education: 0, storage: 0, resources: [] }],
           biomes: [HALL_BIOME],
           maxUpgrades: 1,
+          modifiers: { [ns('heirloomFind')]: STORY_HEIRLOOM_FIND },
           requirements: [{ type: 'ItemFound', itemID: ns(deedId(s.id)) }],
           canDegrade: false,
         })),
@@ -704,6 +707,12 @@ export const CHARTER_ID = 'Guild_Charter';
 export const HALL_ID = 'Guild_Hall';
 export const HALL_MAX = 5;
 export const HALL_WAGE_DISCOUNT = 1;
+/**
+ * Guild Heirlooms are found once a Hall stands; each Hall raises the find chance by this percent, each Square and each
+ * story decoration by theirs (the user, 5 Nov 2026: "each stage adds % to drop chance and town decoration items as
+ * well"). Full town: 5 × 20 + 5 × 10 + 5 × 10 = +200%.
+ */
+export const HALL_HEIRLOOM_FIND = 20;
 /** Township tier 5, Town Hall's: Township level 80 and 40,000 citizens (the user, 4 Nov 2026). */
 export const HALL_TIER = 5;
 export const HALL_BIOME = 'melvorF:Grasslands';
@@ -722,6 +731,7 @@ export const SQUARE_ID = 'Guild_Square';
 export const SQUARE_MAX = 5;
 export const SQUARE_HAPPINESS = 2;
 export const SQUARE_EDUCATION = 2;
+export const SQUARE_HEIRLOOM_FIND = 10;
 export const SQUARE_TIER = 5;
 export const SQUARE_COST = Object.freeze(HALL_COST.map(([id, quantity]) => [id, quantity / 2]));
 
@@ -773,7 +783,7 @@ export function guildPackage(text = {}) {
           provides: [{ biomeID: HALL_BIOME, population: 0, happiness: 0, education: 0, storage: 0, resources: [] }],
           biomes: [HALL_BIOME],
           maxUpgrades: HALL_MAX,
-          modifiers: { [ns('folkWageDiscount')]: HALL_WAGE_DISCOUNT },
+          modifiers: { [ns('folkWageDiscount')]: HALL_WAGE_DISCOUNT, [ns('heirloomFind')]: HALL_HEIRLOOM_FIND },
           requirements: [{ type: 'ItemFound', itemID: ns(CHARTER_ID) }],
           canDegrade: true,
         }, {
@@ -785,6 +795,7 @@ export function guildPackage(text = {}) {
           provides: [{ biomeID: HALL_BIOME, population: 0, happiness: SQUARE_HAPPINESS, education: SQUARE_EDUCATION, storage: 0, resources: [] }],
           biomes: [HALL_BIOME],
           maxUpgrades: SQUARE_MAX,
+          modifiers: { [ns('heirloomFind')]: SQUARE_HEIRLOOM_FIND },
           requirements: [{ type: 'ItemFound', itemID: ns(FREEDOM_ID) }],
           canDegrade: true,
         }],

@@ -89,7 +89,7 @@ test('bags: a Satchel adds a third of the tier’s bag room, a Pack two thirds, 
 });
 
 test('bags are the one kind of Hiring item a Folk may wear', () => {
-  assert.deepEqual(FOLK_OWN_ITEMS.slice().sort(), Object.keys(BAG_SHARE).sort());
+  Object.keys(BAG_SHARE).forEach((id) => assert.ok(FOLK_OWN_ITEMS.includes(id), id));
   FOLK_OWN_ITEMS.forEach((id) => assert.equal(isFolkGear(`worker_folks:${id}`), true));
   assert.equal(isFolkGear('worker_folks:Overseers_Hat'), false);
 });

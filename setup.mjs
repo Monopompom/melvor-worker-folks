@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-11-05.185';
+export const BUILD = '2026-11-05.188';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -115,6 +115,8 @@ export async function setup(ctx) {
   const gearData = await ctx.loadModule('src/gear-data.mjs');
   const discoveryRules = await ctx.loadModule('src/discovery-model.mjs');
   const discoveries = await ctx.loadModule('src/discoveries.mjs');
+  const heirloomRules = await ctx.loadModule('src/heirloom-model.mjs');
+  const heirlooms = await ctx.loadModule('src/heirlooms.mjs');
   const stewardRules = await ctx.loadModule('src/steward-model.mjs');
   const steward = await ctx.loadModule('src/steward.mjs');
   const traitRules = await ctx.loadModule('src/traits-model.mjs');
@@ -191,6 +193,15 @@ export async function setup(ctx) {
     name: getLangString(`MOD_WF_ITEM_${id}`),
     description: templateLangString('MOD_WF_BAG_DESC', roomRules.bagRange(id)),
   })) });
+  // Guild Heirlooms: six rare pieces of Folk gear, found by Folk actions once a Guild Hall stands. No game modifiers on
+  // the items: the mod reads the Folk's slot, so they do nothing for the player. Only with the full game: without
+  // Township's Grasslands no Hall stands, and items no one can find would bar the item log's completion.
+  if (hasFull) {
+    await ctx.gameData.addPackage({ $schema: '', namespace: 'worker_folks', data: heirloomRules.heirloomPackage((id) => ({
+      name: getLangString(`MOD_WF_ITEM_${id}`),
+      description: getLangString(`MOD_WF_ITEM_${id}_DESC`),
+    })) });
+  }
   // Township Commissions at Known and Honoured: the Guild Charter and Freedom of the Town, and Township's Guild Hall and
   // Guild Square, which ask for them (Township's biomes come with the full game).
   if (hasFull) {
@@ -375,6 +386,13 @@ export async function setup(ctx) {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     rules: discoveryRules,
     petId: `worker_folks:${gearData.PET_ID}`,
+    log,
+  });
+
+  // 8a. Guild Heirlooms: the roll on each Folk action once a Guild Hall stands; worn ones add to their Folk's effects.
+  heirlooms.install(ctx, {
+    getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+    model: heirloomRules,
     log,
   });
 
