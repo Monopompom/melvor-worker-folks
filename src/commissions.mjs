@@ -524,7 +524,10 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
     const content = el('div', 'block-content wf-dash-content');
     const head = el('div', 'd-flex align-items-center flex-wrap mb-3 wf-dash-title');
     head.append(img(township().media, 'skill-icon-sm mr-2'));
-    head.append(el('h5', 'font-w600 mb-0', getLangString('MOD_WF_COMM_TITLE')));
+    // The full title, and a short one a phone shows (its title row is too narrow for both words and the grip).
+    const title = el('h5', 'font-w600 mb-0');
+    title.append(el('span', 'wf-title-long', getLangString('MOD_WF_COMM_TITLE')), el('span', 'wf-title-short', getLangString('MOD_WF_COMM_TITLE_SHORT')));
+    head.append(title);
     const help = el('button', 'btn btn-sm wf-help');
     help.type = 'button';
     help.setAttribute('aria-label', getLangString('MOD_WF_HELP_LABEL_commissions'));

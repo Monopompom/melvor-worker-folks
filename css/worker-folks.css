@@ -568,9 +568,6 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
    folded, the Payroll mini bar. */
 #worker-folks-overview > .wf-dash-content { padding: 16px !important; }
 .wf-dash-right { gap: 12px; min-width: 0; }
-/* The commissions' badge, Town history button and clock: on a phone the clock takes a line of its own (at 375px the
-   three on one line ran 49px past the screen). */
-#worker-folks-commissions .wf-dash-right { flex-wrap: wrap; row-gap: 6px; }
 .wf-dash-pill { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--wf-line); font-size: 0.9rem; white-space: nowrap; }
 /* Beside the title the pill stays one row: a long text wraps inside its span, the bar and percentage stay on its
    right. A wrapping flex box is sized short of its content in Chrome (415px for ~487px), which put "0%" on a line of
@@ -644,17 +641,27 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
   .wf-dash-scroll { flex: 0 1 auto; }
   .wf-dash-roster { max-height: 14rem; }
 }
-/* An Overview too narrow for the title and the whole pill side by side puts the Next pill on its own full-width row
-   under the title, and the grip stays at the end of the title row: by the block's width, not the window's, like the
-   bands (build .112). 820px = the title (~200px) + the pill at its 32rem cap + the grip and padding; at 600px the
-   pill wrapped half-width onto a second line between the two (the user, .118). */
-@container wf-overview (max-width: 819.98px) {
-  .wf-dash-title .wf-dash-right { order: 10; flex-basis: 100%; margin: 8px 0 0 !important; flex-wrap: wrap; }
-  .wf-dash-title .wf-grip { margin-left: auto !important; }
-  /* On its own row the pill is the row's width: the text on its line, the bar fills the line under it (the user). */
-  .wf-dash-title .wf-dash-next { flex: 1 1 100%; max-width: none; flex-wrap: wrap; }
-  .wf-dash-title .wf-dash-next .wf-dash-next-text { flex: 1 1 100%; }
-  .wf-dash-title .wf-dash-next .wf-dash-bar { flex: 1 1 auto; width: auto; }
+/* A block's title row (Overview, Work Orders, Commissions) is one line only while the title, the right-hand group and
+   the grip all fit; layout.mjs measures it with .wf-head-measure (one line, nothing shrinks) and sets .wf-head-stack
+   when it does not. Stacked, the group takes a full-width row under the title and the grip stays at the end of the
+   title row (the user, 5 Nov 2026: the grip had wrapped under the caret, or ridden down with the clock; and the
+   Overview's pills had wrapped half-width beside the title before stacking). */
+.wf-head-measure { flex-wrap: nowrap !important; }
+.wf-head-measure > * { flex-shrink: 0 !important; }
+.wf-head-measure > .wf-dash-right { flex: none !important; flex-wrap: nowrap !important; }
+.wf-head-stack > .wf-dash-right { order: 10; flex-basis: 100%; margin: 8px 0 0 !important; flex-wrap: wrap; row-gap: 8px; }
+.wf-head-stack > .wf-grip { margin-left: auto !important; }
+/* Stacked, the group's own gap spaces its items: a clock that wraps starts flush with the badge above it. */
+.wf-head-stack > .wf-dash-right > * { margin-left: 0 !important; }
+/* On its own row the Next pill is the row's width: the text on its line, the bar fills the line under it (the user). */
+.wf-head-stack .wf-dash-next { flex: 1 1 100%; max-width: none; flex-wrap: wrap; }
+.wf-head-stack .wf-dash-next .wf-dash-next-text { flex: 1 1 100%; }
+.wf-head-stack .wf-dash-next .wf-dash-bar { flex: 1 1 auto; width: auto; }
+/* A phone's title row holds the caret, icon, title, "?" and grip: "Township Commissions" is too long for it there. */
+.wf-title-short { display: none; }
+@media (max-width: 575.98px) {
+  .wf-title-long { display: none; }
+  .wf-title-short { display: inline; }
 }
 /* Folk cards by the grid's own width (A-10, A-11): three from 1260px, two from 840px, else one. A card's button row
    gets its column's width less 68px, and Details, Gear, Traits and Fire need about 340px on one line: at the old 1140

@@ -64,6 +64,39 @@ export function install(ctx, { log, tips, model }) {
     tips?.set(g, getLangString(key));
     return g;
   };
+  /**
+   * A title row with a right-hand group (pills, clock, buttons) stays one line only while all of it fits, the grip
+   * included; otherwise the group drops to a full-width row under the title and the grip stays at the end of the
+   * title row. Measured on the row's own content, so it follows the block's width, what the group holds now (the
+   * folded Overview's Payroll bar) and the language, with no width written down per block (the user, 5 Nov 2026: the
+   * grip had wrapped under the caret, or ridden down with the clock).
+   */
+  const fitHead = (head) => {
+    const right = head.querySelector(':scope > .wf-dash-right');
+    if (right === null) return;
+    head.classList.remove('wf-head-stack');
+    head.classList.add('wf-head-measure');
+    const over = head.clientWidth > 0 && head.scrollWidth > head.clientWidth + 1;
+    head.classList.remove('wf-head-measure');
+    head.classList.toggle('wf-head-stack', over);
+  };
+  const heads = new Set();
+  let fitQueued = false;
+  const fitHeads = () => {
+    if (fitQueued) return;
+    fitQueued = true;
+    requestAnimationFrame(() => { fitQueued = false; heads.forEach(fitHead); });
+  };
+  const watchHead = (head) => {
+    const right = head.querySelector(':scope > .wf-dash-right');
+    if (right === null) return;
+    heads.add(head);
+    if (typeof ResizeObserver === 'function') new ResizeObserver(fitHeads).observe(head);
+    // The clock's and the pill's text change while the row's width does not.
+    if (typeof MutationObserver === 'function') new MutationObserver(fitHeads).observe(right, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['class'] });
+    fitHeads();
+  };
+
   const dress = (id, block, head) => {
     block.classList.add('wf-layout-block');
     block.dataset.wfBlock = id;
@@ -71,6 +104,7 @@ export function install(ctx, { log, tips, model }) {
     head.prepend(foldButton(id));
     head.append(grip());
     blocks[id] = block;
+    watchHead(head);
   };
 
   const idsIn = (col) => Array.from(col.children).filter((el) => el.dataset.wfBlock !== undefined).map((el) => el.dataset.wfBlock);
@@ -96,6 +130,7 @@ export function install(ctx, { log, tips, model }) {
         if (i !== null) i.className = folded ? 'fa fa-caret-right' : 'fa fa-caret-down';
       }
     }
+    fitHeads(); // folding shows or hides the Overview's Payroll bar in its title row
     refresh();
   };
 

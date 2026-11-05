@@ -627,6 +627,7 @@
   "MOD_WF_ROOM_TIP_TOWN": "For the town: a commission’s items, waiting for the next run. They take room like the rest.",
   "MOD_WF_HELP_LABEL_commissions": "About Township Commissions",
   "MOD_WF_COMM_TITLE": "Township Commissions",
+  "MOD_WF_COMM_TITLE_SHORT": "Commissions",
   "MOD_WF_COMM_LOCKED": "Opens at Hiring ${level}: the people of your town ask your Folks for their work, and pay in Township resources and Town Standing.",
   "MOD_WF_COMM_LOCKED_TOWN": "Found your town in Township first: its people will then bring their requests to your guild.",
   "MOD_WF_COMM_SLOT_LOCKED": "Opens at Trusted (${points} / ${need} Standing): a fourth person of your town brings a request.",
