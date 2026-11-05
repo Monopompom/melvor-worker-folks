@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-11-05.188';
+export const BUILD = '2026-11-05.195';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -117,6 +117,8 @@ export async function setup(ctx) {
   const discoveries = await ctx.loadModule('src/discoveries.mjs');
   const heirloomRules = await ctx.loadModule('src/heirloom-model.mjs');
   const heirlooms = await ctx.loadModule('src/heirlooms.mjs');
+  const demandRules = await ctx.loadModule('src/demands-model.mjs');
+  const demands = await ctx.loadModule('src/demands.mjs');
   const stewardRules = await ctx.loadModule('src/steward-model.mjs');
   const steward = await ctx.loadModule('src/steward.mjs');
   const traitRules = await ctx.loadModule('src/traits-model.mjs');
@@ -313,6 +315,12 @@ export async function setup(ctx) {
     milestones,
     resume,
     log,
+  });
+
+  // 5c'. Strike demands (an option in Wages): what a striking Folk wants for each trait; payroll rolls and settles.
+  demands.install(ctx, {
+    getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+    model: demandRules,
   });
 
   // 5d. Hiring level milestones, Hiring XP share, level gates.

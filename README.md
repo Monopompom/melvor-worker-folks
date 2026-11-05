@@ -185,6 +185,43 @@ settling, the Folk cools down (Trainee 30 min · Apprentice 1 h · Journeyman 2 
 Master 4 h · Foreman 8 h, offline time counts). Pay three times the severance instead to
 skip the cooldown.
 
+### Strike demands (optional)
+
+With **Strike demands** on (Settings, off by default), a striking Folk also wants something
+for each trait it holds, listed on its card with how far you are: junk and ignored items
+(Old Boots, Rubber Duckies, Feathers, Ash, Topaz…), a dungeon chest you have found before,
+kills of a monster you have killed before, or clears of a dungeon you have cleared before.
+More for a higher tier, and +50% for each strike after its first (at most ×3). Kills and
+clears count from the strike's start, offline too. Settle stays grey until every demand is
+met, and then takes the items from your bank (never a locked one: unlock it to hand it over); an apology triples the GP only, the demands
+are owed once. There is no other way out of the strike but firing the Folk. A Folk with no
+traits asks for GP only. Switching the option off waives the demands of a strike in progress, and
+a demand for something the game no longer has (a mod or an expansion turned off) counts as met. With
+the mastery-pool bonus that settles strikes by itself, the demanded items are taken too and the notice
+says which.
+
+| Trait | Wants (Trainee → Foreman) |
+|---|---|
+| Specialist | 2 → 25 Bird Nests |
+| Early Bird | 100 → 1,500 Feathers |
+| Night Owl | 20 → 300 kills (or Bones) |
+| Quick Learner | 1 → 8 Messages in a Bottle |
+| Frugal | 500 → 10,000 Normal Logs |
+| Loyal | 10 → 150 Shells |
+| Veteran | 1 → 8 dungeon chests (or Bird Nests) |
+| Meticulous | 100 → 1,500 Bronze Bars |
+| Greedy | 5 → 80 Topaz |
+| Workaholic | 100 → 2,000 Shrimp |
+| Lucky | 5 → 100 Rubber Duckies |
+| Ambitious | 1 → 5 dungeon clears (or Big Bones) |
+| Clumsy | 10 → 150 Old Boots |
+| Lazy | 200 → 3,000 Potatoes |
+| Sickly | 10 → 150 Seaweed |
+| Wasteful | 200 → 5,000 Ash |
+| Resentful | 50 → 800 kills (or Bones) |
+| Local (Townsfolk) | 50 → 750 Cabbages |
+| another mod's trait | 10 → 150 Rusty Keys |
+
 ## Hiring levels
 
 Hiring gains XP for every hour your Folks work, by tier: Trainee 60, Apprentice 140,
@@ -350,7 +387,7 @@ Mod Settings → Worker Folks: wage difficulty, a preset from **No sweat** (free
 strikes; a strike or unpaid wages from before are only on hold and come back if you switch to a paid
 difficulty) through Easy (¼), Relaxed (½), **Standard** (full wages, the default), Tense (×1.5),
 Hard (×2), Brutal (×3) to **Evil hardcore** (×5); Abyssal
-Pieces wages on/off, Hiring XP rate (default 100%), and **Hide Folks' gain popups**
+Pieces wages on/off, **Strike demands** (off by default, see above), Hiring XP rate (default 100%), and **Hide Folks' gain popups**
 (off by default: when on, the XP, item, currency and mastery popups from your Folks' work stay hidden;
 level-ups, warnings and your own popups still show), and **Faster mastery displays** (on by default:
 mastery bars are updated without searching the whole page on every mastery gain; off brings back the

@@ -594,6 +594,37 @@ function fillCard(col, folk, view) {
       sev.classList.toggle('text-danger', !debtOnly);
       sev.classList.toggle('text-warning', debtOnly);
     }
+    // Strike demands: a head line, then one line each, its icon first, green once met, red until then. Rebuilt only
+    // when a line changes (the page redraws every second while a demand waits).
+    const demands = el.querySelector('[data-wf="strike-demands"]');
+    if (demands !== null) {
+      const lines = debtOnly ? [] : info.demandLines ?? [];
+      demands.classList.toggle('d-none', lines.length === 0);
+      const key = JSON.stringify(lines);
+      if (demands.dataset.wfKey !== key) {
+        demands.dataset.wfKey = key;
+        demands.replaceChildren();
+        if (lines.length > 0) {
+          const head = document.createElement('div');
+          head.className = 'font-w600 text-danger';
+          head.textContent = info.demandsHead;
+          demands.append(head);
+        }
+        lines.forEach((line) => {
+          const row = document.createElement('div');
+          row.className = `wf-demand font-size-sm ${line.met ? 'text-success' : 'text-danger'}`;
+          if (line.media) {
+            const img = document.createElement('img');
+            img.className = 'skill-icon-xs mr-1';
+            img.src = line.media;
+            img.alt = '';
+            row.append(img);
+          }
+          row.append(document.createTextNode(`${line.met ? '✓' : '✗'} ${line.text}`));
+          demands.append(row);
+        });
+      }
+    }
     const settle = el.querySelector('[data-wf="settle"]');
     if (settle !== null) {
       settle.classList.toggle('d-none', debtOnly);

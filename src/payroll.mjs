@@ -28,6 +28,13 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
       hint: getLangString('MOD_WF_SETTING_AP_WAGES_HINT'),
       default: true,
     },
+    {
+      type: 'switch',
+      name: 'strikeDemands',
+      label: getLangString('MOD_WF_SETTING_DEMANDS'),
+      hint: getLangString('MOD_WF_SETTING_DEMANDS_HINT'),
+      default: false,
+    },
   ]);
   const multiplier = () => wages.presetMultiplier(section.get('wageDifficulty'));
   const currency = (id) => game.currencies.getObjectByID(id);
@@ -35,6 +42,19 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
   const api = {
     get enabled() {
       return multiplier() > 0;
+    },
+    /** Strike demands on: a strike also wants something for each trait (src/demands-model.mjs). */
+    get demandsOn() {
+      return section.get('strikeDemands') === true && hiring.demands !== undefined;
+    },
+    /** Demands still unmet on this strike (none while the option is off: they are waived, not dropped). */
+    demandsPending(folk) {
+      return api.demandsOn && (folk.demand?.length ?? 0) > 0 && !hiring.demands.met(folk);
+    },
+    /** Rolls a starting strike's demands (with the option on). */
+    rollDemands(folk) {
+      folk.demand = api.demandsOn ? hiring.demands.roll(folk) : [];
+      if (folk.demand.length > 0) log(`${folk.name} demands ${folk.demand.map((d) => `${d.qty} ${d.id}`).join(', ')}`);
     },
     /** Currency a skill's wages are charged in right now. */
     currencyIdFor(skill) {
@@ -118,6 +138,7 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     },
     canSettle(folk, options = {}) {
       if (options.apology && hiring.levels !== undefined && !hiring.levels.apologyUnlocked()) return false;
+      if (api.demandsPending(folk)) return false;
       const { parts } = api.settlementOf(folk, options);
       return Object.entries(parts).every(([id, amount]) => currency(id)?.canAfford(amount) === true);
     },
@@ -125,7 +146,10 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     settle(folk, { apology = false } = {}) {
       if (!folk.onStrike || !api.canSettle(folk, { apology })) return false;
       const { parts } = api.settlementOf(folk, { apology });
+      // The demands once, apology or not: the items leave the bank; kills and clears were only checked.
+      if (api.demandsOn && (folk.demand?.length ?? 0) > 0 && !hiring.demands.take(folk)) return false;
       Object.entries(parts).forEach(([id, amount]) => currency(id).remove(amount));
+      folk.demand = [];
       folk.debt = 0;
       folk.debtCurrency = null;
       folk.debtMs = 0;
@@ -283,6 +307,7 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     folk.onStrike = true;
     folk.strikes += 1;
     log(`${folk.name} strikes on ${skill.id}, owed ${folk.debt} ${folk.debtCurrency}`);
+    api.rollDemands(folk);
     const pick = selectionOf(skill);
     if (pick !== null) strikeSelection.set(folk.id, pick);
     folk.restartPick = toSaved(pick);
@@ -303,16 +328,25 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
    * when the bank can't pay, so the perk never fired).
    */
   const selfSettle = (folk) => {
-    if (!folk.onStrike || !hiring.autoSettle?.() || !api.canSettle(folk) || !api.settle(folk)) return false;
+    if (!folk.onStrike || !hiring.autoSettle?.() || !api.canSettle(folk)) return false;
+    // With strike demands the bank's items go too: the notice (and Welcome Back) says which.
+    const items = api.demandsOn ? hiring.demands.itemsText(folk) : '';
+    if (!api.settle(folk)) return false;
+    if (items !== '') autoTaken.set(folk.id, items);
+    else autoTaken.delete(folk.id);
     if (game._isInOnlineLoop) {
       game.notifications.createSuccessNotification(
         'worker_folks:autosettle',
-        templateLangString('MOD_WF_AUTO_SETTLED', { name: folk.name }),
+        items === '' ? templateLangString('MOD_WF_AUTO_SETTLED', { name: folk.name })
+          : templateLangString('MOD_WF_AUTO_SETTLED_ITEMS', { name: folk.name, items }),
         hiring.portrait(folk.tier),
       );
     }
     return true;
   };
+  /** What the last self-settle took from the bank for its demands, by Folk id (not saved; for Welcome Back). */
+  const autoTaken = new Map();
+  api.autoTakenText = (folk) => autoTaken.get(folk.id) ?? '';
 
   /**
    * Wages off (No sweat) parks debts and strikes instead of forgiving them (the user's call, build .86: otherwise a
@@ -376,7 +410,8 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     setInterval(() => {
       if (game.openPage?.id !== 'worker_folks:Hiring') return;
       const bank = [GP_ID, AP_ID].map((id) => currency(id)?.amount ?? 0).join('|');
-      if (bank !== bankSeen || hiring.crew.all.some((f) => f.cooldownTicks > 0)) hiring.renderQueue.folks = true;
+      // A strike's demands follow the bank's items and your kills: redrawn every second while one waits on them.
+      if (bank !== bankSeen || hiring.crew.all.some((f) => f.cooldownTicks > 0 || (api.demandsOn && f.onStrike && (f.demand?.length ?? 0) > 0))) hiring.renderQueue.folks = true;
       bankSeen = bank;
     }, 1000);
   });

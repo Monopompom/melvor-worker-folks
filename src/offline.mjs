@@ -61,9 +61,15 @@ export function install(ctx, { getHiring, time, log }) {
     /** The language line as HTML, the marked values in their colour. */
     const fill = (key, vars, marks = {}, media) => {
       // In brackets, "(Woodcutting)": the icon's 4 px margin after "(" is matched before ")" (the user, 20 Oct 2026).
-      const boxed = getLangString(key).includes('(${skill})');
-      return templateLangString(key, Object.fromEntries(Object.entries(vars)
-        .map(([k, v]) => [k, k === 'skill' && media ? icon(media, v, boxed) : marks[k] ? `<span class="${marks[k]}">${esc(v)}</span>` : esc(v)])));
+      const raw = getLangString(key);
+      const boxed = media !== undefined && raw.includes('(${skill})');
+      const values = Object.fromEntries(Object.entries(vars)
+        .map(([k, v]) => [k, k === 'skill' && media ? icon(media, v, boxed) : marks[k] ? `<span class="${marks[k]}">${esc(v)}</span>` : esc(v)]));
+      if (!boxed) return templateLangString(key, values);
+      // The brackets, the icon and the name never wrap apart (the user, build .194: "( [icon] Crafting )" broke after
+      // the "("): the whole "(…)" goes in one no-wrap span.
+      values.skill = `<span class="text-nowrap">(${values.skill})</span>`;
+      return raw.replace('(${skill})', '${skill}').replace(/\$\{(\w+)\}/g, (m, k) => (k in values ? values[k] : m));
     };
     /** The skill's name with its icon in front: icon, a plain space, the name, as the game writes "8 [icon] Normal Logs"
      *  (no margin class), kept together on one line. */
@@ -134,8 +140,14 @@ export function install(ctx, { getHiring, time, log }) {
       const currency = this.currencies.getObjectByID(folk.debtCurrency ?? 'melvorD:GP');
       // Still on strike: the amount red and how to fix it; settled itself from the bank: plain, nothing to do (build .55).
       if (folk.onStrike) {
-        lines.push({ media, html: fill('MOD_WF_OFFLINE_STRUCK', { name: folk.name, skill, amount: `${numberWithCommas(folk.debt)} ${currency?.name ?? ''}`.trim() }, { amount: 'text-danger' }, media), fix: getLangString('MOD_WF_OFFLINE_STRUCK_FIX') });
-      } else lines.push({ media, html: fill('MOD_WF_OFFLINE_STRUCK_SETTLED', { name: folk.name, skill }, {}, media) });
+        // Strike demands: what it still wants goes in the advice line.
+        const wants = hiring.payroll?.demandsPending(folk) ? hiring.demands.missingText(folk) : '';
+        const fix = wants === '' ? getLangString('MOD_WF_OFFLINE_STRUCK_FIX') : templateLangString('MOD_WF_OFFLINE_STRUCK_FIX_DEMANDS', { list: wants });
+        lines.push({ media, html: fill('MOD_WF_OFFLINE_STRUCK', { name: folk.name, skill, amount: `${numberWithCommas(folk.debt)} ${currency?.name ?? ''}`.trim() }, { amount: 'text-danger' }, media), fix });
+      } else {
+        const taken = hiring.payroll?.autoTakenText?.(folk) ?? '';
+        lines.push({ media, html: fill(taken === '' ? 'MOD_WF_OFFLINE_STRUCK_SETTLED' : 'MOD_WF_OFFLINE_STRUCK_SETTLED_ITEMS', { name: folk.name, skill, items: taken }, {}, media) });
+      }
     });
     // Traits: what a Folk learned or lost while you were away, the trait's own icon first; a good one green, a bad one
     // red, a fade green (a bad trait gone).

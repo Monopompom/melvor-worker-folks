@@ -55,6 +55,8 @@ export function install({ hiring, log, tiers }) {
       folk.debt = debt;
       folk.debtCurrency = 'melvorD:GP';
       folk.onStrike = true;
+      folk.strikes += 1;
+      hiring.payroll?.rollDemands(folk);
       hiring.forceStop(hiring.skillOf(folk));
       hiring.crew.touch();
       return true;
@@ -67,6 +69,7 @@ export function install({ hiring, log, tiers }) {
       folk.debtCurrency = 'melvorD:GP';
       folk.debtMs = Math.max(0, minutesUsed) * 60000;
       folk.onStrike = false;
+      folk.demand = [];
       hiring.crew.touch();
       return true;
     },
@@ -75,6 +78,7 @@ export function install({ hiring, log, tiers }) {
       const folk = hiring.crew.byId(ref(id));
       if (folk === undefined) return false;
       folk.onStrike = false;
+      folk.demand = [];
       folk.debt = 0;
       folk.cooldownTicks = 0;
       hiring.crew.touch();

@@ -643,8 +643,11 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
           const apologyOpen = this.levels === undefined || this.levels.apologyUnlocked();
           const canApologise = blocked === '' && payroll.canSettle(folk, { apology: true });
           // What is missing goes in each button's tooltip (the user, build .155); only a refusal stays as the line.
-          const settleWhy = blocked === '' && !payroll.canSettle(folk) ? templateLangString('MOD_WF_SETTLE_NEED', { amount: shortOf(plain.parts) }) : '';
-          const apologyWhy = blocked === '' && apologyOpen && !canApologise ? templateLangString('MOD_WF_APOLOGY_NEED', { amount: shortOf(apology.parts) }) : '';
+          // Strike demands (an option): what is still missing comes first in both tooltips, then the GP short.
+          const demandWhy = payroll.demandsPending(folk) ? templateLangString('MOD_WF_SETTLE_DEMANDS', { list: this.demands.missingText(folk) }) : '';
+          const need = (key, parts) => (shortOf(parts) === '' ? '' : templateLangString(key, { amount: shortOf(parts) }));
+          const settleWhy = blocked === '' && !canSettle ? [demandWhy, need('MOD_WF_SETTLE_NEED', plain.parts)].filter((l) => l !== '') : [];
+          const apologyWhy = blocked === '' && apologyOpen && !canApologise ? [demandWhy, need('MOD_WF_APOLOGY_NEED', apology.parts)].filter((l) => l !== '') : [];
           return {
             reason: blocked,
             settleWhy,
@@ -652,6 +655,9 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
             owedText: templateLangString('MOD_WF_STRIKE_OWED', { amount: fmt({ [plain.debtCurrency]: plain.debt }) }),
             // its own line (the user, build .108): a long amount never wraps the severance; none when it is free
             severanceText: plain.severance > 0 ? templateLangString('MOD_WF_STRIKE_SEVERANCE', { severance: numberWithCommas(plain.severance) }) : '',
+            // What it wants besides the GP, one line each with how far it is (none with the option off).
+            demandsHead: getLangString('MOD_WF_DEMANDS_HEAD'),
+            demandLines: payroll.demandsOn ? this.demands.lines(folk) : [],
             // Settle and Apologise side by side (build .153): the word, the price on the line under it.
             settleLabel: getLangString('MOD_WF_BUTTON_SETTLE'),
             settleAmount: fmt(plain.parts),
@@ -660,7 +666,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
               ? `${fmt(apology.parts)} (${this.levels.lockText(this.levels.apologyLevel)})`
               : fmt(apology.parts),
             // What it buys sits in its tooltip, not on the button (the user, build .155), above what is missing.
-            apologyTip: [getLangString('MOD_WF_APOLOGY_NO_COOLDOWN'), apologyWhy].filter((l) => l !== ''),
+            apologyTip: [getLangString('MOD_WF_APOLOGY_NO_COOLDOWN'), ...apologyWhy],
             canSettle,
             canApologise,
             onSettle: () => { if (!this.refused('staff', { action: 'settle', folk })) payroll.settle(folk); },

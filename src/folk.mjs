@@ -59,6 +59,8 @@ export function createFolk({ id, slot, tier, name, hiredAt = 0, paid = null }) {
     ownStock: false,
     /** Hired from your own town (Township Commissions, Trusted): born with the Local trait, for good. */
     townsfolk: false,
+    /** What the Folk wants to end its strike, rolled when it began (src/demands-model.mjs); empty off strike. */
+    demand: [],
   };
 }
 
@@ -125,6 +127,7 @@ export function normalizeFolk(raw) {
   folk.room = normalizeRoom(raw.room);
   folk.ownStock = raw.ownStock === true;
   folk.townsfolk = raw.townsfolk === true;
+  folk.demand = folk.onStrike ? normalizeDemands(raw.demand) : [];
   return folk;
 }
 
@@ -155,6 +158,16 @@ export function normalizeRoom(raw) {
     }
   });
   return room;
+}
+
+/** A strike's demands: a clean list from whatever the save holds. */
+export function normalizeDemands(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((d) => d !== null && typeof d === 'object' && ['item', 'kill', 'dungeon'].includes(d.kind)
+    && typeof d.id === 'string' && d.id !== '' && Number.isInteger(d.qty) && d.qty > 0)
+    .map((d) => (d.kind === 'item'
+      ? { kind: 'item', id: d.id, qty: d.qty }
+      : { kind: d.kind, id: d.id, qty: d.qty, start: Number.isFinite(d.start) && d.start >= 0 ? Math.floor(d.start) : 0 }));
 }
 
 export function createEmptyReserve() {
