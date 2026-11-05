@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-11-05.195';
+export const BUILD = '2026-11-05.199';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -345,7 +345,12 @@ export async function setup(ctx) {
   });
 
   // 5d4. Mastery displays found without searching the whole page (setting in the Hiring section).
-  (await ctx.loadModule('src/mastery-index.mjs')).install(ctx, { log });
+  const masteryIndex = (await ctx.loadModule('src/mastery-index.mjs')).install(ctx, { log });
+  // 5d5. Wage and completion log draws held to a few a second while Folks work (the same setting).
+  (await ctx.loadModule('src/redraw-hold.mjs')).install(ctx, {
+    getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+    log,
+  });
 
   // 5e. Folk hitpoints: Thieving damage, food, regen, death and frozen slots.
   health.install(ctx, {
@@ -483,6 +488,6 @@ export async function setup(ctx) {
     hiring.events.on('folkFired', ({ folk, reason }) => log(`folkFired: ${folk.name} (${reason})`));
     hiring.events.on('folkAssigned', ({ folk, skillId }) => log(`folkAssigned: ${folk.name} -> ${skillId}`));
     shopHooks.onCharacterLoaded();
-    if (dev !== null) dev.install({ hiring, log, tiers: folkModel.TIERS });
+    if (dev !== null) dev.install({ hiring, log, tiers: folkModel.TIERS, masteryIndex });
   });
 }

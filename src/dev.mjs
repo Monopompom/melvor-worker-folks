@@ -1,7 +1,7 @@
 // Developer console commands (window.workerFolksDev). Lets later slices be
 // tested before the shop exists. Ticket 14 decides whether to gate this.
 
-export function install({ hiring, log, tiers }) {
+export function install({ hiring, log, tiers, masteryIndex }) {
   /**
    * Which Folk a command means: its row in workerFolksDev.list() (0, 1, …), its id, or its name (any case). Returns
    * the id, or the input unchanged so the command reports "no Folk".
@@ -293,8 +293,12 @@ export function install({ hiring, log, tiers }) {
       return { occupied: game.bank.occupiedSlots, maximum: game.bank.maximumSlots };
     },
     tiers: tiers.slice(),
+    /** poolIndex(false): mastery pool bars found by the game's whole-page search again (timing); true: the index. */
+    poolIndex(on = true) {
+      return masteryIndex?.setPools(on) ?? null;
+    },
   };
   globalThis.workerFolksDev = api;
-  log('dev commands (a Folk = its row in list(), its name or its id): workerFolksDev.spawn(tier, name?) | fire(id) | assign(id, skillId) | strike(id, debt?) | debt(id, gp?) | cooldown(id, ticks) | reset(id) | hp(id, hp) | kill(id) | thaw(slot?) | loadout(id) | gear(id, skillId?, {replace, qty}) | reserve() | mastery(id, level) | poolXP(xp) | list() | clear() | dump() | load(root) | shiftSlots(n) | delegated() | pet() | relics(n) | orders() | orderClock(hours) | commissions() | commissionClock(hours) | finishRuns() | rerollCommissions() | story() | room(id) | ownStock(id, on) | restock(id, actions?) | bankFull(on)');
+  log('dev commands (a Folk = its row in list(), its name or its id): workerFolksDev.spawn(tier, name?) | fire(id) | assign(id, skillId) | strike(id, debt?) | debt(id, gp?) | cooldown(id, ticks) | reset(id) | hp(id, hp) | kill(id) | thaw(slot?) | loadout(id) | gear(id, skillId?, {replace, qty}) | reserve() | mastery(id, level) | poolXP(xp) | list() | clear() | dump() | load(root) | shiftSlots(n) | delegated() | pet() | relics(n) | orders() | orderClock(hours) | commissions() | commissionClock(hours) | finishRuns() | rerollCommissions() | story() | room(id) | ownStock(id, on) | restock(id, actions?) | bankFull(on) | poolIndex(on)');
   return api;
 }

@@ -213,6 +213,9 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     return true;
   };
 
+  /** A wage out of the bank: through the redraw hold when it is there (its draw may wait a moment online). */
+  const payFromBank = (cur, amount) => (hiring.payFromBank === undefined ? cur.remove(amount) : hiring.payFromBank(cur, amount));
+
   /** Outstanding debt from the grace period is collected as soon as the reserve or bank can pay. */
   const repayDebt = (folk) => {
     if (folk.onStrike || !(folk.debt > 0) || folk.debtCurrency === null) return;
@@ -221,7 +224,7 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     const r = wages.repayDebt({ debt: folk.debt, debtMs: folk.debtMs }, hiring.crew.reserveOf(id), cur === undefined ? 0 : cur.amount);
     if (r.fromReserve === 0 && r.fromBank === 0) return;
     if (r.fromReserve > 0) hiring.crew.adjustReserve(id, -r.fromReserve);
-    if (r.fromBank > 0) cur.remove(r.fromBank);
+    if (r.fromBank > 0) payFromBank(cur, r.fromBank);
     folk.debt = r.debt;
     folk.debtMs = r.debtMs;
     if (r.cleared) {
@@ -243,7 +246,7 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     const bank = cur === undefined ? 0 : cur.amount;
     const split = wages.splitPayment(amount, hiring.crew.reserveOf(id), bank);
     if (split.fromReserve > 0) hiring.crew.adjustReserve(id, -split.fromReserve);
-    if (split.fromBank > 0) cur.remove(split.fromBank);
+    if (split.fromBank > 0) payFromBank(cur, split.fromBank);
     warnReserve(id);
     // What was paid, for the Welcome Back summary's wages line (build .136).
     const paid = split.fromReserve + split.fromBank;

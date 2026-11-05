@@ -3,7 +3,7 @@
 // Pure: the Hiring skill and the Folk model are injected (mod modules cannot import their siblings).
 
 /** Bumped when something here changes in a way a caller must know about. Voyage refuses an older one. */
-export const API_VERSION = 8;
+export const API_VERSION = 9;
 /** The least of the hire price an outside hire pays (v7): a bargain, never a free Folk. */
 export const HIRE_SHARE_MIN = 0.25;
 
@@ -204,6 +204,15 @@ export function createApi({ getHiring, model, pricing, rules, getBackup, version
       const skill = hiring().game?.skills?.getObjectByID(skillId);
       const folk = skill === undefined ? undefined : hiring().actorFor(skill);
       return folk === undefined ? undefined : view(folk);
+    },
+    /**
+     * The Folk a start of this skill goes to now, only where it is (v9): { id, place, travel }, or undefined for the
+     * player. For calls made on every action: workerOf builds a whole view (~6 µs), this reads three fields.
+     */
+    actorOf: (skillId) => {
+      const skill = hiring().game?.skills?.getObjectByID(skillId);
+      const folk = skill === undefined ? undefined : hiring().actorFor(skill);
+      return folk === undefined ? undefined : Object.freeze({ id: folk.id, place: placeCopy(folk.place), travel: folk.travel });
     },
     /** fn(folkView) returns the card's and the Worker box's line for where the Folk is ('' for none) (v2). */
     registerLocationText: (fn) => {

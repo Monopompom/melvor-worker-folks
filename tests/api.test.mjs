@@ -127,6 +127,15 @@ test('api v2: workerOf asks the skill who would act; registerLocationText sets a
   assert.ok(api.version >= 2);
   assert.equal(api.workerOf('melvorD:Mining').id, folk.id);
   assert.equal(api.workerOf('melvorD:Fishing'), undefined);
+  // v9: the same Folk, only where it is, for calls made on every action.
+  folk.place = { q: 3, r: 4 };
+  const actor = api.actorOf('melvorD:Mining');
+  assert.deepEqual(actor, { id: folk.id, place: { q: 3, r: 4 }, travel: folk.travel });
+  assert.deepEqual(Object.keys(actor), ['id', 'place', 'travel']);
+  assert.throws(() => { actor.place.q = 0; });
+  assert.equal(actor.place === folk.place, false);
+  assert.equal(api.actorOf('melvorD:Fishing'), undefined);
+  assert.equal(api.actorOf('nomod:Nothing'), undefined);
   const fn = (v) => `At ${v.name}'s hex`;
   const off = api.registerLocationText(fn);
   assert.equal(hiring.locationText, fn);

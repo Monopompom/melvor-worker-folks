@@ -3,9 +3,13 @@
 // each time, once per action of the player and once more per Folk action. The displays get their skill and action only
 // through setMastery / setNoMastery, so a list kept by those two calls finds them at once. Game-facing.
 //
+// The mastery pool bars the same way: the game searches the whole page for a skill's pool bars every time its pool
+// changes, which is once per Folk action for Hiring's pool and often for the worked skill's. They get their skill only
+// through setSkill.
+//
 // Safety: a key nobody filed is looked up in the page once (what another mod built with the ids written in its HTML
 // is found and filed then), a display that left the page sends the next lookup back to the whole page, and the
-// setting "Faster mastery displays" (Hiring section) turns all of it off.
+// setting "Faster displays" (Hiring section) turns all of it off.
 
 export function install(ctx, { log }) {
   const Full = customElements.get('mastery-display');
@@ -14,7 +18,7 @@ export function install(ctx, { log }) {
     && typeof SkillWithMastery === 'function' && typeof SkillWithMastery.prototype.updateMasteryDisplays === 'function';
   if (!usable) {
     log('mastery displays: the game changed, the faster lookup stays off');
-    return;
+    return { setPools: () => false };
   }
 
   const SELECTOR = 'mastery-display, compact-mastery-display';
@@ -62,7 +66,7 @@ export function install(ctx, { log }) {
       label: getLangString('MOD_WF_SETTING_FAST_MASTERY'),
       hint: getLangString('MOD_WF_SETTING_FAST_MASTERY_HINT'),
       default: true,
-      onChange: () => { index = null; },
+      onChange: () => { index = null; pools = null; },
     },
   ]);
   const enabled = () => section.get('fastMasteryDisplays') !== false;
@@ -104,5 +108,92 @@ export function install(ctx, { log }) {
     return undefined;
   });
 
+  // Mastery pool bars, by skill id.
+  const Pool = customElements.get('mastery-pool-display');
+  const poolUsable = Pool !== undefined && typeof Pool.prototype.setSkill === 'function' && typeof Pool.prototype.updateProgress === 'function'
+    && typeof SkillWithMastery.prototype.renderMasteryPool === 'function';
+  /** For a before / after comparison only (the dev console): false sends pool bars back to the game's search. */
+  let poolsOn = true;
+  /** skill id → its pool bars. null: read the page again at the next lookup. */
+  let pools = null;
+  let poolFiledAs = new WeakMap();
+  let poolMisses = new Set();
+  let poolPageSeen;
+  const filePool = (el) => {
+    if (pools === null) return;
+    const was = poolFiledAs.get(el);
+    const key = el.getAttribute('data-skill-id');
+    if (was === key) return;
+    if (was !== undefined) pools.get(was)?.delete(el);
+    if (key === null) {
+      poolFiledAs.delete(el);
+      return;
+    }
+    let set = pools.get(key);
+    if (set === undefined) pools.set(key, (set = new Set()));
+    set.add(el);
+    poolFiledAs.set(el, key);
+    poolMisses.delete(key);
+  };
+  const readPools = () => {
+    pools = new Map();
+    poolFiledAs = new WeakMap();
+    poolMisses = new Set();
+    document.querySelectorAll('mastery-pool-display').forEach(filePool);
+  };
+  /** The skill's pool bars on the page now (an empty list when it has none). */
+  const poolBars = (skillId) => {
+    if (pools === null) readPools();
+    if (game.openPage !== poolPageSeen) {
+      poolPageSeen = game.openPage;
+      poolMisses.clear();
+    }
+    let set = pools.get(skillId);
+    if (set === undefined || set.size === 0) {
+      if (poolMisses.has(skillId)) return [];
+      // Not filed: the page is searched for this one, as the game does, and what it finds is filed.
+      document.querySelectorAll(`mastery-pool-display[data-skill-id="${skillId}"]`).forEach(filePool);
+      set = pools.get(skillId);
+      if (set === undefined || set.size === 0) {
+        poolMisses.add(skillId);
+        return [];
+      }
+    }
+    const bars = [];
+    for (const bar of set) {
+      // A bar that left the page (or moved): the next lookup reads the whole page again.
+      if (bar.isConnected) bars.push(bar);
+      else pools = null;
+    }
+    return bars;
+  };
+
+  if (poolUsable) {
+    ctx.patch(Pool, 'setSkill').after(function () { filePool(this); });
+    ctx.patch(SkillWithMastery, 'renderMasteryPool').replace(function (original) {
+      if (!enabled() || !poolsOn) return original();
+      if (this.renderQueue.masteryPool.size === 0) return undefined;
+      const bars = poolBars(this.id);
+      this.renderQueue.masteryPool.forEach((realm) => {
+        bars.forEach((bar) => bar.updateProgress(this, realm));
+        // As the game does: the open Spend Mastery XP window follows the pool (its own spelling, "curentSkill").
+        const menu = typeof spendMasteryMenu === 'undefined' ? undefined : spendMasteryMenu;
+        if (menu !== undefined && menu.curentSkill === this && menu.currentRealm === realm) menu.updateAllActions();
+      });
+      this.renderQueue.masteryPool.clear();
+      return undefined;
+    });
+  } else {
+    log('mastery pool bars: the game changed, the faster lookup stays off');
+  }
+
   log('mastery displays: faster lookup ready');
+  return {
+    /** Dev only: the pool bars' lookup on or off, for timing it against the game's own search. */
+    setPools(on) {
+      poolsOn = on !== false;
+      pools = null;
+      return poolUsable && poolsOn;
+    },
+  };
 }
