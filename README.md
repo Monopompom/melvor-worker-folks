@@ -112,6 +112,15 @@ Leftovers from an earlier recipe are used by any later recipe that needs them. S
 Own stock off sends the stock to your bank as far as it has space; what finds no free slot
 is lost, and the card warns you beside the switch.
 
+**Auto-restock.** From Hiring 75, an **Auto-restock** switch under Own stock refills a Folk's
+stock from your bank on its own whenever it falls below the time you pick (15 min to 8 h), and
+starts again a Folk whose stock ran out. A Folk you stopped yourself waits for you.
+
+**With Voyage.** A Folk working out of reach of a bank (Voyage decides where that is) keeps
+what it makes, the coins it earns and its inputs in its room, its **haul**, until you come by
+and collect it. It stops when the haul is full or its inputs run out, and its wage keeps
+running while it stands. Auto-restock waits until the Folk is back at a bank.
+
 **Bags.** A Folk wearing a bag in its Cape slot gets a bigger room, in place of a skillcape:
 the **Folk Satchel** (Crafting 20: 40 Leather, 1 Amulet of Looting) adds a third of the
 tier's bag room, the **Folk Pack** (Crafting 50: a Satchel, 10 Bobby's Pockets, 150
@@ -233,7 +242,7 @@ features: the Payroll Reserve at 5 (24 h of the whole crew's wages, growing to 7
 7 days at 65 and 30 days at 95), the Work Orders board at 8 (more orders at 30 and 70, the
 reroll at 50), promotions at 10, forgetting a trait at 15, Licences at 20 / 40 / 60 / 80, the
 apology bonus at 25, Township Commissions at 30, half the firing severance at 45, Summoning marks for Folks at 50,
-automatic restart of a Folk's skill after a settlement at 55, cheaper Overtime (×1.5 wages)
+automatic restart of a Folk's skill after a settlement at 55, Auto-restock at 75, cheaper Overtime (×1.5 wages)
 at 85, no firing severance at 90, a free Shift Slot and a +20% Foreman crew bonus cap at 99
 and, with Throne of the Herald, -10%
 wages at 100, a second free Shift Slot at 110 and 50% promotion fees at 120. Locked
@@ -412,6 +421,9 @@ relic set, see above).
 same mechanic: which skill the game treats as active and what keeps running when you start
 another one. With Multitasking loaded, Worker Folks switches itself off, shows a message
 explaining why, and registers nothing; disable one of the two in the Mod Manager and reload.
+
+With **Voyage**, your Folks stand at places on its map: one out of reach of a bank keeps a
+haul in its room (see A Folk's room). Without Voyage nothing of that applies.
 
 Other mods' custom skills get a Worker box where their skill follows the game's skill
 classes. Mods that only add items, modifiers or UI are unaffected.
