@@ -104,6 +104,8 @@ export function install(ctx, { getHiring, time, log }) {
     });
     // A skill a strike or a death released already has its own line: no "stopped: restock" line for it (C-10).
     const explained = new Set([...tracker.struck.map((t) => t.skillId), ...tracker.died.map((t) => t.skillId)]);
+    // A Folk stopped by a full room or haul: its stopped line says so, no second "holds …" line for it (build .204).
+    const stoppedFull = new Set();
     tracker.released.forEach((skillId) => {
       if (explained.has(skillId)) return;
       // Delegated again by now: the skill went from one Folk to another (Voyage's walker taking it over), not stopped.
@@ -115,16 +117,21 @@ export function install(ctx, { getHiring, time, log }) {
       const folk = hiring.crew.bySkill(skillId);
       const full = hiring.room?.isFull(folk) === true;
       const out = !full && hiring.room?.isDry(folk) === true;
-      const key = full ? 'ROOM_' : out ? 'DRY_' : '';
-      lines.push({ media: d.media, html: fill('MOD_WF_OFFLINE_STOPPED', { name: d.name, skill: d.skill, why: getLangString(`MOD_WF_OFFLINE_STOPPED_${key}WHY`) }, { why: 'text-danger' }, d.media), fix: getLangString(`MOD_WF_OFFLINE_STOPPED_${key}FIX`) });
+      // On another mod's haul (API v10) a full room is a full haul: collecting it is the fix.
+      const key = full ? (hiring.room?.onHaul(folk) === true ? 'HAUL_' : 'ROOM_') : out ? 'DRY_' : '';
+      // "Haul full" needs no fix line: collecting it is what a haul is for (build .205).
+      if (full) stoppedFull.add(folk.id);
+      lines.push({ media: d.media, html: fill('MOD_WF_OFFLINE_STOPPED', { name: d.name, skill: d.skill, why: getLangString(`MOD_WF_OFFLINE_STOPPED_${key}WHY`) }, { why: 'text-danger' }, d.media), fix: key === 'HAUL_' ? '' : getLangString(`MOD_WF_OFFLINE_STOPPED_${key}FIX`) });
     });
     // What a Folk's room holds on your return, its skill's icon first: kept there while the bank had no free slot.
     if (hiring.room !== undefined) hiring.crew.all.forEach((folk) => {
+      if (stoppedFull.has(folk.id)) return;
       const held = hiring.room.heldList(folk);
       if (held.length === 0) return;
       const skill = hiring.skillOf(folk);
       const media = skill?.media;
-      lines.push({ media, html: `${media ? `<span class="text-nowrap"><img class="skill-icon-xs" src="${media}" alt=""></span> ` : ''}${templateLangString('MOD_WF_OFFLINE_ROOM', { name: esc(folk.name), items: esc(hiring.room.kindsText(held)) })}` });
+      const key = hiring.room.onHaul(folk) ? 'MOD_WF_OFFLINE_HAUL' : 'MOD_WF_OFFLINE_ROOM';
+      lines.push({ media, html: `${media ? `<span class="text-nowrap"><img class="skill-icon-xs" src="${media}" alt=""></span> ` : ''}${templateLangString(key, { name: esc(folk.name), items: esc(hiring.room.kindsText(held)) })}` });
     });
     tracker.died.forEach(({ name, skill, media, lost }) => {
       lines.push({ media, html: `<span class="text-danger">${fill('MOD_WF_OFFLINE_DIED', { name, skill }, {}, media)}</span>` });

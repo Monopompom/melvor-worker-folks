@@ -699,7 +699,7 @@ export function storyPackage(stories, text = {}) {
 
 /**
  * Known gives the Guild Charter, an item; Township's Guild Hall asks for it (the game's buildings take only its fixed
- * requirement kinds, and "item found" is one). Each Hall built in Grasslands lowers Folk wages by 1%, up to five,
+ * requirement kinds, and "item found" is one). The Hall has five stages in Grasslands, each lowering Folk wages by 1%,
  * through the same modifier as the other reliefs (none over 10%); a run-down Hall gives less, as the town's own do.
  */
 export const CHARTER_TIER = 1;
@@ -708,7 +708,7 @@ export const HALL_ID = 'Guild_Hall';
 export const HALL_MAX = 5;
 export const HALL_WAGE_DISCOUNT = 1;
 /**
- * Guild Heirlooms are found once a Hall stands; each Hall raises the find chance by this percent, each Square and each
+ * Guild Heirlooms are found once the Hall stands; each of its stages raises the find chance by this percent, each Square and each
  * story decoration by theirs (the user, 5 Nov 2026: "each stage adds % to drop chance and town decoration items as
  * well"). Full town: 5 × 20 + 5 × 10 + 5 × 10 = +200%.
  */
@@ -722,8 +722,8 @@ export const HALL_COST = Object.freeze([['melvorF:GP', 100000000], ['melvorF:Pla
 // ---- Freedom of the Town and the Guild Square (Honoured) ----------------------------------------------------------
 
 /**
- * Honoured gives Freedom of the Town, a second charter item; Township's Guild Square asks for it. Each Square built in
- * Grasslands gives the town +2% happiness and +2% education, up to five, at half the Hall's bill (the user, 4 Nov 2026).
+ * Honoured gives Freedom of the Town, a second charter item; Township's Guild Square asks for it. Its five stages in
+ * Grasslands each give the town +2% happiness and +2% education, at half the Hall's bill (the user, 4 Nov 2026).
  */
 export const FREEDOM_TIER = 3;
 export const FREEDOM_ID = 'Freedom_of_the_Town';

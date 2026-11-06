@@ -19,6 +19,7 @@ export const MILESTONES = [
   { level: 60, key: 'LICENCE_SENIOR', icon: 'Senior' },
   { level: 65, key: 'RESERVE_7D', icon: 'reserve' },
   { level: 70, key: 'ORDERS_LARGE', icon: 'hiring' },
+  { level: 75, key: 'AUTO_RESTOCK', icon: 'hiring' },
   { level: 80, key: 'LICENCE_EXPERT', icon: 'Expert' },
   { level: 85, key: 'OVERTIME', icon: 'hiring' },
   { level: 90, key: 'SEVERANCE_NONE', icon: 'hiring' },
@@ -34,6 +35,7 @@ export const PROMOTION_LEVEL = 10;
 export const FORGET_LEVEL = 15;
 export const APOLOGY_LEVEL = 25;
 export const AUTO_RESTART_LEVEL = 55;
+export const AUTO_RESTOCK_LEVEL = 75;
 export const OVERTIME_LEVEL = 85;
 export const WAGE_DISCOUNT_LEVEL = 100;
 export const PROMO_COST_LEVEL = 120;
@@ -90,6 +92,11 @@ export function apologyUnlocked(level) {
 
 export function autoRestartUnlocked(level) {
   return level >= AUTO_RESTART_LEVEL;
+}
+
+/** A Folk on its own stock refills it from your bank below the hours you pick (build .202). */
+export function autoRestockUnlocked(level) {
+  return level >= AUTO_RESTOCK_LEVEL;
 }
 
 /** Overtime wage multiplier: ×2 until level 85, ×1.5 after. */

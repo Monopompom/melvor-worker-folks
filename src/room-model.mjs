@@ -204,6 +204,76 @@ export function restockPlan({ perAction, intervalMs, freeMs, bankQty, maxActions
   return { actions, items: inputs.map(({ id, qty }) => ({ id, qty: qty * actions, ms })), short };
 }
 
+/**
+ * Where a Folk's goods go (API v10): 'bank' (as without the haul: the bank, the own-stock switch deciding the inputs)
+ * or 'room' (another mod's haul: everything it makes waits in its room, its inputs come only from its stock). Any
+ * other answer from that mod's hook reads 'bank', so a broken hook never strands a Folk's goods.
+ */
+export const ACCESS = Object.freeze(['bank', 'room']);
+export function normalizeAccess(answer) {
+  return answer === 'room' ? 'room' : 'bank';
+}
+
+/** The room's state for other mods: 'full' (no space for the next action), 'dry' (out of inputs) or 'ok'. */
+export function stateOf({ full = false, dry = false } = {}) {
+  return full ? 'full' : dry ? 'dry' : 'ok';
+}
+
+/** Adds currency to the purse (v9): a positive, finite amount only. */
+export function putPurse(room, currencyId, amount) {
+  if (room === undefined || typeof currencyId !== 'string' || currencyId === '' || !(Number.isFinite(amount) && amount > 0)) return;
+  room.purse ??= {};
+  room.purse[currencyId] = (room.purse[currencyId] ?? 0) + amount;
+}
+
+/** The purse as [{ id, amount }], the biggest amount first. */
+export function purseEntries(room) {
+  return Object.entries(room?.purse ?? {}).map(([id, amount]) => ({ id, amount })).sort((a, b) => b.amount - a.amount || a.id.localeCompare(b.id));
+}
+
+/** Empties the purse; returns what it held, as purseEntries. */
+export function takePurse(room) {
+  const list = purseEntries(room);
+  if (room !== undefined) room.purse = {};
+  return list;
+}
+
+/** Stock items the current recipe does not use (`recipeIds`): leftovers a collection may send home. */
+export function leftoverIds(room, recipeIds) {
+  const used = new Set(recipeIds ?? []);
+  return Object.keys(room?.stock ?? {}).filter((id) => !used.has(id)).sort();
+}
+
+/** Hours of work the stock feeds now. */
+export function stockHours(room) {
+  return Object.values(room?.stock ?? {}).reduce((total, e) => total + e.ms, 0) / HOUR_MS;
+}
+
+/**
+ * Auto-restock (v9): due when the stock feeds fewer hours than the Folk's threshold and the room has space for at
+ * least one more action. `atHours` null or not positive: off.
+ */
+export function restockDue({ room, atHours, capMs, intervalMs }) {
+  if (!(Number.isFinite(atHours) && atHours > 0) || !(intervalMs > 0)) return false;
+  if (stockHours(room) >= atHours) return false;
+  return capMs - usedMs(room) >= intervalMs;
+}
+
+/** The auto-restock lines a player can pick, in hours of stock (build .202). */
+export const RESTOCK_AT_HOURS = Object.freeze([0.25, 0.5, 1, 2, 3, 4, 6, 8]);
+
+/** The lines that fit a room of `capHours`: below its size, so a refill always has room to add. */
+export function restockAtOptions(capHours) {
+  const fit = RESTOCK_AT_HOURS.filter((h) => h < capHours);
+  return fit.length > 0 ? fit : [RESTOCK_AT_HOURS[0]];
+}
+
+/** The line a switched-on auto-restock starts at: the largest within a quarter of the room, else the smallest. */
+export function defaultRestockAt(capHours) {
+  const fit = restockAtOptions(capHours).filter((h) => h <= capHours / 4);
+  return fit.length > 0 ? fit[fit.length - 1] : RESTOCK_AT_HOURS[0];
+}
+
 /** What the card shows: hours held and the room's size, its fill in percent. */
 export function fillView(room, capMs) {
   const used = usedMs(room);

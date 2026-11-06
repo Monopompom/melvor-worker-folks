@@ -87,6 +87,8 @@ export function install(ctx, { getHiring, model, hallId = `${NS}:Guild_Hall`, bi
     roll,
     hallBuilt,
     missing,
+    /** Every heirloom, in the guild's order: { id, item, held } (the Town history's tile). */
+    list: () => model.HEIRLOOM_IDS.map((id) => ({ id, item: itemOf(id), held: held(id) })),
     total: () => items.size,
     /** "×1.6": the town's buildings on the base chance. */
     multiplier: () => model.findMultiplier(findPercent()),

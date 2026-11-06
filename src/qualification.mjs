@@ -72,6 +72,11 @@ export function install(ctx, { getHiring, model, log }) {
     hiring.qualification = {
       enabled,
       reasonFor,
+      /** { ok, needs } for the API (v10): may this Folk work this skill now, and the level of yours it asks for. */
+      check: (folk, skill) => {
+        const c = checkOf(folk, skill);
+        return { ok: !enabled() || c.ok, needs: c.level };
+      },
       /** What this Folk would need on its skill after a promotion to `tier` ('' when nothing changes for the worse). */
       afterPromotion: (folk, tier) => {
         const skill = hiring.skillOf(folk);

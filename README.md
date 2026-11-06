@@ -303,16 +303,16 @@ by 2% a day.
 
 At Known the town hands your guild its **Guild Charter**: the **Guild Hall** appears in
 Township's Grasslands. It is a tier 5 building like the Town Hall (Township 80 and 40,000
-citizens) and costs as much: 100,000,000 GP and 100,000 each of Planks, Stone and Bar. Build up to
-five; each one cuts every Folk's wages by 1%, less as it runs down, like the town's own buildings. The charter and the Halls
-stay even if your Standing fades.
+citizens) and costs as much: 100,000,000 GP and 100,000 each of Planks, Stone and Bar, per stage.
+It has five stages; each cuts every Folk's wages by 1%, less as it runs down, like the town's own buildings. The charter and
+the Hall stay even if your Standing fades.
 
 At Trusted one shop hire in four grew up in your town: a **Townsfolk**, with the **Local** trait
 for good. Its runs to town take half the time, and while your town's happiness is 50% or more its
 cooldown after a strike is halved.
 
 At Honoured the town grants your guild its **Freedom**: the **Guild Square** appears in
-Grasslands, at half the Hall's bill. Build up to five; each gives the town +2% happiness and +2%
+Grasslands, at half the Hall's bill. It has five stages; each gives the town +2% happiness and +2%
 education.
 
 From Honoured, every fifth new commission can also be a **story**: a project of your town in
@@ -325,7 +325,7 @@ Commissions suit cheaper Folks best: a Foreman's hour is worth far more on Work 
 
 ### Guild Heirlooms
 
-Once a Guild Hall stands, every action of an Apprentice or higher may turn up a **Guild Heirloom**:
+Once the Guild Hall stands, every action of an Apprentice or higher may turn up a **Guild Heirloom**:
 one in 500,000 actions, raised by 20% for each Guild Hall and 10% for each Guild Square and story
 decoration (a full town: three times as often). There are six, and you hold at most one of each: a find
 is always one that is in neither your bank, nor a Folk's gear, nor your own equipment. One you lose (say, with a Folk

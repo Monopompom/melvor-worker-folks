@@ -31,6 +31,19 @@ test('workerOptions marks the current holder, Folks busy elsewhere and unavailab
   assert.deepEqual(o.map((x) => x.lines), [[], [], []]);
 });
 
+test('workerOptions lists the Folks who can take the skill first, crew order kept in each group', () => {
+  const folks = [
+    { id: 'a', name: 'Ann', tier: 'Newbie', skillId: null, available: false },
+    { id: 'b', name: 'Bob', tier: 'Junior', skillId: 'fi', available: true },
+    { id: 'c', name: 'Cid', tier: 'Newbie', skillId: 'wc', available: false },
+    { id: 'd', name: 'Dot', tier: 'Newbie', skillId: null, available: true },
+  ];
+  const o = workerOptions({ folks, skillId: 'wc', skillNameOf: (id) => id });
+  assert.deepEqual(o.map((x) => x.id), ['b', 'd', 'a', 'c']);
+  assert.equal(o[3].current, true);
+  assert.deepEqual(folks.map((f) => f.id), ['a', 'b', 'c', 'd']);
+});
+
 test('moveMode defers the move only while the Folk is working elsewhere', () => {
   assert.equal(moveMode({ currentSkillId: 'wc', targetSkillId: 'wc', working: true }), 'none');
   assert.equal(moveMode({ currentSkillId: 'wc', targetSkillId: 'fi', working: true }), 'deferred');

@@ -361,7 +361,10 @@ function fillCard(col, folk, view) {
       put('.wf-restock-value', `${v.hoursAt(n)}\u00a0h`);
       put('.wf-restock-now', view.text('MOD_WF_RESTOCK_NOW', { hours: v.nowText }));
       put('.wf-restock-full', view.text('MOD_WF_RESTOCK_FULL', { hours: v.fullText }));
-      put('.wf-restock-cost', v.costText(n));
+      put('.wf-restock-cost-label', v.costLabel(n));
+      const tiles = panel.querySelector('.wf-restock-cost-tiles');
+      const html = tiles === null ? '' : v.costTiles(n);
+      if (tiles !== null && tiles.wfHtml !== html) { tiles.innerHTML = html; tiles.wfHtml = html; v.tipTiles(tiles); }
       const bank = panel.querySelector('.wf-restock-bank');
       if (bank !== null) { setText(bank, v.bankText); bank.classList.toggle('d-none', v.bankText === '' || n <= v.bank); }
       setText(go, full ? view.text('MOD_WF_RESTOCK_FILL') : view.text('MOD_WF_RESTOCK_TO', { hours: v.hoursAt(n) }));
@@ -448,6 +451,49 @@ function fillCard(col, folk, view) {
       note.classList.toggle('text-danger', stock.on && stock.noteLost);
       note.classList.toggle('text-warning', stock.on && !stock.noteLost);
       note.classList.toggle('wf-subtle', !stock.on);
+    }
+  });
+  const auto = view.autoRestock?.(folk);
+  set('auto-restock', (el) => {
+    el.classList.toggle('d-none', auto === undefined);
+    if (auto === undefined) return;
+    const sw = el.querySelector('[data-wf="auto-restock-switch"]');
+    const pick = el.querySelector('[data-wf="auto-restock-at"]');
+    if (sw !== null) {
+      sw.classList.toggle('wf-switch-on', auto.on);
+      setAttr(sw, 'aria-checked', `${auto.on}`);
+      sw.disabled = auto.disabled === true;
+      const label = sw.querySelector('[data-wf="auto-restock-label"]');
+      if (label !== null) setText(label, auto.text);
+      const sub = sw.querySelector('[data-wf="auto-restock-sub"]');
+      if (sub !== null) setText(sub, auto.sub);
+      view.tip(sw, auto.tip);
+      sw.onclick = () => view.onToggleAutoRestock(folk);
+    }
+    if (pick !== null) {
+      pick.classList.toggle('d-none', !auto.on);
+      const button = pick.querySelector('.dropdown-toggle');
+      const menu = pick.querySelector('.dropdown-menu');
+      const current = auto.lines.find((l) => l.value === auto.at);
+      if (button !== null) {
+        button.disabled = auto.disabled === true;
+        setText(button, current?.text ?? '');
+        setAttr(button, 'aria-label', `${auto.pickLabel}: ${current?.text ?? ''}`);
+      }
+      // Rebuilt only when the lines or the pick change, so an open menu survives the card's redraws (the menu element
+      // itself stays, and Bootstrap's open state with it).
+      const key = `${auto.at}|${auto.lines.map((l) => `${l.value}:${l.text}`).join('|')}`;
+      if (menu !== null && menu.dataset.wfLines !== key) {
+        menu.dataset.wfLines = key;
+        menu.replaceChildren(...auto.lines.map((l) => {
+          const o = document.createElement('button');
+          o.type = 'button';
+          o.className = `dropdown-item${l.value === auto.at ? ' active' : ''}`;
+          o.textContent = l.text;
+          o.onclick = () => view.onPickRestockAt(folk, l.value);
+          return o;
+        }));
+      }
     }
   });
   set('mastery', (el) => {

@@ -5,7 +5,7 @@ import { createFolk, normalizeFolk, migrateRoot, parseRoot, serializeRoot, norma
 
 test('createFolk fills defaults and rejects bad input', () => {
   const f = createFolk({ id: 'a', slot: 0, tier: 'Newbie', name: 'Ada' });
-  assert.deepEqual(f, { id: 'a', slot: 0, tier: 'Newbie', name: 'Ada', skillId: null, loadout: {}, debt: 0, debtCurrency: null, debtMs: 0, onStrike: false, cooldownTicks: 0, wageCarry: 0, overtime: false, strikes: 0, restartWhenReady: false, restartPick: null, hp: null, place: null, travel: 'idle', hiredAt: 0, traitState: { traits: [], waiting: [], counts: {} }, paid: null, room: { haul: {}, stock: {}, town: {} }, ownStock: false, townsfolk: false, demand: [] });
+  assert.deepEqual(f, { id: 'a', slot: 0, tier: 'Newbie', name: 'Ada', skillId: null, loadout: {}, debt: 0, debtCurrency: null, debtMs: 0, onStrike: false, cooldownTicks: 0, wageCarry: 0, overtime: false, strikes: 0, restartWhenReady: false, restartPick: null, hp: null, place: null, travel: 'idle', hiredAt: 0, traitState: { traits: [], waiting: [], counts: {} }, paid: null, room: { haul: {}, stock: {}, town: {}, purse: {} }, ownStock: false, restockAt: null, townsfolk: false, demand: [] });
   assert.equal(createFolk({ id: 'a', slot: 0, tier: 'Newbie', name: 'Ada', paid: 4200 }).paid, 4200);
   assert.throws(() => createFolk({ id: 'a', slot: -1, tier: 'Newbie', name: 'Ada' }));
   assert.throws(() => createFolk({ id: 'a', slot: 0, tier: 'Boss', name: 'Ada' }));
@@ -26,7 +26,7 @@ test('normalizeFolk repairs optional fields and rejects impossible records', () 
 test('migrateRoot upgrades a pre-version root (v0) to the current version', () => {
   const legacy = { folks: [{ id: 'a', slot: 0, tier: 'Junior', name: 'Cora' }] };
   const { root, applied } = migrateRoot(legacy);
-  assert.deepEqual(applied, [0, 1, 2, 3, 4, 5, 6, 7]);
+  assert.deepEqual(applied, [0, 1, 2, 3, 4, 5, 6, 7, 8]);
   assert.equal(root.v, SAVE_VERSION);
   assert.equal(root.folks[0].strikes, 0);
   assert.equal(root.folks[0].cooldownTicks, 0);
@@ -107,22 +107,23 @@ test('serializeRoot / parseRoot round-trip preserves every field', () => {
 // A real save: slot 3 (FolksScanB) in the browser, Worker Folks 1.2.0, read from the game save on 20 Oct 2026.
 const realV3 = readFileSync(new URL('./fixtures/save-v3-folksscanb.json', import.meta.url), 'utf8').trim();
 
-test('a real v3 save migrates to v8: every Folk kept as it was, with no place, not travelling, no traits, no known cost and an empty room', () => {
+test('a real v3 save migrates to v9: every Folk kept as it was, with no place, not travelling, no traits, no known cost and an empty room', () => {
   const before = JSON.parse(realV3);
   const r = parseRoot(realV3);
-  assert.deepEqual(r.applied, [3, 4, 5, 6, 7]);
+  assert.deepEqual(r.applied, [3, 4, 5, 6, 7, 8]);
   assert.equal(r.corrupt, false);
   assert.equal(r.dropped, 0);
-  assert.equal(r.root.v, 8);
+  assert.equal(r.root.v, 9);
   assert.equal(r.root.commissions, null);
   assert.equal(r.root.folks.length, before.folks.length);
   r.root.folks.forEach((folk, i) => {
-    const { place, travel, traitState, paid, room, ownStock, townsfolk, restartPick, demand, ...rest } = folk;
+    const { place, travel, traitState, paid, room, ownStock, restockAt, townsfolk, restartPick, demand, ...rest } = folk;
+    assert.equal(restockAt, null);
     assert.equal(townsfolk, false);
     assert.deepEqual(demand, []);
     assert.equal(restartPick, null);
     assert.equal(paid, null);
-    assert.deepEqual(room, { haul: {}, stock: {}, town: {} });
+    assert.deepEqual(room, { haul: {}, stock: {}, town: {}, purse: {} });
     assert.equal(ownStock, false);
     assert.equal(place, null);
     assert.equal(travel, 'idle');
@@ -150,11 +151,16 @@ test('a room rides in the save and reads back as it was', () => {
   folk.room.haul['melvorD:Bird_Nest'] = { qty: 4, ms: 12_000 };
   folk.room.stock['melvorD:Coal_Ore'] = { qty: 90, ms: 45_000 };
   folk.room.town['melvorD:Oak_Logs'] = { qty: 300, ms: 900_000 };
+  folk.room.purse['melvorD:GP'] = 1_250;
   folk.ownStock = true;
+  folk.restockAt = 1.5;
   const back = parseRoot(serializeRoot([folk]));
-  assert.deepEqual(back.root.folks[0].room, { haul: { 'melvorD:Bird_Nest': { qty: 4, ms: 12_000 } }, stock: { 'melvorD:Coal_Ore': { qty: 90, ms: 45_000 } }, town: { 'melvorD:Oak_Logs': { qty: 300, ms: 900_000 } } });
+  assert.deepEqual(back.root.folks[0].room, { haul: { 'melvorD:Bird_Nest': { qty: 4, ms: 12_000 } }, stock: { 'melvorD:Coal_Ore': { qty: 90, ms: 45_000 } }, town: { 'melvorD:Oak_Logs': { qty: 300, ms: 900_000 } }, purse: { 'melvorD:GP': 1_250 } });
   assert.equal(back.root.folks[0].ownStock, true);
-  assert.deepEqual(normalizeFolk({ ...folk, room: 'full' }).room, { haul: {}, stock: {}, town: {} });
+  assert.equal(back.root.folks[0].restockAt, 1.5);
+  assert.deepEqual(normalizeFolk({ ...folk, room: { purse: { a: -1, b: 'x', c: 2.5, '': 3 } } }).room.purse, { c: 2.5 });
+  for (const bad of [0, -2, 'x', Infinity]) assert.equal(normalizeFolk({ ...folk, restockAt: bad }).restockAt, null);
+  assert.deepEqual(normalizeFolk({ ...folk, room: 'full' }).room, { haul: {}, stock: {}, town: {}, purse: {} });
   assert.equal(normalizeFolk({ ...folk, ownStock: 'yes' }).ownStock, false);
   assert.equal(normalizeFolk({ ...folk, ownStock: true }).ownStock, true);
 });
@@ -179,9 +185,19 @@ test('normalizeLost keeps whole stacks of frozen slots only', () => {
 test('v7 → v8 keeps each room as it was, adds an empty town side and no commissions yet', () => {
   const v7 = { v: 7, folks: [{ id: 'a', slot: 0, tier: 'Middle', name: 'Ada', room: { haul: { x: { qty: 2, ms: 10 } }, stock: {} } }], board: null };
   const { root, applied } = migrateRoot(v7);
-  assert.deepEqual(applied, [7]);
-  assert.deepEqual(root.folks[0].room, { haul: { x: { qty: 2, ms: 10 } }, stock: {}, town: {} });
+  assert.deepEqual(applied, [7, 8]);
+  assert.deepEqual(root.folks[0].room, { haul: { x: { qty: 2, ms: 10 } }, stock: {}, town: {}, purse: {} });
   assert.equal(root.commissions, null);
+});
+
+test('v8 → v9 keeps each room as it was, adds an empty purse and auto-restock off', () => {
+  const v8 = { v: 8, folks: [{ id: 'a', slot: 0, tier: 'Middle', name: 'Ada', ownStock: true, room: { haul: {}, stock: { c: { qty: 9, ms: 30 } }, town: { t: { qty: 1, ms: 5 } } } }], board: null, commissions: null };
+  const { root, applied } = migrateRoot(v8);
+  assert.deepEqual(applied, [8]);
+  assert.equal(root.v, 9);
+  assert.deepEqual(root.folks[0].room, { haul: {}, stock: { c: { qty: 9, ms: 30 } }, town: { t: { qty: 1, ms: 5 } }, purse: {} });
+  assert.equal(root.folks[0].restockAt, null);
+  assert.equal(root.folks[0].ownStock, true);
 });
 
 test('the commissions state rides in the save as an object; anything else reads as none', () => {

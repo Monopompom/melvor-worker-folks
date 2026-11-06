@@ -148,6 +148,7 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 .wf-restock-label b { color: var(--wf-hover); }
 .wf-restock-range { display: block; width: 100%; margin: 6px 0 0; accent-color: var(--wf-cooldown); }
 .wf-restock-ends { display: flex; justify-content: space-between; color: var(--wf-subtle); margin-bottom: 6px; }
+.wf-restock-cost .wf-item-grid { grid-template-columns: repeat(auto-fill, 52px); margin: 4px 0 2px; }
 .wf-room-preview { background-color: var(--wf-cooldown); opacity: 0.4; }
 /* The Folk's switches under the work: a track and knob, the label and a line under it. */
 .wf-switches { display: flex; flex-direction: column; border-top: 1px solid var(--wf-line-soft); margin-top: 10px; padding-top: 6px; }
@@ -161,6 +162,10 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 .wf-switch-on .wf-switch-track { background: var(--wf-cooldown); }
 .wf-switch-warn.wf-switch-on .wf-switch-track { background: var(--wf-alert); }
 .wf-switch small { white-space: pre-line; } /* a note's second sentence on a line of its own */
+/* Auto-restock: the switch, and its line picker beside it while on. */
+.wf-auto-restock { display: flex; align-items: center; gap: 8px; }
+.wf-auto-restock > .wf-switch { flex: 1 1 auto; min-width: 0; }
+.wf-auto-restock-at { flex: none; }
 /* Health on one line: the HP text, its bar, the food (which wraps under when long). */
 .wf-band-health { display: flex; flex-wrap: wrap; align-items: center; column-gap: 10px; row-gap: 2px; }
 .wf-band-health .wf-hp-bar { flex: 1 1 60px; margin-bottom: 0; }
@@ -565,6 +570,19 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-comm-story { font-size: 0.8rem; font-weight: 600; color: var(--bs-warning, #e69721); gap: 2px; }
 .wf-order.wf-comm-is-story { box-shadow: inset 3px 0 0 #e69721; }
 .wf-history-row { gap: 4px; margin-bottom: 6px; padding: 8px; }
+/* The guild in town (build .211): Halls, Squares and Heirlooms as tiles side by side, the count large, every effect
+   one short line; every tile one width, centred, wrapping on a narrow popup. */
+.wf-guild { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 12px; }
+.wf-guild-tile { flex: 0 0 9.5rem; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 8px; border-radius: 6px;
+  background: var(--wf-band); border: 1px solid var(--wf-line-soft); text-align: center; white-space: nowrap; min-width: 0; }
+.wf-guild-img { width: 48px; height: 48px; object-fit: contain; margin-bottom: 2px; }
+.wf-guild-name { font-size: 0.8rem; font-weight: 600; color: var(--wf-head); text-transform: uppercase; letter-spacing: 0.04em; }
+.wf-guild-count { font-size: 1.5rem; font-weight: 700; line-height: 1.15; }
+.wf-guild-of { font-size: 0.95rem; font-weight: 400; color: var(--wf-subtle); }
+.wf-guild-effect { font-size: 0.85rem; line-height: 1.3; }
+.wf-guild-heirlooms { display: grid; grid-template-columns: repeat(3, 22px); gap: 3px; height: 48px; align-content: center; margin-bottom: 2px; }
+.wf-guild-heirloom { width: 22px; height: 22px; object-fit: contain; }
+.wf-guild-missing { opacity: 0.25; filter: grayscale(1); }
 .wf-history-img { width: 56px; height: 56px; object-fit: contain; flex: none; }
 .wf-comm .wf-comm-held { opacity: 0.45; }
 .wf-comm-foot { gap: 6px; margin-top: auto; padding-top: 8px; }

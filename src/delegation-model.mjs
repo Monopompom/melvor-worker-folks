@@ -51,9 +51,14 @@ export function releaseMode({ working }) {
 /**
  * Entries for a skill page's Worker dropdown. `folks` are every crew member with
  * their current skill id and availability; the skill's own holder is marked current.
+ * The Folks who can take the skill now come first, crew order kept within each group
+ * (build .202): with Voyage, the ones here before the ones a hex away; without it,
+ * the qualified and free before the ones on strike or short of your level.
  */
 export function workerOptions({ folks, skillId, skillNameOf }) {
-  return folks.map((f) => ({
+  const ready = folks.filter((f) => f.available);
+  const rest = folks.filter((f) => !f.available);
+  return [...ready, ...rest].map((f) => ({
     id: f.id,
     name: f.name,
     tier: f.tier,

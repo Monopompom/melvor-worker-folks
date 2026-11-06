@@ -26,6 +26,14 @@
 // room's town side (commissions.mjs claims it); it is counted as made there too (`folkMade` with `town`, so Work
 // Orders leave it out). Runs to town take it from there; what is left over moves to the haul side, and from there to
 // the bank like anything else the room holds for you.
+//
+// The haul (API v10, slice C): another mod (Voyage) may answer, per Folk, where its goods go: 'bank' (all of the
+// above) or 'room'. A Folk on 'room' keeps everything it makes in its room, bank space or not, and the currencies it
+// earns in its purse; its inputs come only from its stock, whatever the own-stock switch says. With no space for the
+// next action it stops "Haul full"; out of inputs it stops "Out of inputs"; either way its wages keep running (the
+// haul's demanding rule; a Folk on the bank still pays only for work). Its goods reach the bank only through that
+// mod: collect, emptyToBank, or the bank's own buffer once its answer turns to 'bank'. The answer is kept per Folk and
+// asked again when it moves, when that mod calls refreshBankAccess and at a load. No hook: 'bank' for every Folk.
 
 const CHECK_TICKS = 20;
 const CAPE_SLOT = 'melvorD:Cape';
@@ -41,6 +49,13 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
   /** The Folk whose stock a start button reads (the Create, Cast or Burn click), outside any action. */
   let startFolk;
   let ticks = 0;
+  /**
+   * The haul (API v10): another mod's answer for where a Folk's goods go (`hiring.accessHook`, set by the API so it
+   * holds in either load order), kept per Folk; none = 'bank'.
+   */
+  const access = new Map();
+  /** Folks whose room changed since the last roomChanged event. */
+  const changed = new Set();
 
   const capOf = (folk) => model.capacityMs(folk.tier, model.bagHours(folk.tier, folk.loadout?.[CAPE_SLOT]?.id));
   /** The work an action is worth: the timer that just ran (any skill has one, mod skills too), at least a tick. */
@@ -62,6 +77,46 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     told.forEach((key) => { if (key.startsWith(`${folk.id}|`)) told.delete(key); });
   };
 
+  /** 'bank' or 'room' for this Folk now (API v10): asked of the haul's hook once, then kept until refreshAccess. */
+  const accessOf = (folk) => {
+    const hook = hiring?.accessHook;
+    if (typeof hook !== 'function' || folk === undefined) return 'bank';
+    const kept = access.get(folk.id);
+    if (kept !== undefined) return kept;
+    let answer = 'bank';
+    try {
+      answer = model.normalizeAccess(hook(folk));
+    } catch (err) {
+      log('bank access hook failed', err);
+    }
+    access.set(folk.id, answer);
+    return answer;
+  };
+  const onHaul = (folk) => accessOf(folk) === 'room';
+  /** Takes its inputs from its stock: the own-stock switch, or away from a bank on the haul. */
+  const usesStock = (folk) => folk !== undefined && folk.room !== undefined && (folk.ownStock === true || onHaul(folk));
+  const touch = (folk) => { if (folk !== undefined) changed.add(folk.id); };
+  const emitChanged = (folk) => {
+    changed.delete(folk.id);
+    hiring.events.emit('roomChanged', { folk });
+  };
+  /** Asks the hook again for one Folk, or every Folk; a Folk whose answer changed gets a roomChanged. */
+  const refreshAccess = (folk) => {
+    if (hiring === undefined) return;
+    const list = folk === undefined ? hiring.crew.all : [folk];
+    list.forEach((f) => {
+      const before = access.get(f.id);
+      access.delete(f.id);
+      const now = accessOf(f);
+      if (before !== undefined && before !== now) {
+        blocked.delete(f.id);
+        log(`room: ${f.name} now uses ${now === 'room' ? 'its room' : 'the bank'}`);
+        emitChanged(f);
+      }
+    });
+    hiring.renderQueue.folks = true;
+  };
+
   /** Puts an item the bank can't take in the acting Folk's room; false only for a Folk with no room. */
   const hold = (acting, item, quantity) => {
     const folk = acting.folk;
@@ -71,6 +126,8 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     const over = acting.roomCharged !== true && !model.fits(folk.room, capOf(folk), charge);
     model.put(folk.room, item.id, quantity, charge);
     acting.roomCharged = true;
+    touch(folk);
+    const haul = onHaul(folk);
     if (over || acting.roomOver === true) {
       // No space for this action's work: its items are kept all the same, and the Folk stops after it (acting.mjs
       // stops the timer the action would restart).
@@ -78,12 +135,18 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
       if (acting.skill.isActive) acting.skill.stop();
       if (!blocked.has(folk.id)) {
         blocked.add(folk.id);
-        notify(templateLangString('MOD_WF_ROOM_FULL_NOTICE', { name: folk.name }));
+        notify(templateLangString(haul ? 'MOD_WF_HAUL_FULL_NOTICE' : 'MOD_WF_ROOM_FULL_NOTICE', { name: folk.name }));
+        hiring.events.emit('roomFull', { folk });
       }
       hiring.renderQueue.folks = true;
       return true;
     }
     blocked.delete(folk.id);
+    // On the haul every item waits in the room: no notice for that.
+    if (haul) {
+      hiring.renderQueue.folks = true;
+      return true;
+    }
     const key = `${folk.id}|${item.id}`;
     if (!told.has(key)) {
       told.add(key);
@@ -106,17 +169,21 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
    * game's short form, 1.2K), its tooltip set by `tipTiles` once the HTML is in the page. `lost`: a red frame and
    * count; `small`: a card's size.
    */
-  const itemTiles = (list, { lost = false, small = false } = {}) => `<div class="wf-item-grid${small ? ' wf-item-grid-sm' : ''}" data-no-skill-names>${list.map(({ id, qty }) => {
+  const itemTiles = (list, { lost = false, small = false } = {}) => `<div class="wf-item-grid${small ? ' wf-item-grid-sm' : ''}" data-no-skill-names>${list.map(({ id, qty, have }) => {
     const item = game.items.getObjectByID(id);
     const icon = item?.media ? `<img class="wf-item-tile-icon" src="${item.media}" alt="">` : '';
     const count = typeof formatNumber === 'function' ? formatNumber(qty) : numberWithCommas(qty);
-    return `<div class="wf-item-tile${lost ? ' wf-item-tile-lost' : ''}" data-wf-item="${esc(id)}" data-wf-qty="${qty}">${icon}<span class="wf-item-tile-count">${esc(count)}</span></div>`;
+    // `have` on an entry: the bank holds fewer than `qty`, the tile red and its tooltip saying how many (build .216).
+    const short = have !== undefined;
+    return `<div class="wf-item-tile${lost || short ? ' wf-item-tile-lost' : ''}" data-wf-item="${esc(id)}" data-wf-qty="${qty}"${short ? ` data-wf-have="${have}"` : ''}>${icon}<span class="wf-item-tile-count">${esc(count)}</span></div>`;
   }).join('')}</div>`;
   /** Each tile's tooltip under `root`: the item's own (name and icon), its exact count. */
   const tipTiles = (root) => {
     root?.querySelectorAll('[data-wf-item]').forEach((el) => {
       const item = game.items.getObjectByID(el.dataset.wfItem);
-      tips?.set(el, [{ item: item ?? undefined, text: `${item?.name ?? el.dataset.wfItem} ×${numberWithCommas(Number(el.dataset.wfQty))}` }]);
+      const line = { item: item ?? undefined, text: `${item?.name ?? el.dataset.wfItem} ×${numberWithCommas(Number(el.dataset.wfQty))}` };
+      const have = el.dataset.wfHave;
+      tips?.set(el, have === undefined ? [line] : [line, { cls: 'text-danger', text: templateLangString('MOD_WF_RESTOCK_HAVE', { have: numberWithCommas(Number(have)) }) }]);
     });
   };
 
@@ -149,12 +216,104 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     ]);
   };
 
+  /** The purse to your currencies (outside any action, so nothing holds it again); returns [{ currencyId, amount }]. */
+  const purseHome = (folk) => {
+    const paid = [];
+    model.takePurse(folk.room).forEach(({ id, amount }) => {
+      const currency = game.currencies?.getObjectByID(id);
+      // A currency no loaded mod registers stays in the purse: its mod may be back next load.
+      if (currency === undefined) {
+        model.putPurse(folk.room, id, amount);
+        return;
+      }
+      currency.add(amount);
+      paid.push({ currencyId: id, amount });
+    });
+    return paid;
+  };
+
+  /**
+   * Moves a side's stacks (all, or `ids`) to the bank as far as it takes them, found as new: [{ itemId, qty }] moved,
+   * and what stayed (a new kind with no free slot, or an item no loaded mod registers) in `left`.
+   */
+  const moveSide = (folk, side, ids, left) => {
+    const moved = [];
+    for (const { id } of model.entries(folk.room, side)) {
+      if (ids !== undefined && !ids.includes(id)) continue;
+      const item = game.items.getObjectByID(id);
+      if (item === undefined || !bankTakes(game.bank, item)) {
+        left.push({ itemId: id, qty: model.qtyOf(folk.room, id, side) });
+        continue;
+      }
+      const { qty, ms } = model.take(folk.room, id, Infinity, side);
+      if (game.bank.addItem(item, qty, false, true, false, game._isInOnlineLoop, `Skill.${hiring.id}`)) {
+        moved.push({ itemId: id, qty });
+        told.delete(`${folk.id}|${id}`);
+      } else {
+        model.put(folk.room, id, qty, ms, side);
+        left.push({ itemId: id, qty });
+      }
+    }
+    return moved;
+  };
+
+  /** After goods left the room: a "Haul full" or "Bank and room full" Folk with space again starts again. */
+  const afterOut = (folk) => {
+    if (model.usedMs(folk.room) >= capOf(folk)) return;
+    const wasFull = blocked.delete(folk.id);
+    if (wasFull) startAfterRestock(folk, hiring.skillOf(folk));
+  };
+
+  /**
+   * collect (API v10): what the Folk made and its purse go to your bank and currencies, and, while its own-stock switch
+   * is off, stock its current recipe can't use. { items, left, purse }.
+   */
+  const collect = (folk) => {
+    if (folk?.room === undefined) return undefined;
+    const left = [];
+    const items = moveSide(folk, 'haul', undefined, left);
+    if (folk.ownStock !== true && !model.isEmpty(folk.room, 'stock')) {
+      const recipe = inputsOf(folk).perAction.map(({ id }) => id);
+      const spare = model.leftoverIds(folk.room, recipe);
+      if (spare.length > 0) items.push(...moveSide(folk, 'stock', spare, left));
+    }
+    const purse = purseHome(folk);
+    if (items.length > 0 || purse.length > 0) {
+      log(`room: collected ${items.length} kind(s) and ${purse.length} currency(ies) from ${folk.name}`);
+      afterOut(folk);
+      hiring.renderQueue.folks = true;
+      // Only when something moved: a listener that collects on roomChanged must not loop on a stack the bank refuses.
+      emitChanged(folk);
+    }
+    return Object.freeze({ items: Object.freeze(items), left: Object.freeze(left), purse: Object.freeze(purse) });
+  };
+
+  /**
+   * emptyToBank (API v10): its haul and purse, and its stock unless its own-stock switch is on (`inputs` true: that
+   * stock too). A commission's goods stay. { items, left, purse }.
+   */
+  const emptyToBank = (folk, { inputs = false } = {}) => {
+    if (folk?.room === undefined) return undefined;
+    const left = [];
+    const items = moveSide(folk, 'haul', undefined, left);
+    if (folk.ownStock !== true || inputs === true) items.push(...moveSide(folk, 'stock', undefined, left));
+    const purse = purseHome(folk);
+    if (items.length > 0 || purse.length > 0) {
+      log(`room: emptied ${items.length} kind(s) from ${folk.name} to the bank`);
+      afterOut(folk);
+      hiring.renderQueue.folks = true;
+      emitChanged(folk);
+    }
+    return Object.freeze({ items: Object.freeze(items), left: Object.freeze(left), purse: Object.freeze(purse) });
+  };
+
   /** A Folk leaves the crew: its room goes to the bank as far as it has space; returns what was lost. */
   const leave = (folk) => {
+    if (folk?.room !== undefined) purseHome(folk);
     if (folk?.room === undefined || (model.isEmpty(folk.room) && model.isEmpty(folk.room, 'stock') && model.isEmpty(folk.room, 'town'))) return [];
     const { kept, lost } = leaveSplit(folk, { gear: false });
     lost.push(...toBank(kept));
-    folk.room = { haul: {}, stock: {}, town: {} };
+    folk.room = { haul: {}, stock: {}, town: {}, purse: {} };
     forget(folk);
     log(`room: ${folk.name} left; ${kept.length} kind(s) to the bank, ${lost.length} lost`);
     return lost;
@@ -226,7 +385,7 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
 
   /** Out of inputs: stopped for want of its own stock (this session), or (after a load) idle with a stock that falls short. */
   const isDry = (folk) => {
-    if (folk?.ownStock !== true) return false;
+    if (!usesStock(folk)) return false;
     if (dry.has(folk.id)) return true;
     const skill = hiring.skillOf(folk);
     if (skill === undefined || hiring.delegated.has(skill)) return false;
@@ -237,6 +396,7 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     if (dry.has(folk.id)) return;
     dry.add(folk.id);
     hiring.renderQueue.folks = true;
+    hiring.events.emit('roomDry', { folk });
     log(`room: ${folk.name} is out of inputs`);
   };
 
@@ -244,7 +404,7 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
   const stockFolk = () => {
     if (startFolk !== undefined) return startFolk;
     const folk = hiring?.acting?.folk;
-    return folk?.ownStock === true && folk.room !== undefined ? folk : undefined;
+    return usesStock(folk) ? folk : undefined;
   };
   /** The Folk who would take this skill at a start click, when it works from its own stock. */
   const startingFolk = (skill) => {
@@ -252,7 +412,7 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     const pending = hiring.pendingFor?.(skill);
     if (pending === null) return undefined;
     const folk = pending ?? (hiring.decideStart?.(skill) === 'delegate' ? hiring.crew.bySkill(skill.id) : undefined);
-    return folk?.ownStock === true ? folk : undefined;
+    return usesStock(folk) ? folk : undefined;
   };
   const asStart = (folk, fn) => {
     const outer = startFolk;
@@ -266,6 +426,40 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
 
   /** The stock's items against the bank now: what switching off would send home and what it would lose. */
   const stockSplit = (folk) => splitNow(sideList(folk, 'stock'));
+
+  /** The auto-restock line in hours of stock, or null for off (Hiring 75, build .202). */
+  const setRestockAt = (folk, hours) => {
+    if (folk === undefined) return;
+    const at = Number.isFinite(hours) && hours > 0 ? hours : null;
+    if (folk.restockAt === at) return;
+    folk.restockAt = at;
+    hiring.renderQueue.folks = true;
+    // Already under the new line: the next look refills it.
+  };
+  /** The card's switch: off to the line a quarter of the room down, on to off. */
+  const toggleAutoRestock = (folk) => {
+    if (folk === undefined) return;
+    setRestockAt(folk, folk.restockAt === null ? model.defaultRestockAt(capOf(folk) / 3_600_000) : null);
+  };
+  /** "15 min", "1 h": a line in the auto-restock picker. */
+  const lineText = (h) => (h < 1
+    ? templateLangString('MOD_WF_AUTO_RESTOCK_MINUTES', { minutes: `${Math.round(h * 60)}` })
+    : templateLangString('MOD_WF_AUTO_RESTOCK_HOURS', { hours: numberWithCommas(h) }));
+
+  /**
+   * Auto-restock (Hiring 75, build .202): a Folk on its own stock whose stock feeds fewer hours than its line fills its
+   * room from your bank, quietly, as the card's Restock does; one its stock stopped starts again. Only while it works or
+   * its stock stopped it: a Folk you stopped yourself waits for you. Never on the haul: no bank there.
+   */
+  const autoRestock = (folk) => {
+    if (folk.ownStock !== true || folk.restockAt === null || hiring.levels?.autoRestock?.() !== true) return;
+    const skill = hiring.skillOf(folk);
+    if (skill === undefined || (!hiring.delegated.has(skill) && !dry.has(folk.id))) return;
+    const { perAction, intervalMs } = inputsOf(folk);
+    if (perAction.length === 0) return;
+    if (!model.restockDue({ room: folk.room, atHours: folk.restockAt, capMs: capOf(folk), intervalMs })) return;
+    restockResult(folk, Infinity, { quiet: true });
+  };
 
   /** "Work from its own stock" on or off. Off sends the stock to the bank; what finds no space is lost. */
   const setOwnStock = (folk, on) => {
@@ -298,19 +492,31 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     }
   };
 
-  /** Restock: the free room filled with the current recipe's inputs from your bank, then the Folk starts again. */
-  /** Restock: the free room's worth of inputs, or at most `maxActions` actions' (the card's slider, build .153). */
-  const restock = (folk, maxActions = Infinity) => {
-    if (folk?.ownStock !== true || folk.room === undefined) return false;
+  /**
+   * Restock: the free room's worth of inputs from your bank, or at most `maxActions` actions' (the card's slider, build
+   * .153), then the Folk starts again. { ok: true, actions, items: [{ itemId, qty }] } or { ok: false, why } (why
+   * 'noStock' | 'noSkill' | 'noInputs' | 'noRoom' | 'noBank' | 'refused'). `quiet`: no notices (auto-restock). On the
+   * haul the card's button asks the other mod's staff guard first ({ action: 'restock', folk }): it knows whether you
+   * stand by the Folk; the API's own call is that mod's, so it is not asked (`guard` false).
+   */
+  const restockResult = (folk, maxActions = Infinity, { quiet = false, guard = true } = {}) => {
+    if (!usesStock(folk)) return { ok: false, why: 'noStock' };
     const { skill, perAction, intervalMs } = inputsOf(folk);
-    const fail = (key, vars = {}) => {
-      game.notifications.createErrorNotification('worker_folks:restock', templateLangString(key, { name: folk.name, ...vars }));
-      return false;
+    const fail = (why, key, vars = {}) => {
+      if (!quiet && key !== undefined) game.notifications.createErrorNotification('worker_folks:restock', templateLangString(key, { name: folk.name, ...vars }));
+      return { ok: false, why };
     };
-    if (perAction.length === 0) return fail(skill === undefined ? 'MOD_WF_RESTOCK_NO_SKILL' : 'MOD_WF_RESTOCK_NO_INPUTS', { skill: skill === undefined ? '' : hiring.skillName(skill) });
+    if (guard && onHaul(folk)) {
+      const reason = hiring.refusal?.('staff', { action: 'restock', folk }) ?? '';
+      if (reason !== '') {
+        if (!quiet) game.notifications.createErrorNotification('worker_folks:restock', reason);
+        return { ok: false, why: 'refused' };
+      }
+    }
+    if (perAction.length === 0) return skill === undefined ? fail('noSkill', 'MOD_WF_RESTOCK_NO_SKILL') : fail('noInputs', 'MOD_WF_RESTOCK_NO_INPUTS', { skill: hiring.skillName(skill) });
     const item = (id) => game.items.getObjectByID(id);
     const plan = model.restockPlan({ perAction, intervalMs, freeMs: capOf(folk) - model.usedMs(folk.room), bankQty: (id) => game.bank.getQty(item(id)), maxActions });
-    if (plan.actions === 0) return plan.short === null ? fail('MOD_WF_RESTOCK_NO_ROOM') : fail('MOD_WF_RESTOCK_NO_BANK', { item: item(plan.short)?.name ?? plan.short });
+    if (plan.actions === 0) return plan.short === null ? fail('noRoom', 'MOD_WF_RESTOCK_NO_ROOM') : fail('noBank', 'MOD_WF_RESTOCK_NO_BANK', { item: item(plan.short)?.name ?? plan.short });
     plan.items.forEach(({ id, qty, ms }) => {
       // false: an item keeps its charges on the way out of the bank, as gear does.
       game.bank.removeItemQuantity(item(id), qty, false);
@@ -318,11 +524,41 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     });
     dry.delete(folk.id);
     const hours = (plan.actions * intervalMs) / 3_600_000;
-    game.notifications.createSuccessNotification('worker_folks:restock', templateLangString('MOD_WF_RESTOCK_DONE', { name: folk.name, hours: hoursOf(hours), items: itemsText(plan.items) }), hiring.portrait?.(folk.tier));
+    if (!quiet) game.notifications.createSuccessNotification('worker_folks:restock', templateLangString('MOD_WF_RESTOCK_DONE', { name: folk.name, hours: hoursOf(hours), items: itemsText(plan.items) }), hiring.portrait?.(folk.tier));
     log(`room: ${folk.name} restocked ${plan.actions} actions (${hours.toFixed(2)} h)`);
     startAfterRestock(folk, skill);
     hiring.renderQueue.folks = true;
-    return true;
+    touch(folk);
+    return { ok: true, actions: plan.actions, items: plan.items.map(({ id, qty }) => ({ itemId: id, qty })) };
+  };
+  /** The card's Restock: true when something was restocked. */
+  const restock = (folk, maxActions = Infinity) => restockResult(folk, maxActions).ok;
+
+  /** restockPlan (API v10): what a Restock would take now. { items: [{ itemId, qty, have }], freeMs, actions }. */
+  const restockPlanOf = (folk) => {
+    if (folk?.room === undefined) return undefined;
+    const { perAction, intervalMs } = inputsOf(folk);
+    const freeMs = Math.max(0, capOf(folk) - model.usedMs(folk.room));
+    const have = (id) => game.bank.getQty(game.items.getObjectByID(id));
+    const plan = model.restockPlan({ perAction, intervalMs, freeMs, bankQty: have });
+    return Object.freeze({ items: Object.freeze(plan.items.map(({ id, qty }) => Object.freeze({ itemId: id, qty, have: have(id) }))), freeMs, actions: plan.actions });
+  };
+
+  /** room (API v10): everything the room holds and its state, frozen; undefined for no Folk. */
+  const roomOf = (folk) => {
+    if (folk?.room === undefined) return undefined;
+    const side = (s) => Object.freeze(model.entries(folk.room, s).map(({ id, qty, ms }) => Object.freeze({ itemId: id, qty, ms })));
+    const full = isFull(folk);
+    return Object.freeze({
+      sizeMs: capOf(folk),
+      usedMs: model.usedMs(folk.room),
+      haul: side('haul'),
+      stock: side('stock'),
+      town: side('town'),
+      purse: Object.freeze(model.purseEntries(folk.room).map(({ id, amount }) => Object.freeze({ currencyId: id, amount }))),
+      state: model.stateOf({ full, dry: !full && isDry(folk) }),
+      access: accessOf(folk),
+    });
   };
 
   /**
@@ -331,7 +567,7 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
    * undefined while the Folk works from your bank or its skill takes no inputs.
    */
   const restockView = (folk) => {
-    if (folk?.ownStock !== true || folk.room === undefined) return undefined;
+    if (!usesStock(folk)) return undefined;
     const { perAction, intervalMs } = inputsOf(folk);
     if (perAction.length === 0 || !(intervalMs > 0)) return undefined;
     const usedMs = model.usedMs(folk.room);
@@ -348,10 +584,14 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
       fullText: time.hoursText(capMs / 3_600_000),
       percentAt: (n) => (capMs > 0 ? Math.min(100, ((n * intervalMs) / capMs) * 100) : 0),
       usedPercent: capMs > 0 ? Math.min(100, (usedMs / capMs) * 100) : 0,
-      costText: (n) => templateLangString('MOD_WF_RESTOCK_COST', {
-        hours: hoursOf((n * intervalMs) / 3_600_000),
-        items: itemsText(perAction.map(({ id, qty }) => ({ id, qty: qty * n }))),
-      }),
+      // What `n` actions take (build .216): a short label, then the items as tiles; one the bank can't cover red.
+      costLabel: (n) => templateLangString('MOD_WF_RESTOCK_COST', { hours: hoursOf((n * intervalMs) / 3_600_000) }),
+      costTiles: (n) => itemTiles(perAction.map(({ id, qty }) => {
+        const need = qty * n;
+        const have = game.bank.getQty(game.items.getObjectByID(id));
+        return have < need ? { id, qty: need, have } : { id, qty: need };
+      }), { small: true }),
+      tipTiles,
       bankText: plan.actions < space ? templateLangString('MOD_WF_RESTOCK_BANK_SHORT', { hours: hoursOf((plan.actions * intervalMs) / 3_600_000) }) : '',
     };
   };
@@ -385,24 +625,35 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     cardView(folk) {
       if (folk?.room === undefined) return undefined;
       const full = isFull(folk);
-      const stockOn = folk.ownStock === true;
+      const haul = onHaul(folk);
+      const stockOn = usesStock(folk);
       const noStock = model.isEmpty(folk.room, 'stock');
       const noTown = model.isEmpty(folk.room, 'town');
-      if (model.isEmpty(folk.room) && noStock && noTown && !full && !stockOn) return undefined;
+      const purse = model.purseEntries(folk.room);
+      if (model.isEmpty(folk.room) && noStock && noTown && purse.length === 0 && !full && !stockOn && !haul) return undefined;
       const out = !full && isDry(folk);
       const fill = model.fillView(folk.room, capOf(folk));
+      // Each part a short label, then its items; an empty part says so on its label's line (build .208).
       const lines = [];
-      if (stockOn || !noStock) lines.push(getLangString('MOD_WF_ROOM_TIP_STOCK'), ...tipLines(folk, 'stock'));
+      const part = (key, side) => {
+        const items = tipLines(folk, side);
+        lines.push(getLangString(items.length === 0 ? `${key}_EMPTY` : key), ...items);
+      };
+      if (stockOn || !noStock) part('MOD_WF_ROOM_TIP_STOCK', 'stock');
       if (!noTown) lines.push(getLangString('MOD_WF_ROOM_TIP_TOWN'), ...tipLines(folk, 'town'));
-      if (!model.isEmpty(folk.room) || (!stockOn && noTown)) lines.push(getLangString('MOD_WF_ROOM_TIP'), ...tipLines(folk, 'haul'));
+      if (!model.isEmpty(folk.room) || (!stockOn && noTown) || haul) part(haul ? 'MOD_WF_ROOM_TIP_HAUL' : 'MOD_WF_ROOM_TIP', 'haul');
+      if (purse.length > 0) lines.push(getLangString('MOD_WF_ROOM_TIP_PURSE'), ...purse.map(({ id, amount }) => {
+        const currency = game.currencies?.getObjectByID(id);
+        return { text: `${currency?.name ?? id} ×${numberWithCommas(Math.floor(amount))}` };
+      }));
       const text = templateLangString('MOD_WF_CARD_ROOM', { used: hoursOf(fill.usedHours), cap: time.hoursText(fill.capHours) });
       return {
         percent: fill.percent,
         full,
         out,
         text,
-        status: full ? getLangString('MOD_WF_CARD_ROOM_FULL') : out ? getLangString('MOD_WF_CARD_ROOM_DRY') : '',
-        why: full ? getLangString('MOD_WF_CARD_ROOM_FULL_WHY') : out ? text : '',
+        status: full ? getLangString(haul ? 'MOD_WF_CARD_HAUL_FULL' : 'MOD_WF_CARD_ROOM_FULL') : out ? getLangString('MOD_WF_CARD_ROOM_DRY') : '',
+        why: full ? getLangString(haul ? 'MOD_WF_CARD_HAUL_FULL_WHY' : 'MOD_WF_CARD_ROOM_FULL_WHY') : out ? text : '',
         tip: lines,
         restock: stockOn ? { text: getLangString('MOD_WF_BUTTON_RESTOCK'), tip: [getLangString('MOD_WF_RESTOCK_TIP')], attention: out } : undefined,
       };
@@ -412,6 +663,9 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
      * home or loses; while off on a skill without inputs (gathering), why it can't be switched on.
      */
     ownStockView(folk) {
+      if (folk !== undefined && onHaul(folk)) {
+        return { on: true, disabled: true, text: getLangString('MOD_WF_SWITCH_OWN_STOCK'), tip: [getLangString('MOD_WF_OWN_STOCK_TIP')], note: getLangString('MOD_WF_OWN_STOCK_AWAY'), noteLost: false };
+      }
       const on = folk?.ownStock === true;
       const lost = on ? stockSplit(folk).lost : [];
       const skill = folk === undefined ? undefined : hiring.skillOf(folk);
@@ -426,7 +680,42 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
         noteLost: lost.length > 0,
       };
     },
+    setRestockAt,
+    toggleAutoRestock,
+    /**
+     * The card's Auto-restock switch, under Own stock once Hiring 75 unlocks it: on or off, its line and the lines that
+     * fit the room. On the haul it shows greyed while on (it waits for a bank); undefined where it has nothing to do.
+     */
+    autoRestockView(folk) {
+      if (folk === undefined || hiring.levels?.autoRestock?.() !== true) return undefined;
+      const on = folk.restockAt !== null;
+      const away = onHaul(folk);
+      if (away ? !on : folk.ownStock !== true) return undefined;
+      if (inputsOf(folk).perAction.length === 0) return undefined;
+      const capHours = capOf(folk) / 3_600_000;
+      const lines = model.restockAtOptions(capHours);
+      // A line saved for a bigger room (a bag taken off) shows as the largest that still fits; the tick uses the saved one.
+      const at = on ? (lines.includes(folk.restockAt) ? folk.restockAt : lines[lines.length - 1]) : model.defaultRestockAt(capHours);
+      return {
+        on,
+        disabled: away,
+        text: getLangString('MOD_WF_SWITCH_AUTO_RESTOCK'),
+        sub: getLangString(away ? 'MOD_WF_AUTO_RESTOCK_AWAY' : on ? 'MOD_WF_AUTO_RESTOCK_ON' : 'MOD_WF_AUTO_RESTOCK_OFF'),
+        tip: [getLangString('MOD_WF_AUTO_RESTOCK_TIP')],
+        pickLabel: getLangString('MOD_WF_AUTO_RESTOCK_AT'),
+        at,
+        lines: lines.map((h) => ({ value: h, text: lineText(h) })),
+      };
+    },
     empty,
+    accessOf,
+    onHaul,
+    refreshAccess,
+    collect,
+    emptyToBank,
+    roomOf,
+    restockPlanOf,
+    restockResult,
     /** How many of these items (a commission's) the room's town side holds. */
     townQty(folk, ids) {
       return folk?.room === undefined ? 0 : ids.reduce((sum, id) => sum + model.qtyOf(folk.room, id, 'town'), 0);
@@ -474,7 +763,8 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
       return true;
     }
     const ignoreSpace = rest[2] === true;
-    if (!ignoreSpace && Number.isInteger(quantity) && !bankTakes(this, item) && hold(acting, item, quantity)) {
+    const haul = folk?.room !== undefined && onHaul(folk);
+    if (Number.isInteger(quantity) && (haul || (!ignoreSpace && !bankTakes(this, item))) && hold(acting, item, quantity)) {
       made(acting, item, quantity, true);
       return true;
     }
@@ -482,6 +772,18 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     if (added) made(acting, item, quantity, false);
     return added;
   });
+
+  // The haul's purse: what a Folk on the haul earns waits there (Thieving's GP, Alt. Magic, other mods' currencies).
+  if (typeof Currency === 'function' && typeof Currency.prototype.add === 'function') {
+    ctx.patch(Currency, 'add').replace(function (original, amount, ...rest) {
+      const folk = hiring?.acting?.folk;
+      if (folk?.room === undefined || !(Number.isFinite(amount) && amount > 0) || !onHaul(folk)) return original(amount, ...rest);
+      model.putPurse(folk.room, this.id, amount);
+      touch(folk);
+      hiring.renderQueue.folks = true;
+      return undefined;
+    });
+  }
 
   // Own stock: a recipe's item costs read and spend the Folk's stock; its currency costs stay yours.
   ctx.patch(Costs, 'checkIfOwned').replace(function (original) {
@@ -495,7 +797,7 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
   ctx.patch(Costs, 'consumeCosts').replace(function (original) {
     const acting = hiring?.acting;
     const folk = acting?.folk;
-    if (folk?.ownStock !== true || folk.room === undefined) return original();
+    if (!usesStock(folk)) return original();
     // The game's own spending for the currencies, the items left out of it.
     const items = this._items;
     this._items = new Map();
@@ -508,6 +810,7 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     items.forEach((qty, item) => {
       if (qty > 0 && model.take(folk.room, item.id, qty, 'stock').qty < qty) short = true;
     });
+    touch(folk);
     // Cartography's paper making never checks its logs before it spends them: a stock that falls short stops the Folk.
     if (short) {
       markDry(folk);
@@ -562,13 +865,36 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     if (hiring === undefined || this.isGolbinRaid) return;
     ticks += 1;
     if (ticks % CHECK_TICKS !== 0) return;
-    hiring.crew.all.forEach((folk) => { if (!model.isEmpty(folk.room)) empty(folk); });
+    hiring.crew.all.forEach((folk) => {
+      const haul = onHaul(folk);
+      // A Folk on the haul keeps its goods until collected: only the bank's own buffer empties on its own.
+      if (!haul && !model.isEmpty(folk.room)) empty(folk);
+      if (haul) standby(folk);
+      else autoRestock(folk);
+      if (changed.has(folk.id)) emitChanged(folk);
+    });
   });
+
+  /**
+   * Standby wages (the haul, API v10): a Folk on the haul that its room stopped ("Haul full" or "Out of inputs") with its
+   * skill still held pays its wage for the time it stands, a second at each look, through payroll's charge for time (a
+   * run's). The stop is known for this session only: after a load such a Folk pays again once it has tried to work.
+   */
+  const standby = (folk) => {
+    if (folk.skillId === null || folk.onStrike) return;
+    const skill = hiring.skillOf(folk);
+    if (skill === undefined || hiring.delegated.has(skill)) return;
+    // Only a stop the room made (this session): a Folk you stopped yourself costs nothing.
+    if (!blocked.has(folk.id) && !dry.has(folk.id)) return;
+    hiring.payroll?.chargeTime?.(folk, skill, CHECK_TICKS * TICK_INTERVAL);
+  };
 
   ctx.onCharacterLoaded(() => {
     blocked.clear();
     told.clear();
     dry.clear();
+    access.clear();
+    changed.clear();
     // A recipe skill out of inputs stops with the game's "not enough materials" toast; for a Folk working from its
     // own stock it says whose stock ran dry and that Restock fixes it, and the card shows "Out of inputs".
     const queue = game.combat?.notifications;
@@ -577,7 +903,7 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
       queue.add = (n) => {
         const acting = hiring.acting;
         const folk = acting?.folk;
-        if (folk?.ownStock === true && n?.type === 'Player' && n.args?.[0] === acting.skill && n.args?.[2] === 'danger') {
+        if (usesStock(folk) && n?.type === 'Player' && n.args?.[0] === acting.skill && n.args?.[2] === 'danger') {
           markDry(folk);
           return add({ ...n, args: [n.args[0], templateLangString('MOD_WF_DRY_NOTICE', { name: folk.name, skill: hiring.skillName(acting.skill) }), n.args[2]] });
         }
@@ -594,6 +920,8 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
       notify(templateLangString('MOD_WF_ROOM_LOST_NOTICE', { name: folk.name, items: itemsText(lost) }));
     });
     hiring.events.on('folkStarted', ({ folk } = {}) => { if (folk !== undefined) dry.delete(folk.id); });
+    // A Folk that moved may now stand by a bank, or away from one: ask the haul's hook again.
+    hiring.events.on('folkMoved', ({ folk } = {}) => { if (folk !== undefined) refreshAccess(folk); });
     // A bag put on or taken off changes the room's size.
     hiring.events.on('loadoutChanged', () => { hiring.renderQueue.folks = true; });
     log('Folk rooms ready');

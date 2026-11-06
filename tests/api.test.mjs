@@ -51,7 +51,7 @@ test('api: version, read-only views, places and travel with a folkMoved event', 
   assert.equal(api.version, API_VERSION);
   const folk = hiring.crew.hire('Junior');
   const v = api.folkById(folk.id);
-  assert.deepEqual(v, { id: folk.id, name: folk.name, tier: 'Junior', slot: 0, skillId: null, status: 'idle', place: null, travel: 'idle', hp: null, maxHp: undefined, portrait: undefined, traits: [] });
+  assert.deepEqual(v, { id: folk.id, name: folk.name, tier: 'Junior', slot: 0, skillId: null, status: 'idle', place: null, travel: 'idle', hp: null, maxHp: undefined, portrait: undefined, traits: [], mastery: undefined });
   assert.ok(Object.isFrozen(v));
   assert.equal(api.folkById('nobody'), undefined);
 
@@ -390,4 +390,60 @@ test('api v8: without the backup module, with the mod off or before the skill ex
   assert.deepEqual(await api.backup(), unavailable);
   module = { backup: async () => ({ ok: true, code: 'c' }) };
   assert.equal((await api.backup()).code, 'c');
+});
+
+test('api v10: mastery in the view, qualifies, and the haul calls go to the room module', () => {
+  const { hiring } = makeHiring();
+  const skill = { id: 'melvorD:Mining', name: 'Mining' };
+  hiring.delegableSkills = [skill];
+  hiring.masteryLevelOf = () => 42;
+  hiring.qualification = { check: (folk, s) => ({ ok: s === skill && folk.tier !== 'Newbie', needs: 30 }) };
+  const calls = [];
+  const fakeRoom = {
+    refreshAccess: (folk) => calls.push(['refresh', folk?.id]),
+    accessOf: (folk) => (hiring.accessHook === undefined ? 'bank' : hiring.accessHook(folk)),
+    roomOf: (folk) => ({ id: folk.id }),
+    collect: (folk) => ({ collected: folk.id }),
+    restockPlanOf: (folk) => ({ plan: folk.id }),
+    restockResult: (folk, max, opts) => { calls.push(['restock', folk.id, max, opts.guard]); return { ok: true, actions: 3, items: [] }; },
+    emptyToBank: (folk, opts) => { calls.push(['empty', folk.id, opts.inputs]); return { items: [], left: [], purse: [] }; },
+  };
+  const api = createApi({ getHiring: () => hiring, model });
+  assert.equal(api.version, 10);
+  const junior = hiring.crew.hire('Junior');
+  const newbie = hiring.crew.hire('Newbie');
+  assert.equal(api.folkById(junior.id).mastery, 42);
+  assert.deepEqual(api.qualifies(junior.id, 'melvorD:Mining'), { ok: true, needs: 30 });
+  assert.deepEqual(api.qualifies(newbie.id, 'melvorD:Mining'), { ok: false, needs: 30 });
+  assert.equal(api.qualifies('nobody', 'melvorD:Mining'), undefined);
+  assert.equal(api.qualifies(junior.id, 'melvorD:Nope'), undefined);
+
+  // Registered before the room module is there (either load order): the hook waits on the skill.
+  const seen = [];
+  const off = api.registerBankAccess((view) => { seen.push(view); return view.tier === 'Junior' ? 'room' : 'bank'; });
+  assert.equal(typeof hiring.accessHook, 'function');
+  assert.equal(api.room(junior.id), undefined, 'no room module yet');
+  hiring.room = fakeRoom;
+  assert.equal(api.accessOf(junior.id), 'room');
+  assert.equal(api.accessOf(newbie.id), 'bank');
+  assert.ok(Object.isFrozen(seen[0]), 'the hook gets views');
+  assert.deepEqual(api.room(junior.id), { id: junior.id });
+  assert.deepEqual(api.collect(junior.id), { collected: junior.id });
+  assert.deepEqual(api.restockPlan(junior.id), { plan: junior.id });
+  assert.equal(api.restock(junior.id, { maxActions: 5 }).actions, 3);
+  assert.deepEqual(calls.at(-1), ['restock', junior.id, 5, false], 'the API caller is the guard');
+  assert.equal(api.collect('nobody'), undefined);
+  api.emptyToBank(junior.id, { inputs: true });
+  assert.deepEqual(calls.at(-1), ['empty', junior.id, true]);
+  const all = api.emptyToBank();
+  assert.deepEqual(all.map((r) => r.id), [junior.id, newbie.id]);
+  api.refreshBankAccess(junior.id);
+  assert.deepEqual(calls.at(-1), ['refresh', junior.id]);
+  api.refreshBankAccess();
+  assert.deepEqual(calls.at(-1), ['refresh', undefined]);
+  assert.throws(() => api.registerBankAccess('room'));
+  off();
+  assert.equal(hiring.accessHook, undefined);
+  assert.equal(api.accessOf(junior.id), 'bank');
+  assert.deepEqual(calls.at(-1), ['refresh', undefined], 'removing the hook asks every Folk again');
 });

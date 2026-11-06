@@ -28,6 +28,9 @@ export function install({ model }) {
     el.classList.remove('wf-dream-in');
     void el.offsetWidth; // restart the fade
     el.classList.add('wf-dream-in');
+    // The fade plays once: the card's measuring hides and shows the daydream on every redraw, which would replay it
+    // (build .204).
+    el.addEventListener('animationend', () => el.classList.remove('wf-dream-in'), { once: true });
   }
 
   setInterval(() => {

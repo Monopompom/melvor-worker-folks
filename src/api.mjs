@@ -3,7 +3,7 @@
 // Pure: the Hiring skill and the Folk model are injected (mod modules cannot import their siblings).
 
 /** Bumped when something here changes in a way a caller must know about. Voyage refuses an older one. */
-export const API_VERSION = 9;
+export const API_VERSION = 10;
 /** The least of the hire price an outside hire pays (v7): a bargain, never a free Folk. */
 export const HIRE_SHARE_MIN = 0.25;
 
@@ -29,9 +29,10 @@ const placeCopy = (place) => (place === null || place === undefined ? null : Obj
 /**
  * A read-only view of a Folk. `hp` null means full health; `maxHp` (v3) is undefined where health isn't known;
  * `portrait` (build .124) is the URL of its rank's picture, as on its card; `traits` (v5) the ids of the traits it
- * holds (a trait waiting for a slot does nothing, so it isn't listed).
+ * holds (a trait waiting for a slot does nothing, so it isn't listed); `mastery` (v10) its Hiring mastery level, 1 to
+ * 99, where known. A Folk has no skill levels of its own: it works every skill at your level.
  */
-export function folkView(folk, status, maxHp, portrait) {
+export function folkView(folk, status, maxHp, portrait, mastery) {
   return Object.freeze({
     id: folk.id,
     name: folk.name,
@@ -45,6 +46,7 @@ export function folkView(folk, status, maxHp, portrait) {
     maxHp,
     portrait,
     traits: Object.freeze((folk.traitState?.traits ?? []).map((t) => t.id)),
+    mastery,
   });
 }
 
@@ -84,7 +86,13 @@ function viewPayload(payload, view) {
 export function createApi({ getHiring, model, pricing, rules, getBackup, version = API_VERSION }) {
   const { normalizePlace, TRAVEL } = model;
   const hiring = () => getHiring();
-  const view = (folk) => folkView(folk, hiring().statusOf(folk), hiring().health?.maxHpOf(folk), hiring().portrait?.(folk.tier));
+  const view = (folk) => folkView(folk, hiring().statusOf(folk), hiring().health?.maxHpOf(folk), hiring().portrait?.(folk.tier), hiring().masteryLevelOf?.(folk));
+  /** The room's calls (v10) go to room.mjs; an unknown Folk, or no room module, answers undefined. */
+  const roomCall = (id, fn) => {
+    const folk = record(id);
+    const room = hiring().room;
+    return folk === undefined || room === undefined ? undefined : fn(room, folk);
+  };
   const skillById = (skillId) => hiring().delegableSkills.find((s) => s.id === skillId);
   const record = (id) => hiring().crew.byId(id);
   /** `hire`'s checks, in its order; the price a share of the Shop's, never under HIRE_SHARE_MIN of it. */
@@ -310,6 +318,80 @@ export function createApi({ getHiring, model, pricing, rules, getBackup, version
      * 'failed': it broke part way and nothing was saved, so reload without saving.
      */
     restore: (code) => backupCall('restore', code),
+    /**
+     * Whether a Folk may work a skill now (v10): { ok, needs }, `needs` the level of yours its tier asks for (Alt.
+     * Magic: Magic), standard levels only; with the Qualification setting off, ok is always true. undefined for an
+     * unknown Folk or skill.
+     */
+    qualifies: (id, skillId) => {
+      const folk = record(id);
+      const skill = skillById(skillId);
+      const q = folk === undefined || skill === undefined ? undefined : hiring().qualification?.check(folk, skill);
+      return q === undefined ? undefined : Object.freeze({ ok: q.ok, needs: q.needs });
+    },
+    /**
+     * The haul (v10). fn(folkView) answers where that Folk's goods go: 'bank' (as today) or 'room' (everything it makes
+     * waits in its room and its purse, its inputs come only from its stock; it stops "Haul full" or "Out of inputs" and
+     * its wages keep running while stopped). Anything else reads 'bank'. One hook at a time; none means 'bank' for
+     * every Folk. The answer is kept per Folk and asked again on folkMoved, a load and refreshBankAccess(). Returns
+     * the function that removes it.
+     */
+    registerBankAccess: (fn) => {
+      if (typeof fn !== 'function') throw new Error('bank access must be a function');
+      const h = hiring();
+      // Kept on the skill, as the location text is, so it holds whichever mod loads first; room.mjs reads it.
+      const hook = (folk) => fn(view(folk));
+      h.accessHook = hook;
+      h.room?.refreshAccess();
+      return () => {
+        if (h.accessHook !== hook) return;
+        h.accessHook = undefined;
+        h.room?.refreshAccess();
+      };
+    },
+    /** Asks the haul's hook again for one Folk (by id) or every Folk: call when its answer may change without a move. */
+    refreshBankAccess: (id) => {
+      const room = hiring().room;
+      if (room === undefined) return;
+      if (id === undefined) room.refreshAccess();
+      else if (record(id) !== undefined) room.refreshAccess(record(id));
+    },
+    /** 'bank' or 'room' for this Folk now (v10), undefined for an unknown Folk. */
+    accessOf: (id) => roomCall(id, (room, folk) => room.accessOf(folk)),
+    /**
+     * A Folk's room (v10), frozen: { sizeMs, usedMs, haul, stock, town, purse, state, access }. haul / stock / town are
+     * [{ itemId, qty, ms }] (town: a Township commission's goods, not yours to move), purse [{ currencyId, amount }],
+     * state 'ok' | 'full' | 'dry', access 'bank' | 'room'.
+     */
+    room: (id) => roomCall(id, (room, folk) => room.roomOf(folk)),
+    /**
+     * Collects a Folk's room (v10): what it made and its purse go to your bank (found, as new items are) and your
+     * currencies, and, while its own-stock switch is off, stock its current recipe can't use. A "Haul full" Folk with
+     * space again starts again. { items: [{ itemId, qty }], left: [...] (no free bank slot: still held), purse:
+     * [{ currencyId, amount }] }.
+     */
+    collect: (id) => roomCall(id, (room, folk) => room.collect(folk)),
+    /** What a Restock would take from your bank now (v10): { items: [{ itemId, qty, have }], freeMs, actions }. */
+    restockPlan: (id) => roomCall(id, (room, folk) => room.restockPlanOf(folk)),
+    /**
+     * Restocks a Folk's free room with its current recipe's inputs from your bank (v10), at most `maxActions`
+     * actions' worth, and starts an "Out of inputs" Folk again. { ok: true, actions, items: [{ itemId, qty }] } or
+     * { ok: false, why: 'noStock' | 'noSkill' | 'noInputs' | 'noRoom' | 'noBank' }. Not asked of the staff guards: the
+     * caller is the guard.
+     */
+    restock: (id, { maxActions = Infinity } = {}) => roomCall(id, (room, folk) => Object.freeze(room.restockResult(folk, maxActions, { guard: false }))),
+    /**
+     * Empties a Folk's room to the bank (v10), or every Folk's with no id: its haul and purse, and its stock unless its
+     * own-stock switch is on (`inputs: true` sends that stock too). A commission's goods stay. With an id:
+     * { items, left, purse } as collect; without: [{ id, items, left, purse }].
+     */
+    emptyToBank: (id, { inputs = false } = {}) => {
+      const room = hiring().room;
+      if (room === undefined) return undefined;
+      if (id === undefined || id === null) return Object.freeze(hiring().crew.all.map((folk) => Object.freeze({ id: folk.id, ...room.emptyToBank(folk, { inputs }) })));
+      const folk = record(id);
+      return folk === undefined ? undefined : room.emptyToBank(folk, { inputs });
+    },
     /** Asks for the guarded buttons and the Shop's lines to be drawn again (call after the player moves). */
     refresh: () => hiring().refreshGuarded(),
   });

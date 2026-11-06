@@ -176,6 +176,8 @@ export function heldBy(record) {
       for (const side of ['haul', 'stock', 'town']) {
         if (isObj(f.room[side])) for (const [id, e] of Object.entries(f.room[side])) if (isObj(e)) bump(items, id, e.qty);
       }
+      // The haul's purse (save v9): currencies a Folk earned away from a bank, not yet collected.
+      if (isObj(f.room.purse)) for (const [id, n] of Object.entries(f.room.purse)) bump(currencies, id, n);
     }
   }
   if (isObj(root?.reserve)) for (const [id, n] of Object.entries(root.reserve)) bump(currencies, id, n);

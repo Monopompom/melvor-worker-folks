@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ROOM_HOURS, BAG_HOURS, BAG_SHARE, BAG_RECIPES, bagHours, bagRange, bagPackage, capacityMs, isEmpty, usedMs, fits, put, take, qtyOf, entries, stockCovers, restockPlan, fillView, splitForBank } from '../src/room-model.mjs';
+import { ROOM_HOURS, BAG_HOURS, BAG_SHARE, BAG_RECIPES, bagHours, bagRange, bagPackage, capacityMs, isEmpty, usedMs, fits, put, take, qtyOf, entries, stockCovers, restockPlan, fillView, splitForBank, ACCESS, normalizeAccess, stateOf, putPurse, purseEntries, takePurse, leftoverIds, stockHours, restockDue, restockAtOptions, defaultRestockAt } from '../src/room-model.mjs';
 import { FOLK_OWN_ITEMS, isFolkGear } from '../src/loadout-model.mjs';
 import { TIERS, createRoom, normalizeRoom } from '../src/folk.mjs';
 
@@ -53,11 +53,11 @@ test('entries list the biggest share of work first', () => {
 });
 
 test('normalizeRoom keeps good stacks and drops the rest', () => {
-  assert.deepEqual(normalizeRoom(undefined), { haul: {}, stock: {}, town: {} });
-  assert.deepEqual(normalizeRoom({ haul: [1] }), { haul: {}, stock: {}, town: {} });
+  assert.deepEqual(normalizeRoom(undefined), { haul: {}, stock: {}, town: {}, purse: {} });
+  assert.deepEqual(normalizeRoom({ haul: [1] }), { haul: {}, stock: {}, town: {}, purse: {} });
   const room = normalizeRoom({ haul: { a: { qty: 3, ms: 900 }, b: { qty: 0, ms: 5 }, c: { qty: 2, ms: -1 }, d: null, e: { qty: 'x' } } });
-  assert.deepEqual(room, { haul: { a: { qty: 3, ms: 900 }, c: { qty: 2, ms: 0 } }, stock: {}, town: {} });
-  assert.deepEqual(normalizeRoom({ stock: { a: { qty: 5, ms: 10 }, b: { qty: 1.5 } } }), { haul: {}, stock: { a: { qty: 5, ms: 10 } }, town: {} });
+  assert.deepEqual(room, { haul: { a: { qty: 3, ms: 900 }, c: { qty: 2, ms: 0 } }, stock: {}, town: {}, purse: {} });
+  assert.deepEqual(normalizeRoom({ stock: { a: { qty: 5, ms: 10 }, b: { qty: 1.5 } } }), { haul: {}, stock: { a: { qty: 5, ms: 10 } }, town: {}, purse: {} });
 });
 
 test('fillView gives hours and a percent capped at 100', () => {
@@ -187,4 +187,63 @@ test('the town side holds a commission\'s goods: it takes room like the rest and
   assert.deepEqual(take(room, 'oak', 40, 'town'), { qty: 40, ms: 240_000 });
   assert.equal(usedMs(room), 360_000);
   assert.deepEqual(entries(room, 'town'), [{ id: 'oak', qty: 60, ms: 360_000 }]);
+});
+
+test('haul access: only "room" reads as the room, anything else is the bank', () => {
+  assert.deepEqual(ACCESS, ['bank', 'room']);
+  assert.equal(normalizeAccess('room'), 'room');
+  for (const odd of ['bank', 'Room', 'depot:1', undefined, null, 3, {}]) assert.equal(normalizeAccess(odd), 'bank');
+  assert.equal(stateOf(), 'ok');
+  assert.equal(stateOf({ dry: true }), 'dry');
+  assert.equal(stateOf({ full: true, dry: true }), 'full', 'full wins');
+});
+
+test('the purse adds up, lists the biggest first, empties on take and refuses odd amounts', () => {
+  const room = createRoom();
+  putPurse(room, 'melvorD:GP', 500);
+  putPurse(room, 'melvorD:GP', 250);
+  putPurse(room, 'melvorItA:AbyssalPieces', 900);
+  for (const [id, n] of [['melvorD:GP', 0], ['melvorD:GP', -5], ['melvorD:GP', NaN], ['melvorD:GP', Infinity], ['', 5], [7, 5]]) putPurse(room, id, n);
+  assert.deepEqual(purseEntries(room), [{ id: 'melvorItA:AbyssalPieces', amount: 900 }, { id: 'melvorD:GP', amount: 750 }]);
+  assert.equal(usedMs(room), 0, 'a purse takes no room');
+  assert.deepEqual(takePurse(room).map((e) => e.id), ['melvorItA:AbyssalPieces', 'melvorD:GP']);
+  assert.deepEqual(room.purse, {});
+  assert.deepEqual(purseEntries(undefined), []);
+  const old = { haul: {}, stock: {}, town: {} };
+  putPurse(old, 'melvorD:GP', 1);
+  assert.deepEqual(old.purse, { 'melvorD:GP': 1 }, 'a room from before v9 gets a purse');
+});
+
+test('leftovers: stock the current recipe does not use, sorted', () => {
+  const room = createRoom();
+  put(room, 'coal', 10, 100, 'stock');
+  put(room, 'iron', 10, 100, 'stock');
+  put(room, 'runite', 2, 50, 'stock');
+  put(room, 'logs', 5, 10);
+  assert.deepEqual(leftoverIds(room, ['iron', 'coal']), ['runite']);
+  assert.deepEqual(leftoverIds(room, []), ['coal', 'iron', 'runite']);
+  assert.deepEqual(leftoverIds(createRoom(), ['x']), []);
+});
+
+test('auto-restock is due below its hours, with space for an action, and never when off', () => {
+  const room = createRoom();
+  put(room, 'coal', 10, 0.5 * H, 'stock');
+  assert.equal(stockHours(room), 0.5);
+  assert.equal(restockDue({ room, atHours: 1, capMs: 2 * H, intervalMs: 3000 }), true);
+  assert.equal(restockDue({ room, atHours: 0.5, capMs: 2 * H, intervalMs: 3000 }), false, 'at the line: not yet');
+  assert.equal(restockDue({ room, atHours: null, capMs: 2 * H, intervalMs: 3000 }), false);
+  assert.equal(restockDue({ room, atHours: 0, capMs: 2 * H, intervalMs: 3000 }), false);
+  assert.equal(restockDue({ room, atHours: 1, capMs: 2 * H, intervalMs: 0 }), false);
+  put(room, 'bars', 1, 1.5 * H - 1000);
+  assert.equal(restockDue({ room, atHours: 1, capMs: 2 * H, intervalMs: 3000 }), false, 'no space for one more action');
+});
+
+test('auto-restock lines fit below the room, and start within a quarter of it', () => {
+  assert.deepEqual(restockAtOptions(2), [0.25, 0.5, 1]);
+  assert.deepEqual(restockAtOptions(12), [0.25, 0.5, 1, 2, 3, 4, 6, 8]);
+  assert.deepEqual(restockAtOptions(0.2), [0.25], 'never an empty list');
+  assert.equal(defaultRestockAt(2), 0.5);
+  assert.equal(defaultRestockAt(8), 2);
+  assert.equal(defaultRestockAt(12), 3);
+  assert.equal(defaultRestockAt(0.5), 0.25);
 });

@@ -1,7 +1,7 @@
 // Folk record model, validation and save-root migrations. Pure: no game globals.
 
 export const TIERS = ['Newbie', 'Junior', 'Middle', 'Senior', 'Expert'];
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
 /**
  * A Folk's travel state: 'idle' stays on its place, 'with' goes along with the player, 'walking' is on its way somewhere
  * alone (Voyage, phase 6). Only 'idle' works.
@@ -57,6 +57,8 @@ export function createFolk({ id, slot, tier, name, hiredAt = 0, paid = null }) {
     room: createRoom(),
     /** Work from its own stock: inputs come from its room only, never from your bank (build .152). */
     ownStock: false,
+    /** Auto-restock (v9): refill the stock from your bank when it feeds fewer hours than this; null = off. */
+    restockAt: null,
     /** Hired from your own town (Township Commissions, Trusted): born with the Local trait, for good. */
     townsfolk: false,
     /** What the Folk wants to end its strike, rolled when it began (src/demands-model.mjs); empty off strike. */
@@ -126,6 +128,7 @@ export function normalizeFolk(raw) {
   folk.paid = typeof raw.paid === 'number' && Number.isFinite(raw.paid) && raw.paid >= 0 ? raw.paid : null;
   folk.room = normalizeRoom(raw.room);
   folk.ownStock = raw.ownStock === true;
+  folk.restockAt = typeof raw.restockAt === 'number' && Number.isFinite(raw.restockAt) && raw.restockAt > 0 ? raw.restockAt : null;
   folk.townsfolk = raw.townsfolk === true;
   folk.demand = folk.onStrike ? normalizeDemands(raw.demand) : [];
   return folk;
@@ -139,10 +142,11 @@ function savedPick(raw) {
 /**
  * A Folk's room (src/room-model.mjs): { haul: { itemId: { qty, ms } }, stock: { … }, town: { … } }. The haul is what it
  * made and holds for you (ms the work that made the stack), the stock the inputs it works from (ms the work they
- * feed), the town what it made for a Township commission (build .163).
+ * feed), the town what it made for a Township commission (build .163). The purse (v9) holds currencies a Folk earned
+ * while it keeps its haul away from a bank (another mod's haul): { currencyId: amount }; it takes no room.
  */
 export function createRoom() {
-  return { haul: {}, stock: {}, town: {} };
+  return { haul: {}, stock: {}, town: {}, purse: {} };
 }
 
 /** A clean room from whatever the save holds: stacks with whole positive quantities and a time of 0 or more. */
@@ -157,6 +161,12 @@ export function normalizeRoom(raw) {
       room[side][id] = { qty: entry.qty, ms: Number.isFinite(entry.ms) && entry.ms > 0 ? entry.ms : 0 };
     }
   });
+  const purse = raw?.purse;
+  if (purse !== null && typeof purse === 'object' && !Array.isArray(purse)) {
+    for (const [id, amount] of Object.entries(purse)) {
+      if (id !== '' && typeof amount === 'number' && Number.isFinite(amount) && amount > 0) room.purse[id] = amount;
+    }
+  }
   return room;
 }
 
@@ -280,6 +290,12 @@ export const MIGRATIONS = {
     v: 8,
     folks: (Array.isArray(root.folks) ? root.folks : []).map((f) => ({ ...f, room: { haul: {}, stock: {}, ...(f.room ?? {}), town: {} } })),
     commissions: null,
+  }),
+  // v9: a purse in every room (empty) and auto-restock off for every Folk.
+  8: (root) => ({
+    ...root,
+    v: 9,
+    folks: (Array.isArray(root.folks) ? root.folks : []).map((f) => ({ ...f, room: { haul: {}, stock: {}, town: {}, ...(f.room ?? {}), purse: {} }, restockAt: null })),
   }),
 };
 

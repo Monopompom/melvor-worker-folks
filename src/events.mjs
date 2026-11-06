@@ -33,6 +33,11 @@ export const EVENT_NAMES = [
   'commissionRun',
   'commissionDelivered',
   'commissionWithdrawn',
+  // A Folk's room (API v10): it stopped with no space for the next action { folk }; it stopped out of inputs { folk };
+  // what it holds or where its goods go changed { folk } (at most once a second, and at once after a collection).
+  'roomFull',
+  'roomDry',
+  'roomChanged',
 ];
 
 export function createEventBus(names = EVENT_NAMES, { onError } = {}) {

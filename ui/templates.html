@@ -86,7 +86,7 @@
               <div class="wf-restock-label"><span class="wf-restock-up-to"></span><b class="wf-restock-value"></b></div>
               <input type="range" class="wf-restock-range" min="1" max="1" step="1" value="1" />
               <div class="wf-restock-ends"><small class="wf-restock-now"></small><small class="wf-restock-full"></small></div>
-              <small class="d-block wf-subtle wf-restock-cost"></small>
+              <div class="wf-restock-cost"><small class="d-block wf-subtle wf-restock-cost-label"></small><div class="wf-restock-cost-tiles"></div></div>
               <small class="d-block text-warning wf-restock-bank d-none"></small>
               <button type="button" class="btn btn-sm btn-info btn-block mt-2 wf-restock-go"></button>
             </div>
@@ -130,7 +130,7 @@
               <div class="wf-restock-label"><span class="wf-restock-up-to"></span><b class="wf-restock-value"></b></div>
               <input type="range" class="wf-restock-range" min="1" max="1" step="1" value="1" />
               <div class="wf-restock-ends"><small class="wf-restock-now"></small><small class="wf-restock-full"></small></div>
-              <small class="d-block wf-subtle wf-restock-cost"></small>
+              <div class="wf-restock-cost"><small class="d-block wf-subtle wf-restock-cost-label"></small><div class="wf-restock-cost-tiles"></div></div>
               <small class="d-block text-warning wf-restock-bank d-none"></small>
               <button type="button" class="btn btn-sm btn-info btn-block mt-2 wf-restock-go"></button>
             </div>
@@ -145,6 +145,18 @@
               <span class="wf-switch-track" aria-hidden="true"><span class="wf-switch-knob"></span></span>
               <span class="wf-min0"><span class="d-block font-w600" data-wf="own-stock-label"></span><small class="d-block d-none" data-wf="own-stock-note"></small></span>
             </button>
+            <!-- Auto-restock (Hiring 75): the switch, and while on the line it refills below. -->
+            <div class="wf-auto-restock d-none" data-wf="auto-restock">
+              <button type="button" class="wf-switch" role="switch" aria-checked="false" data-wf="auto-restock-switch">
+                <span class="wf-switch-track" aria-hidden="true"><span class="wf-switch-knob"></span></span>
+                <span class="wf-min0"><span class="d-block font-w600" data-wf="auto-restock-label"></span><small class="d-block wf-subtle" data-wf="auto-restock-sub"></small></span>
+              </button>
+              <!-- The game's own dropdown (it has no <select>): the line, and the lines that fit the room. -->
+              <div class="dropdown wf-auto-restock-at d-none" data-wf="auto-restock-at">
+                <button type="button" class="btn btn-sm btn-outline-info dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"></button>
+                <div class="dropdown-menu dropdown-menu-right font-size-sm"></div>
+              </div>
+            </div>
           </div>
         </div>
         <!-- Health on one line: the HP text, its bar, the food. -->

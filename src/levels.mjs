@@ -33,6 +33,8 @@ export function install(ctx, { getHiring, rules, log }) {
     forgetLevel: rules.FORGET_LEVEL,
     apologyLevel: rules.APOLOGY_LEVEL,
     autoRestart: () => rules.autoRestartUnlocked(hiring.level),
+    autoRestock: () => rules.autoRestockUnlocked(hiring.level),
+    autoRestockLevel: rules.AUTO_RESTOCK_LEVEL,
     overtimeWageFactor: () => rules.overtimeWageFactor(hiring.level),
     freeShiftSlots: () => rules.freeShiftSlots(hiring.level),
     wageDiscount: () => rules.levelWageDiscount(hiring.level),

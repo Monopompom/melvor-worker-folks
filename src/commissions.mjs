@@ -120,7 +120,7 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
     }
   };
   const storyTitle = (id) => getLangString(`MOD_WF_STORY_${id}_TITLE`);
-  /** Guild Squares built in Grasslands and what they give the town now (efficiency counted), or null without them. */
+  /** The Guild Square's stages built in Grasslands and what they give the town now (efficiency counted), or null without them. */
   const squares = () => {
     const square = buildingOf(model.SQUARE_ID);
     const biome = township()?.biomes?.getObjectByID(model.HALL_BIOME);
@@ -151,16 +151,8 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
     hiring.renderQueue.folks = true;
   };
   /** With a Hall built: how many Guild Heirlooms the guild holds and what the town makes of the find chance. */
-  const heirloomLine = (h) => {
-    const hl = hiring.heirlooms;
-    if (h === null || h.built <= 0 || hl === undefined) return [];
-    const total = hl.total();
-    const heldCount = total - hl.missing().length;
-    const mult = Math.round(hl.multiplier() * 100) / 100;
-    return [templateLangString(heldCount >= total ? 'MOD_WF_COMM_HEIRLOOMS_ALL' : 'MOD_WF_COMM_HEIRLOOMS', { held: full(heldCount), total: full(total), mult: `${mult}` })];
-  };
 
-  /** Guild Halls built in Grasslands and the wage relief they give now (efficiency counted), or null without them. */
+  /** The Guild Hall's stages built in Grasslands and the wage relief they give now (efficiency counted), or null without them. */
   const halls = () => {
     const hall = hallOf();
     const biome = township()?.biomes?.getObjectByID(model.HALL_BIOME);
@@ -493,6 +485,14 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
     const body = el('div', 'text-left wf-help-body');
     const done = state?.stories.done ?? [];
     const active = state?.stories.active ?? null;
+    // The guild in town first (build .210): its Halls, Squares and Heirlooms now.
+    const guild = guildTiles();
+    if (guild !== null) body.append(guild);
+    // The stories from Honoured, or once one was told.
+    if ((state?.reached ?? 0) < model.STORY_TIER && done.length === 0) {
+      openPopup(body);
+      return;
+    }
     body.append(el('p', 'wf-subtle text-center wf-help-p', templateLangString('MOD_WF_STORY_HISTORY_COUNT', { told: full(done.length), all: full(stories.length) })));
     if (active !== null) {
       const b = el('div', 'wf-band d-flex align-items-center wf-history-row');
@@ -513,6 +513,9 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
       body.append(b);
     });
     if (done.length === 0 && active === null) body.append(el('p', 'wf-subtle text-center wf-help-p', getLangString('MOD_WF_STORY_HISTORY_NONE')));
+    openPopup(body);
+  };
+  const openPopup = (body) => {
     const cls = { popup: 'wf-ui', confirmButton: 'btn btn-success m-1' };
     SwalLocale.fire({
       didRender: popupDidRender,
@@ -597,6 +600,11 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
       ribbon.append(book, marquee('span', 'wf-min0 flex-fill', templateLangString('MOD_WF_STORY_RIBBON', { story: storyTitle(c.story.id), step: full(c.story.step), steps: full(steps) })));
       tips?.set(ribbon, getLangString('MOD_WF_STORY_RIBBON_TIP'));
       card.append(ribbon);
+    } else {
+      // The ribbon's room, shown only in a row with a story card so the asking lines line up (build .210).
+      const pad = el('div', 'mt-1 wf-comm-story wf-comm-story-pad d-none', '\u00a0');
+      pad.setAttribute('aria-hidden', 'true');
+      card.append(pad);
     }
     card.classList.toggle('wf-comm-is-story', c.story !== undefined);
     // The figure's asking line on its own row under the head, the card's full width (a narrow column beside the
@@ -755,9 +763,104 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
     }
     grid.replaceChildren(...nodes);
     tips?.sweep?.();
+    scheduleAlign();
   };
 
-  let lastHallLine = null;
+  /**
+   * Lines the cards of each grid row up (build .210): a row with a story card gives the others its ribbon's room, and
+   * every asking line in the row takes the tallest one's height, so the items start on one line.
+   */
+  const alignCards = () => {
+    if (grid === null || grid.offsetParent === null) return;
+    const cards = Array.from(grid.querySelectorAll(':scope > .wf-comm'));
+    const lineOf = (card) => card.querySelector('.wf-comm-line');
+    cards.forEach((card) => {
+      card.querySelector('.wf-comm-story-pad')?.classList.add('d-none');
+      const l = lineOf(card);
+      if (l !== null) l.style.minHeight = '';
+    });
+    const rows = new Map();
+    cards.forEach((card) => {
+      const top = Math.round(card.offsetTop);
+      if (!rows.has(top)) rows.set(top, []);
+      rows.get(top).push(card);
+    });
+    rows.forEach((row) => {
+      if (row.length < 2) return;
+      if (row.some((card) => card.classList.contains('wf-comm-is-story'))) {
+        row.forEach((card) => card.querySelector('.wf-comm-story-pad')?.classList.remove('d-none'));
+      }
+      const lines = row.map(lineOf).filter((l) => l !== null);
+      const tallest = Math.max(...lines.map((l) => l.offsetHeight));
+      lines.forEach((l) => { l.style.minHeight = `${tallest}px`; });
+    });
+  };
+  let alignPending = false;
+  let alignWidth = -1;
+  /** Once per frame at most; again whenever the grid's width changes (a resize, the page shown). */
+  const scheduleAlign = () => {
+    if (grid !== null && grid.wfAlign !== true && typeof ResizeObserver === 'function') {
+      grid.wfAlign = true;
+      new ResizeObserver(() => { if (grid.clientWidth !== alignWidth) { alignWidth = grid.clientWidth; scheduleAlign(); } }).observe(grid);
+    }
+    if (alignPending) return;
+    alignPending = true;
+    requestAnimationFrame(() => { alignPending = false; try { alignCards(); } catch {} });
+  };
+
+  /**
+   * What the guild has in town now, as tiles side by side (build .211): the Guild Hall from Known, the Guild Square from
+   * Honoured, the Heirlooms once a hall stands. Each its picture, the count large, its effects a short line each.
+   * null when there is none.
+   */
+  const guildTiles = () => {
+    if (state === null) return null;
+    const h = state.reached >= model.CHARTER_TIER ? halls() : null;
+    const sq = state.reached >= model.FREEDOM_TIER ? squares() : null;
+    const tiles = [];
+    const tile = (pic, nameKey, count, effects) => {
+      const t = el('div', 'wf-guild-tile');
+      if (pic !== null) t.append(pic);
+      t.append(el('div', 'wf-guild-name', getLangString(nameKey)), count);
+      effects.forEach(([text, cls]) => t.append(el('div', `wf-guild-effect ${cls}`, text)));
+      tiles.push(t);
+    };
+    const count = (have, of) => {
+      const d = el('div', 'wf-guild-count', full(have));
+      d.append(el('span', 'wf-guild-of', ` / ${full(of)}`));
+      return d;
+    };
+    const pic = (path) => img(hiring.getMediaURL(path), 'wf-guild-img');
+    if (h !== null) {
+      tile(pic('assets/guild_hall.webp'), 'MOD_WF_GUILD_HALLS', count(h.built, model.HALL_MAX),
+        h.built > 0 ? [[templateLangString('MOD_WF_GUILD_WAGES', { relief: `${h.relief}` }), 'text-success']] : [[getLangString('MOD_WF_GUILD_NONE_YET'), 'wf-subtle']]);
+    }
+    if (sq !== null) {
+      tile(pic('assets/guild_square.webp'), 'MOD_WF_GUILD_SQUARES', count(sq.built, model.SQUARE_MAX), sq.built > 0 ? [
+        [templateLangString('MOD_WF_GUILD_HAPPINESS', { value: `${sq.happiness}` }), 'text-success'],
+        [templateLangString('MOD_WF_GUILD_EDUCATION', { value: `${sq.education}` }), 'text-success'],
+      ] : [[getLangString('MOD_WF_GUILD_NONE_YET'), 'wf-subtle']]);
+    }
+    const hl = hiring.heirlooms;
+    if (h !== null && h.built > 0 && hl?.list !== undefined) {
+      const list = hl.list();
+      const heldCount = list.filter((x) => x.held).length;
+      // The six side by side, the ones no one holds faint; each named in its tooltip.
+      const row = el('div', 'wf-guild-heirlooms');
+      list.forEach((x) => {
+        const i = img(x.item?.media, `wf-guild-heirloom${x.held ? '' : ' wf-guild-missing'}`);
+        tips?.set(i, x.item?.name ?? x.id);
+        row.append(i);
+      });
+      const mult = Math.round(hl.multiplier() * 100) / 100;
+      tile(row, 'MOD_WF_GUILD_HEIRLOOMS', count(heldCount, list.length),
+        [heldCount >= list.length ? [getLangString('MOD_WF_GUILD_HEIRLOOMS_ALL'), 'text-success'] : [templateLangString('MOD_WF_GUILD_HEIRLOOMS_FIND', { mult: `${mult}` }), 'wf-subtle']]);
+    }
+    if (tiles.length === 0) return null;
+    const box = el('div', 'wf-guild');
+    box.append(...tiles);
+    return box;
+  };
   const drawHead = () => {
     const on = isOpen() && state !== null;
     const text = on ? templateLangString('MOD_WF_COMM_REFRESH', { time: time.shortTime(model.ticksLeft(state) * TICK_INTERVAL) }) : '';
@@ -766,27 +869,17 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
       lastClockText = text;
     }
     standingEl.classList.toggle('d-none', !on);
-    // The Town history from Honoured (stories), or once a story was told.
-    historyButton?.classList.toggle('d-none', !on || (state.reached < model.STORY_TIER && state.stories.done.length === 0));
+    // The Town history from Known (the guild's buildings), or once a story was told.
+    historyButton?.classList.toggle('d-none', !on || (state.reached < model.CHARTER_TIER && state.stories.done.length === 0));
     if (!on) return;
     const points = state.standing.points;
     const next = model.nextTierPoints(points);
     const label = templateLangString(next === null ? 'MOD_WF_COMM_STANDING_TOP' : 'MOD_WF_COMM_STANDING', {
       tier: getLangString(`MOD_WF_STANDING_${model.TIERS[tier()].id}`), points: n(points), next: next === null ? '' : n(next),
     });
-    const h = state.reached >= model.CHARTER_TIER ? halls() : null;
-    const sq = state.reached >= model.FREEDOM_TIER ? squares() : null;
-    const lines = [
-      ...(h === null ? [] : [templateLangString('MOD_WF_COMM_HALLS', { built: full(h.built), max: full(model.HALL_MAX), relief: h.relief })]),
-      ...(sq === null ? [] : [templateLangString('MOD_WF_COMM_SQUARES', { built: full(sq.built), max: full(model.SQUARE_MAX), happiness: sq.happiness, education: sq.education })]),
-      ...heirloomLine(h),
-    ];
-    const hallLine = lines.join('\n');
-    if (standingEl.textContent !== label || hallLine !== lastHallLine) {
-      standingEl.textContent = label;
-      lastHallLine = hallLine;
-      tips?.set(standingEl, [getLangString('MOD_WF_COMM_STANDING_TIP'), ...lines]);
-    }
+    // No tooltip (build .213, the user: "too much text"): the badge shows the points to the next tier, the section's
+    // help what each tier gives, the Town history what the guild has built.
+    if (standingEl.textContent !== label) standingEl.textContent = label;
   };
 
   let lastDraw = 0;
