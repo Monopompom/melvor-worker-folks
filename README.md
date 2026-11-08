@@ -137,7 +137,8 @@ A failed Produce Rate roll counts as caught, and the Folk's stealth comes from i
 Thieving page shows the Folk's own success rate under yours. Like you, a Folk stops after a stun unless "Continue
 Thieving after being stunned" is on.
 Below 60% health the Folk eats **your selected food** (the food slot you use in combat)
-until it is back to full, so keep food equipped while a Folk thieves. Folks regenerate 1% of their max HP every ten
+until it is back to full, so keep food equipped while a Folk thieves. Mod Settings can move that line anywhere from
+30% to 90%, and make a Folk eat one food at a time instead of healing to full. Folks regenerate 1% of their max HP every ten
 seconds. A Folk that drops to zero dies: its gear returns to your bank as far as there is space (the rest is lost, and the
 frozen slot says what), it leaves the crew,
 and its slot stays frozen for 24 hours of real time before a new hire can take it.

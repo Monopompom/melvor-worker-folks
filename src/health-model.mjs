@@ -6,8 +6,24 @@ export const MAX_HP_BY_TIER = { Newbie: 300, Junior: 500, Middle: 700, Senior: 9
 export const ABYSSAL_DAMAGE_DIVISOR = 10;
 /** Thieving damage uses the game's numberMultiplier (maxHit × 10). */
 export const NUMBER_MULTIPLIER = 10;
-/** A hit that leaves the Folk below this share of max HP makes it eat, back to full. */
+/** A hit that leaves the Folk below this share of max HP makes it eat (the default; a setting picks 30-90%). */
 export const EAT_THRESHOLD = 0.6;
+/** The eat line's choices in Mod Settings, in % of max HP (build .219, joint order round 2). */
+export const EAT_AT_CHOICES = [30, 40, 50, 60, 70, 80, 90];
+export const DEFAULT_EAT_AT = 60;
+/** How far a Folk heals once under the line: back to full, or one food each time. */
+export const HEAL_MODES = ['full', 'one'];
+
+/** The setting's value as a share of max HP: one of the choices, else the default. */
+export function eatShare(percent) {
+  const n = Number(percent);
+  return (EAT_AT_CHOICES.includes(n) ? n : DEFAULT_EAT_AT) / 100;
+}
+
+/** The setting's heal mode: 'one' or else 'full'. */
+export function healMode(value) {
+  return value === 'one' ? 'one' : 'full';
+}
 export const REGEN_INTERVAL_TICKS = 200; // 10 s
 export const FREEZE_MS = 24 * 60 * 60 * 1000;
 
@@ -37,22 +53,26 @@ export function applyDamage(hp, amount) {
   return { hp: next, dead: next === 0 };
 }
 
-export function shouldEat(hp, max) {
-  return hp < max * EAT_THRESHOLD;
+export function shouldEat(hp, max, at = EAT_THRESHOLD) {
+  return hp < max * at;
 }
 
 export function foodHeal(healsFor) {
   return Math.max(0, Math.floor((Number(healsFor) || 0) * NUMBER_MULTIPLIER));
 }
 
-/** Below the threshold: eats one item at a time until the Folk is at full HP or the stack is gone. */
-export function eatPlan({ hp, max, healsFor, qty }) {
+/**
+ * Below the line `at` (a share of max HP): eats one item at a time until the Folk is at full HP or the stack is gone;
+ * with `mode` 'one', a single item.
+ */
+export function eatPlan({ hp, max, healsFor, qty, at = EAT_THRESHOLD, mode = 'full' }) {
   let left = Math.max(0, Math.floor(qty));
   let cur = hp;
   let eaten = 0;
   const heal = foodHeal(healsFor);
-  if (!shouldEat(cur, max)) return { eaten, hp: cur, qtyLeft: left };
-  while (left > 0 && heal > 0 && cur < max) {
+  if (!shouldEat(cur, max, at)) return { eaten, hp: cur, qtyLeft: left };
+  const most = mode === 'one' ? 1 : Infinity;
+  while (left > 0 && heal > 0 && cur < max && eaten < most) {
     cur = Math.min(max, cur + heal);
     left -= 1;
     eaten += 1;

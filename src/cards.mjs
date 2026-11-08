@@ -308,6 +308,7 @@ function fillCard(col, folk, view) {
     const food = el.querySelector('[data-wf="food"]');
     if (food !== null && hp.food !== undefined) {
       setText(food, hp.food.text);
+      view.tip(food, hp.food.tip ?? '');
       const tone = { off: 'wf-subtle', ok: '', low: 'text-warning', none: 'text-danger font-w600' }[hp.food.state] ?? '';
       const className = `wf-hp-food ${tone}`.trim();
       if (food.className !== className) food.className = className;

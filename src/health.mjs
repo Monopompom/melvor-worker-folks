@@ -5,6 +5,37 @@
 export function install(ctx, { getHiring, rules, time, log }) {
   let hiring;
   let regenCounter = 0;
+  // When a thieving Folk eats and how far it heals (build .219, joint order round 2): two settings in the Hiring
+  // section, after the ones added before this module.
+  const section = ctx.settings.section('Hiring');
+  // The cards' food line tooltip names the line: redrawn once a setting changes.
+  const redraw = () => { if (hiring !== undefined) hiring.renderQueue.folks = true; };
+  section.add([
+    {
+      type: 'dropdown',
+      name: 'eatAt',
+      label: getLangString('MOD_WF_SETTING_EAT_AT'),
+      hint: getLangString('MOD_WF_SETTING_EAT_AT_HINT'),
+      default: rules.DEFAULT_EAT_AT,
+      // The default marked, as the wage dropdown marks its own.
+      options: rules.EAT_AT_CHOICES.map((percent) => ({
+        value: percent,
+        display: templateLangString(percent === rules.DEFAULT_EAT_AT ? 'MOD_WF_SETTING_EAT_AT_DEFAULT' : 'MOD_WF_SETTING_EAT_AT_OPTION', { percent: `${percent}` }),
+      })),
+      onChange: () => redraw(),
+    },
+    {
+      type: 'dropdown',
+      name: 'healMode',
+      label: getLangString('MOD_WF_SETTING_HEAL'),
+      hint: getLangString('MOD_WF_SETTING_HEAL_HINT'),
+      default: 'full',
+      options: rules.HEAL_MODES.map((mode) => ({ value: mode, display: getLangString(`MOD_WF_HEAL_${mode}`) })),
+      onChange: () => redraw(),
+    },
+  ]);
+  const eatAt = () => rules.eatShare(section.get('eatAt'));
+  const mode = () => rules.healMode(section.get('healMode'));
 
   const api = {
     maxHpOf(folk) {
@@ -24,12 +55,12 @@ export function install(ctx, { getHiring, rules, time, log }) {
       if (slot === undefined || slot.item === game.emptyFoodItem || !(slot.quantity > 0)) return undefined;
       return { item: slot.item, qty: slot.quantity };
     },
-    /** Below 60% HP: eats the player's food back to full. Returns the number of items eaten. */
+    /** Under the eat line (60% HP unless set): eats the player's food, back to full or one item. Returns the count eaten. */
     eat(folk) {
       const e = api.food();
       if (e === undefined) return 0;
       const max = api.maxHpOf(folk);
-      const plan = rules.eatPlan({ hp: api.hpOf(folk), max, healsFor: e.item.healsFor, qty: e.qty });
+      const plan = rules.eatPlan({ hp: api.hpOf(folk), max, healsFor: e.item.healsFor, qty: e.qty, at: eatAt(), mode: mode() });
       if (plan.eaten === 0) return 0;
       const player = game.combat.player;
       player.food.consume(plan.eaten);
@@ -54,7 +85,7 @@ export function install(ctx, { getHiring, rules, time, log }) {
         api.kill(folk, { skill, cause });
         return true;
       }
-      if (eat && rules.shouldEat(result.hp, api.maxHpOf(folk))) api.eat(folk);
+      if (eat && rules.shouldEat(result.hp, api.maxHpOf(folk), eatAt())) api.eat(folk);
       return false;
     },
     /** Death: the skill stops, gear returns to the bank as far as it has space, the Folk leaves and its slot freezes for 24 h. */
@@ -104,7 +135,9 @@ export function install(ctx, { getHiring, rules, time, log }) {
       const state = rules.foodLineState({ skillId: folk.skillId, foodQty: food?.qty ?? 0 });
       const args = { name: folk.name, item: food?.item.name ?? '', count: numberWithCommas(food?.qty ?? 0) };
       const key = { off: 'MOD_WF_CARD_FOOD_OFF', none: 'MOD_WF_CARD_NO_FOOD', low: 'MOD_WF_CARD_FOOD_LOW', ok: 'MOD_WF_CARD_FOOD' }[state];
-      return { hp, max, percent: Math.round((hp / max) * 100), text, food: { state, text: templateLangString(key, args) } };
+      // When it eats, in the food line's tooltip (the settings can change it).
+      const tip = state === 'off' ? '' : templateLangString(`MOD_WF_CARD_FOOD_TIP_${mode()}`, { percent: `${Math.round(eatAt() * 100)}` });
+      return { hp, max, percent: Math.round((hp / max) * 100), text, food: { state, text: templateLangString(key, args), tip } };
     },
     /** Frozen slots for the Hiring page: [{ slot, text }]. */
     frozenSlotsView() {
