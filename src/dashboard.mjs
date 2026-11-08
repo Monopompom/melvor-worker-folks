@@ -14,7 +14,7 @@ const CONTAINER_ID = 'worker-folks-container';
 /** Milestones whose name starts with a plain word: the Next pill shows them lower case after its colon. */
 export const BLOCK_ID = 'worker-folks-overview';
 
-export function install(ctx, { getHiring, model, milestones, tips, popupDidRender, log }) {
+export function install(ctx, { getHiring, model, milestones, bulk, tips, popupDidRender, log }) {
   let hiring;
   const tally = model.createTally();
   let dirty = true;
@@ -168,7 +168,7 @@ export function install(ctx, { getHiring, model, milestones, tips, popupDidRende
         working: skill !== undefined && hiring.delegated.has(skill),
       };
     }));
-    return { rows, working: rows.filter((r) => r.working).length, total: rows.length };
+    return { rows, working: rows.filter((r) => r.working).length, total: rows.length, bulk: rows.length === 0 ? null : bulk?.view() ?? null };
   };
 
   const madeView = () => {
@@ -229,7 +229,32 @@ export function install(ctx, { getHiring, model, milestones, tips, popupDidRende
       tips?.set(row, `${r.name}\n${r.statusText} · ${r.action ? `${r.skillText} · ${r.action}` : r.skillText}`);
       list.append(row);
     }
-    workBand.replaceChildren(bandHead(getLangString('MOD_WF_DASH_WORK'), count), list);
+    workBand.replaceChildren(bandHead(getLangString('MOD_WF_DASH_WORK'), count), list, ...(v.bulk === null ? [] : [bulkButtons(v.bulk)]));
+  };
+
+  /**
+   * Stop all, Restart all, Restock all, Settle all under the list (build .218): greyed when there is nothing for one to
+   * do, the tooltip saying what it does and who it would act on.
+   */
+  const bulkButtons = (b) => {
+    const row = el('div', 'wf-dash-bulk');
+    const button = (kind, key, count, shown = true) => {
+      if (!shown) return;
+      const btn = el('button', `btn btn-sm ${kind === 'stop' ? 'btn-outline-danger' : 'btn-outline-primary'} wf-dash-bulk-btn`, getLangString(`MOD_WF_BULK_${key}`));
+      btn.type = 'button';
+      const off = count === 0;
+      btn.classList.toggle('disabled', off);
+      btn.setAttribute('aria-disabled', `${off}`);
+      btn.addEventListener('click', () => { if (!btn.classList.contains('disabled')) bulk.run(kind, mark); });
+      const who = off ? getLangString(`MOD_WF_BULK_${key}_NONE`) : templateLangString(`MOD_WF_BULK_${key}_COUNT`, { count: `${count}` });
+      tips?.set(btn, [getLangString(`MOD_WF_BULK_${key}_TIP`), { text: who, cls: off ? 'text-muted' : 'font-w600' }]);
+      row.append(btn);
+    };
+    button('stop', 'STOP', b.stop);
+    button('restart', 'RESTART', b.restart);
+    button('restock', 'RESTOCK', b.restock, b.showRestock);
+    button('settle', 'SETTLE', b.settle, b.showSettle);
+    return row;
   };
 
   /** XP as skill chips, currencies on one line, then the item chips in their own scroll box. */

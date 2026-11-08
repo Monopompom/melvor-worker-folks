@@ -65,6 +65,8 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
   ctx.onModsLoaded(() => {
     hiring = getHiring();
     hiring.decideStart = decide;
+    // What a Folk-held skill last started on, kept through its stop: Restart all starts it on that again.
+    hiring.lastPick = (skill) => picks.get(skill) ?? null;
     installAccessor();
   });
 
@@ -233,7 +235,9 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
       mainAction: this.activeAction,
       hasFolk: (skill) => folkFor(skill) !== undefined,
     });
-    delegated.forEach((skill) => hiring.delegated.add(skill));
+    // A run resumed from the save is a start too: its pick is kept, so Restart all after a Stop all finds it again
+    // (Woodcutting forgets its trees on a stop).
+    delegated.forEach((skill) => { hiring.delegated.add(skill); picks.set(skill, resume.selectionOf(skill)); });
     zombies.forEach((skill) => {
       log(`resetting orphaned active skill ${skill.id}`);
       skill.resetActionState();

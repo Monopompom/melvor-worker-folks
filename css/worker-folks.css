@@ -627,6 +627,15 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-dash-row-blank { display: inline-block; flex: none; }
 .wf-dash-row-status { display: inline-flex; align-items: center; gap: 4px; flex: none; margin-left: auto; font-weight: 600; font-size: 0.9rem; }
 .wf-dash-row-status img { width: 18px; height: 18px; }
+/* Stop / Restart / Restock / Settle all under the list (build .218): two to a row, never growing the band; a label
+   too long for its half ends in an ellipsis, the tooltip names it whole. */
+.wf-dash-bulk { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 8px; flex: 0 0 auto; }
+.wf-dash-bulk-btn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 6px; padding-right: 6px; }
+.wf-dash-bulk-btn.disabled { opacity: 0.45; cursor: default; }
+.wf-bulk .wf-bulk-line { margin: 4px 0; }
+.wf-bulk .wf-bulk-total { margin-top: 8px; }
+/* The bill's items in a centred row of fixed tiles, as the popup is centred (one tile sat at the far left). */
+.wf-bulk .wf-item-grid { grid-template-columns: repeat(auto-fit, 44px); justify-content: center; }
 /* Payroll: one compact block per currency (the reserve's own field, presets and Deposit) */
 .wf-pay-cur + .wf-pay-cur { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--wf-line-soft); }
 .wf-pay-covers { margin-top: 6px; }

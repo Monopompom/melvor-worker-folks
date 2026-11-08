@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-11-06.217';
+export const BUILD = '2026-11-08.218';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -79,10 +79,20 @@ export async function setup(ctx) {
   const tips = (await ctx.loadModule('src/tips.mjs')).install(ctx, { log });
   const layoutModel = await ctx.loadModule('src/layout-model.mjs');
   const layout = (await ctx.loadModule('src/layout.mjs')).install(ctx, { log, tips, model: layoutModel });
+  // Stop / Restart / Restock / Settle all under the Overview's At work list (build .218).
+  const bulk = (await ctx.loadModule('src/bulk.mjs')).install(ctx, {
+    getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+    model: await ctx.loadModule('src/bulk-model.mjs'),
+    time,
+    popupDidRender,
+    tips,
+    log,
+  });
   const dashboard = (await ctx.loadModule('src/dashboard.mjs')).install(ctx, {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     model: await ctx.loadModule('src/dashboard-model.mjs'),
     milestones: await ctx.loadModule('src/milestones.mjs'),
+    bulk,
     tips,
     popupDidRender,
     log,

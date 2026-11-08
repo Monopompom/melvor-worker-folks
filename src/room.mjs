@@ -476,21 +476,32 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     hiring.renderQueue.folks = true;
   };
 
-  /** Starts a restocked Folk again, when it would take the skill (never the player in its place). */
-  const startAfterRestock = (folk, skill) => {
-    if (skill === undefined || skill.isActive || hiring.delegated.has(skill)) return;
-    if (!hiring.folkAvailable(folk) || hiring.workRefusal(folk, skill) !== '' || hiring.decideStart?.(skill) !== 'delegate') return;
+  /**
+   * Starts a Folk on its skill, when it would take it (never the player in its place): on `pick` (resume.mjs), else on
+   * what the skill has selected. '' when it works now, else why not: 'noSkill' | 'busy' (the skill runs: the Folk, or
+   * you) | 'unavailable' | 'refused' | 'noSlot' | 'notStarted' (nothing picked, or the game refused the start).
+   */
+  const startWorker = (folk, pick) => {
+    const skill = folk === undefined ? undefined : hiring.skillOf(folk);
+    if (skill === undefined) return 'noSkill';
+    if (skill.isActive || hiring.delegated.has(skill)) return 'busy';
+    if (!hiring.folkAvailable(folk)) return 'unavailable';
+    if (hiring.workRefusal(folk, skill) !== '') return 'refused';
+    if (hiring.decideStart?.(skill) !== 'delegate') return 'noSlot';
     try {
       // Cooking that never cooked starts through its Cook click, which picks the category; start() alone would throw.
-      const cook = cookStandIn(skill);
-      asStart(folk, () => (cook === undefined ? resume.startAgain(skill, resume.selectionOf(skill)) : skill.onActiveCookButtonClick(cook.category)));
+      const cook = pick?.cook === undefined ? cookStandIn(skill) : undefined;
+      asStart(folk, () => (cook === undefined ? resume.startAgain(skill, pick ?? resume.selectionOf(skill)) : skill.onActiveCookButtonClick(cook.category)));
     } catch (err) {
-      log('restock start failed', err);
+      log('start failed', err);
     }
     if (!hiring.delegated.has(skill) && skill.isActive && game.activeAction !== skill) {
       try { skill.stop(); } catch { skill.isActive = false; }
     }
+    return hiring.delegated.has(skill) ? '' : 'notStarted';
   };
+  /** Starts a restocked Folk again, when it would take the skill. */
+  const startAfterRestock = (folk) => { startWorker(folk); };
 
   /**
    * Restock: the free room's worth of inputs from your bank, or at most `maxActions` actions' (the card's slider, build
@@ -526,7 +537,7 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     const hours = (plan.actions * intervalMs) / 3_600_000;
     if (!quiet) game.notifications.createSuccessNotification('worker_folks:restock', templateLangString('MOD_WF_RESTOCK_DONE', { name: folk.name, hours: hoursOf(hours), items: itemsText(plan.items) }), hiring.portrait?.(folk.tier));
     log(`room: ${folk.name} restocked ${plan.actions} actions (${hours.toFixed(2)} h)`);
-    startAfterRestock(folk, skill);
+    startAfterRestock(folk);
     hiring.renderQueue.folks = true;
     touch(folk);
     return { ok: true, actions: plan.actions, items: plan.items.map(({ id, qty }) => ({ itemId: id, qty })) };
@@ -534,14 +545,18 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
   /** The card's Restock: true when something was restocked. */
   const restock = (folk, maxActions = Infinity) => restockResult(folk, maxActions).ok;
 
-  /** restockPlan (API v10): what a Restock would take now. { items: [{ itemId, qty, have }], freeMs, actions }. */
-  const restockPlanOf = (folk) => {
+  /**
+   * restockPlan (API v10): what a Restock would take now. { items: [{ itemId, qty, have }], freeMs, actions, ms }
+   * (ms: the work it adds). `bankQty` (this mod's Restock all) reads a bank that earlier Folks of the same bill
+   * already took from.
+   */
+  const restockPlanOf = (folk, bankQty) => {
     if (folk?.room === undefined) return undefined;
     const { perAction, intervalMs } = inputsOf(folk);
     const freeMs = Math.max(0, capOf(folk) - model.usedMs(folk.room));
-    const have = (id) => game.bank.getQty(game.items.getObjectByID(id));
+    const have = typeof bankQty === 'function' ? bankQty : (id) => game.bank.getQty(game.items.getObjectByID(id));
     const plan = model.restockPlan({ perAction, intervalMs, freeMs, bankQty: have });
-    return Object.freeze({ items: Object.freeze(plan.items.map(({ id, qty }) => Object.freeze({ itemId: id, qty, have: have(id) }))), freeMs, actions: plan.actions });
+    return Object.freeze({ items: Object.freeze(plan.items.map(({ id, qty }) => Object.freeze({ itemId: id, qty, have: have(id) }))), freeMs, actions: plan.actions, ms: plan.actions * intervalMs });
   };
 
   /** room (API v10): everything the room holds and its state, frozen; undefined for no Folk. */
@@ -716,6 +731,8 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     roomOf,
     restockPlanOf,
     restockResult,
+    startFolk: startWorker,
+    usesStock,
     /** How many of these items (a commission's) the room's town side holds. */
     townQty(folk, ids) {
       return folk?.room === undefined ? 0 : ids.reduce((sum, id) => sum + model.qtyOf(folk.room, id, 'town'), 0);
