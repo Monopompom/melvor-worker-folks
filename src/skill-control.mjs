@@ -4,7 +4,7 @@
 const TEMPLATE_ID = 'wf-skill-control-template';
 const EVENTS = ['crewChanged', 'folkAssigned', 'folkFired', 'folkHired', 'folkStarted', 'folkReleased', 'folkPromoted', 'folkPending', 'folkMoved'];
 
-export function install(ctx, { getHiring, isDisabled = () => false, popupDidRender, effectsFragment, log }) {
+export function install(ctx, { getHiring, isDisabled = () => false, popupDidRender, effectsFragment, tips, log }) {
   let hiring;
   /** skill → control root element */
   const controls = new Map();
@@ -125,6 +125,7 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
           }
           if (seg.text) s.append(document.createTextNode(seg.text));
         }
+        if (entry.tip !== undefined) tips?.set(s, entry.tip);
         text.append(s);
       }
       // What the Folk wears, as one short line like the card's Gear button: "Gear 13/15", then "1 ran out" in amber
@@ -187,6 +188,8 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
       html: root,
       showConfirmButton: false,
       showCloseButton: true,
+      // A tile's tooltip shown when the popup closes under the pointer would stay: the gone tiles' tooltips go with it.
+      didClose: () => tips?.sweep(),
       customClass: (typeof createSwalCustomClass === 'function' ? createSwalCustomClass({ popup: 'wf-worker-popup wf-ui wf-tool' }) : { popup: 'wf-worker-popup wf-ui wf-tool' }),
     });
   };

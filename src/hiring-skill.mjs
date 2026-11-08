@@ -300,6 +300,27 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       };
     }
 
+    /**
+     * The tile line "Net +412K GP/h" for a Folk on the recipe open on `skill`'s page (src/profit.mjs), green when it
+     * pays and red when it costs, with the sums in its tooltip; null when there is no estimate.
+     */
+    netLine(folk, skill) {
+      const p = this.profitOf?.(folk, skill);
+      if (p === null || p === undefined) return null;
+      const gp = this.game.currencies.getObjectByID('melvorD:GP');
+      const currency = gp?.name ?? 'GP';
+      const signed = (n) => `${n < 0 ? '-' : '+'}${numbers.shortNumber(Math.abs(Math.round(n)))}`;
+      const tip = [getLangString('MOD_WF_CTRL_NET_TIP'), templateLangString('MOD_WF_CTRL_NET_MAKES', { amount: signed(p.makes), currency })];
+      if (p.spends > 0) tip.push(templateLangString('MOD_WF_CTRL_NET_INPUTS', { amount: signed(-p.spends), currency }));
+      if (p.wageCounted && p.wage > 0) tip.push(templateLangString('MOD_WF_CTRL_NET_WAGE', { amount: signed(-p.wage), currency }));
+      tip.push({ text: getLangString('MOD_WF_CTRL_NET_LEFT_OUT'), cls: 'text-muted' });
+      return {
+        segments: [{ icon: gp?.media, text: templateLangString('MOD_WF_CTRL_NET', { amount: signed(p.net), currency }) }],
+        cls: p.net < 0 ? 'text-danger font-w600' : 'text-success font-w600',
+        tip,
+      };
+    }
+
     /** A cooldown's time left as the page writes times ("4m 59s", never "0h 4m 60s"; src/time-format.mjs, build .112). */
     cooldownLeft(folk) {
       return time.shortTime(folk.cooldownTicks * TICK_INTERVAL);
@@ -344,6 +365,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       const lines = [{ badges: [{ cls: 'badge badge-info', text: templateLangString('MOD_WF_CARD_RATE', { rate: `${produceRate.produceRate(folk.tier)}` }) }] }];
       const wage = this.wageLine(folk, pageSkill);
       if (wage !== null) lines.push({ badges: [{ cls: 'badge badge-warning', text: wage.text }] });
+      const net = this.netLine(folk, pageSkill);
+      if (net !== null) lines.push(net);
       const effects = this.tierEffects(folk.tier);
       if (effects.length > 0) lines.push({ effects });
       const status = this.statusOf(folk);
