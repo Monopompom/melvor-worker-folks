@@ -295,7 +295,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       const currencyId = payroll.currencyIdFor(skill);
       const currency = this.game.currencies.getObjectByID(currencyId);
       return {
-        text: templateLangString('MOD_WF_CTRL_WAGE', { wage: numberWithCommas(Math.round(payroll.hourlyWageOf(folk))), currency: currency?.name ?? currencyId }),
+        // Short (43.7K) like the net line under it on a Worker tile and every other amount on a card.
+        text: templateLangString('MOD_WF_CTRL_WAGE', { wage: numbers.shortNumber(Math.round(payroll.hourlyWageOf(folk))), currency: currency?.name ?? currencyId }),
         icon: currency?.media,
       };
     }
@@ -309,7 +310,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       if (p === null || p === undefined) return null;
       const gp = this.game.currencies.getObjectByID('melvorD:GP');
       const currency = gp?.name ?? 'GP';
-      const signed = (n) => `${n < 0 ? '-' : '+'}${numbers.shortNumber(Math.abs(Math.round(n)))}`;
+      // Rounded before the sign, so a net of -0.4 reads "+0", never "-0".
+      const signed = (n) => { const r = Math.round(n); return `${r < 0 ? '-' : '+'}${numbers.shortNumber(Math.abs(r))}`; };
       const tip = [getLangString('MOD_WF_CTRL_NET_TIP'), templateLangString('MOD_WF_CTRL_NET_MAKES', { amount: signed(p.makes), currency })];
       if (p.spends > 0) tip.push(templateLangString('MOD_WF_CTRL_NET_INPUTS', { amount: signed(-p.spends), currency }));
       if (p.wageCounted && p.wage > 0) tip.push(templateLangString('MOD_WF_CTRL_NET_WAGE', { amount: signed(-p.wage), currency }));

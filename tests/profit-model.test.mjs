@@ -69,3 +69,40 @@ test('net per hour: no time, no estimate; bad numbers count as nothing', () => {
   assert.equal(r.wage, 0);
   assert.equal(r.net, 0);
 });
+
+test('net per hour: full preservation spends nothing; no success makes nothing and only costs', () => {
+  const kept = netPerHour({ intervalMs: 3000, outputs: [{ qty: 1, value: 10 }], inputs: [{ qty: 2, value: 5 }], preservation: 100 });
+  assert.equal(kept.spends, 0);
+  assert.equal(kept.net, kept.makes);
+  const none = netPerHour({ intervalMs: 3000, outputs: [{ qty: 1, value: 10 }], inputs: [{ qty: 1, value: 5 }], chance: 0, failExtraMs: 3000, wagePerHour: 100 });
+  close(none.actionsPerHour, MS_PER_HOUR / 6000);
+  assert.equal(none.makes, 0);
+  close(none.net, -none.spends - 100);
+});
+
+test('net per hour: chance and preservation outside 0-100% are clamped', () => {
+  const r = netPerHour({ intervalMs: 1000, outputs: [{ qty: 1, value: 1 }], inputs: [{ qty: 1, value: 1 }], chance: 3, preservation: 250 });
+  close(r.makes, 3600);
+  assert.equal(r.spends, 0);
+  const s = netPerHour({ intervalMs: 1000, outputs: [{ qty: 1, value: 1 }], chance: -1, preservation: -20, failExtraMs: -500 });
+  assert.equal(s.makes, 0);
+  close(s.actionsPerHour, 3600);
+});
+
+test('net per hour: an item worth 100M stays a finite sum', () => {
+  const r = netPerHour({ intervalMs: 600, outputs: [{ qty: 1, value: 1e8 }], wagePerHour: 5e6 });
+  assert.ok(Number.isFinite(r.net));
+  close(r.net, 6000 * 1e8 - 5e6, 1);
+});
+
+test('Produce Rate as odds at the edges: 0 never succeeds, exactly 100 is one sure batch', () => {
+  assert.deepEqual(folkYield(0), { chance: 0, batches: 1 });
+  assert.deepEqual(folkYield(100), { chance: 1, batches: 1 });
+  assert.deepEqual(folkYield(-5), { chance: 0, batches: 1 });
+  assert.deepEqual(folkYield('x'), { chance: 0, batches: 1 });
+});
+
+test('primary quantity: a cut base percent still gives at least one item', () => {
+  assert.equal(expectedPrimaryQuantity({ base: 1, basePercent: -90 }), 1);
+  close(expectedPrimaryQuantity({ base: 1, basePercent: -90, flatAdditional: 2 }), 2);
+});

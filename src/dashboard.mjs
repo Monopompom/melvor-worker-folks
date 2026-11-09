@@ -14,7 +14,7 @@ const CONTAINER_ID = 'worker-folks-container';
 /** Milestones whose name starts with a plain word: the Next pill shows them lower case after its colon. */
 export const BLOCK_ID = 'worker-folks-overview';
 
-export function install(ctx, { getHiring, model, milestones, bulk, tips, popupDidRender, log }) {
+export function install(ctx, { getHiring, model, milestones, bulk, tips, marquee, popupDidRender, log }) {
   let hiring;
   const tally = model.createTally();
   let dirty = true;
@@ -212,8 +212,8 @@ export function install(ctx, { getHiring, model, milestones, bulk, tips, popupDi
   const short = (v) => (typeof formatNumber === 'function' ? formatNumber(Math.floor(v)) : n(v));
 
   /**
-   * One line a Folk (trouble first): skill icon, first name, skill, then the status icon and word in its colour (never
-   * an icon alone; scan A-07); the whole name, skill and action in its tooltip.
+   * Two lines a Folk (trouble first): the skill icon over both, the first name and the status icon and word in its colour
+   * (never an icon alone; scan A-07), the skill and its action under them; the whole name, skill and action in its tooltip.
    */
   const drawWork = (v) => {
     const count = el('span', `ml-auto font-w600 ${v.working > 0 ? 'text-success' : 'wf-subtle'}`, templateLangString('MOD_WF_DASH_AT_WORK_COUNT', { working: `${v.working}`, total: `${v.total}` }));
@@ -221,12 +221,16 @@ export function install(ctx, { getHiring, model, milestones, bulk, tips, popupDi
     if (v.rows.length === 0) list.append(note(getLangString('MOD_WF_DASH_NOBODY')));
     for (const r of v.rows) {
       const row = el('div', 'wf-dash-row');
-      // No skill yet: an empty spot the icon's size, so the names line up.
-      row.append(r.skillIcon ? icon(r.skillIcon) : el('span', 'wf-line-icon wf-dash-row-blank'), el('span', 'wf-dash-row-name', r.first), el('span', 'wf-subtle wf-dash-row-skill', r.skillText));
+      // No skill yet: an empty spot the icon's size, so the names line up. A name or skill longer than its room slides to
+      // its end and back (the user: "Running text"), the status beside it never cut.
+      const text = (cls, value) => (typeof marquee === 'function' ? marquee('span', cls, value) : el('span', cls, value));
+      // The second line names what the Folk works on after the skill ("Woodcutting · Normal Trees"); no action, the skill alone.
+      const doing = r.action ? `${r.skillText} · ${r.action}` : r.skillText;
+      row.append(r.skillIcon ? icon(r.skillIcon) : el('span', 'wf-line-icon wf-dash-row-blank'), text('wf-dash-row-name', r.first), text('wf-subtle wf-dash-row-skill', doing));
       const st = el('span', `wf-dash-row-status wf-text-${r.status}`);
       st.append(icon(r.statusIcon, ''), el('span', '', r.statusText));
       row.append(st);
-      tips?.set(row, `${r.name}\n${r.statusText} · ${r.action ? `${r.skillText} · ${r.action}` : r.skillText}`);
+      tips?.set(row, `${r.name}\n${r.statusText} · ${doing}`);
       list.append(row);
     }
     workBand.replaceChildren(bandHead(getLangString('MOD_WF_DASH_WORK'), count), list, ...(v.bulk === null ? [] : [bulkButtons(v.bulk)]));

@@ -109,7 +109,12 @@ export function install(ctx, { getHiring, model, time, popupDidRender, tips, log
   const line = (text, cls = '') => el('div', `wf-bulk-line ${cls}`.trim(), text);
   const hoursOf = (ms) => { const h = ms / 3_600_000; return h > 0 && h < 0.1 ? '<0.1' : time.hoursText(h); };
 
-  const confirm = ({ title, body, go, ok, onConfirm }) => {
+  // A bill that can change while it is open (watch) is asked again this often; it is drawn again only when it changed.
+  const WATCH_MS = 500;
+
+  const confirm = ({ title, body, go, ok, onConfirm, watch }) => {
+    let timer;
+    const clearTips = () => Swal.getHtmlContainer()?.querySelectorAll('[data-wf-item]').forEach((e) => tips?.clear(e));
     SwalLocale.fire({
       didRender: popupDidRender,
       title,
@@ -123,9 +128,28 @@ export function install(ctx, { getHiring, model, time, popupDidRender, tips, log
       didOpen: () => {
         room()?.tipTiles?.(Swal.getHtmlContainer());
         if (!ok) { const b = Swal.getConfirmButton(); if (b) b.disabled = true; }
+        if (typeof watch === 'function') {
+          timer = setInterval(() => {
+            try {
+              // Another popup fired over this one: stop watching, never draw into it.
+              const box = Swal.getHtmlContainer();
+              if (!Swal.isVisible() || !box?.querySelector('.wf-bulk')) { clearInterval(timer); return; }
+              const next = watch();
+              if (next === null) return;
+              clearTips();
+              box.replaceChildren(next.body);
+              room()?.tipTiles?.(box);
+              const b = Swal.getConfirmButton();
+              if (b) b.disabled = !next.ok;
+            } catch (err) {
+              clearInterval(timer);
+              log('bulk bill refresh failed', err);
+            }
+          }, WATCH_MS);
+        }
       },
       // A tile's tooltip shown as the popup closes would stay on screen once its tile is gone.
-      willClose: () => Swal.getHtmlContainer()?.querySelectorAll('[data-wf-item]').forEach((e) => tips?.clear(e)),
+      willClose: () => { clearInterval(timer); clearTips(); },
     }).then((result) => {
       if (!result.isConfirmed) return;
       try { onConfirm(); } catch (err) { log('bulk confirm failed', err); }
@@ -143,7 +167,11 @@ export function install(ctx, { getHiring, model, time, popupDidRender, tips, log
       const tiles = el('div');
       tiles.innerHTML = room().itemTiles(bill.total, { small: true });
       body.append(tiles);
-      for (const f of bill.fill) body.append(line(templateLangString('MOD_WF_BULK_RESTOCK_LINE', { name: f.folk.name, hours: hoursOf(f.ms) })));
+      // A name bold, a time bold blue, as message popups write them.
+      for (const f of bill.fill) {
+        const time = esc(templateLangString('MOD_WF_BULK_RESTOCK_TIME', { hours: hoursOf(f.ms) }));
+        body.append(richLine('MOD_WF_BULK_RESTOCK_LINE', { name: `<span class="font-w600">${esc(f.folk.name)}</span>`, time: `<span class="font-w600 text-info">${time}</span>` }));
+      }
     }
     if (bill.nothing.length > 0) body.append(line(templateLangString('MOD_WF_BULK_RESTOCK_SKIP', { names: names(bill.nothing) }), 'wf-subtle'));
     confirm({
@@ -152,19 +180,36 @@ export function install(ctx, { getHiring, model, time, popupDidRender, tips, log
       go: getLangString('MOD_WF_BUTTON_RESTOCK'),
       ok: bill.fill.length > 0,
       onConfirm: () => {
-        // Each Folk's own Restock, capped at the bill's actions: the bank may have changed while the popup was open.
-        const filled = bill.fill.filter((f) => room().restockResult(f.folk, f.actions, { quiet: true }).ok).map((f) => f.folk);
+        // Each Folk's own Restock, capped at the bill's actions: the bank may have changed while the popup was open. A
+        // Folk let go meanwhile is left out.
+        const still = bill.fill.filter((f) => hiring.crew.all.includes(f.folk));
+        const filled = still.filter((f) => room().restockResult(f.folk, f.actions, { quiet: true }).ok).map((f) => f.folk);
         if (filled.length > 0) notify('success', done('MOD_WF_BULK_RESTOCKED', filled));
-        if (filled.length < bill.fill.length) notify('error', templateLangString('MOD_WF_BULK_RESTOCK_FAILED', { names: names(bill.fill.map((f) => f.folk).filter((f) => !filled.includes(f))) }));
+        if (filled.length < still.length) notify('error', templateLangString('MOD_WF_BULK_RESTOCK_FAILED', { names: names(still.map((f) => f.folk).filter((f) => !filled.includes(f))) }));
         log(`restock all: ${filled.length} of ${bill.fill.length}`);
       },
     });
   };
 
-  const amountText = (parts) => Object.entries(parts)
-    .map(([id, amount]) => `${numberWithCommas(Math.ceil(amount))} ${hiring.game.currencies.getObjectByID(id)?.name ?? id}`).join(' + ');
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  /** A price as message popups write it: the currency's icon, then the amount bold amber ("[GP] 91,400 + [SC] 12"). */
+  const amountHtml = (parts) => Object.entries(parts).map(([id, amount]) => {
+    const c = hiring.game.currencies.getObjectByID(id);
+    const icon = c?.media ? `<img class="skill-icon-xs mr-1" src="${esc(c.media)}" alt="${esc(c.name)}">` : '';
+    return `${icon}<span class="font-w600 text-warning">${numberWithCommas(Math.ceil(amount))}</span>${c?.media ? '' : ` ${esc(c?.name ?? id)}`}`;
+  }).join(' + ');
+  /** A line from a language string whose values are HTML (names bold, prices as above); the string itself is escaped. */
+  const richLine = (key, values, cls = '') => {
+    const e = el('div', `wf-bulk-line ${cls}`.trim());
+    const marks = Object.keys(values).map((k, i) => [k, `\u0001${i}\u0001`]);
+    let text = esc(templateLangString(key, Object.fromEntries(marks)));
+    marks.forEach(([k, m]) => { text = text.split(m).join(values[k]); });
+    e.innerHTML = text;
+    return e;
+  };
 
-  const settleAll = () => {
+  /** Who Settle all pays now, in crew order, and who it can't; `key` changes whenever the bill would read differently. */
+  const settleBill = () => {
     const payroll = hiring.payroll;
     const strikers = rows().filter((r) => r.onStrike).map((r) => r.folk);
     // Only what can be paid now: demands met, nothing refusing it (Voyage: you stand by the Folk), the money there.
@@ -172,28 +217,51 @@ export function install(ctx, { getHiring, model, time, popupDidRender, tips, log
     const parts = new Map(open.map((f) => [f, payroll.settlementOf(f).parts]));
     const { pay } = model.payable(open.map((f) => ({ key: f, parts: parts.get(f) })), (id) => hiring.game.currencies.getObjectByID(id)?.amount ?? 0);
     const left = strikers.filter((f) => !pay.includes(f));
+    const at = (f) => hiring.crew.all.indexOf(f);
+    const key = JSON.stringify([pay.map((f) => [at(f), parts.get(f), (f.demand?.length ?? 0) > 0]), left.map(at)]);
+    return { pay, left, parts, key };
+  };
+
+  const settleBody = ({ pay, left, parts }) => {
     const body = el('div', 'text-center wf-help-body wf-bulk');
     if (pay.length === 0) body.append(line(getLangString('MOD_WF_BULK_SETTLE_NOTHING'), 'wf-subtle'));
     else {
       body.append(line(getLangString('MOD_WF_BULK_SETTLE_HEAD'), 'font-w600'));
       for (const f of pay) {
         const demands = (f.demand?.length ?? 0) > 0 ? getLangString('MOD_WF_BULK_SETTLE_DEMANDS') : '';
-        body.append(line(templateLangString('MOD_WF_BULK_SETTLE_LINE', { name: f.name, amount: amountText(parts.get(f)), demands })));
+        body.append(richLine('MOD_WF_BULK_SETTLE_LINE', { name: `<span class="font-w600">${esc(f.name)}</span>`, amount: amountHtml(parts.get(f)), demands: esc(demands) }));
       }
       const total = model.payable(pay.map((f) => ({ key: f, parts: parts.get(f) })), () => Infinity).total;
-      if (pay.length > 1) body.append(line(templateLangString('MOD_WF_BULK_SETTLE_TOTAL', { amount: amountText(total) }), 'font-w600 wf-bulk-total'));
+      if (pay.length > 1) body.append(richLine('MOD_WF_BULK_SETTLE_TOTAL', { amount: amountHtml(total) }, 'font-w600 wf-bulk-total'));
     }
     if (left.length > 0) body.append(line(templateLangString('MOD_WF_BULK_SETTLE_LEFT', { names: names(left) }), 'wf-subtle'));
+    return body;
+  };
+
+  const settleAll = () => {
+    const payroll = hiring.payroll;
+    let bill = settleBill();
     confirm({
       title: getLangString('MOD_WF_BULK_SETTLE'),
-      body,
+      body: settleBody(bill),
       go: getLangString('MOD_WF_BUTTON_SETTLE'),
-      ok: pay.length > 0,
+      ok: bill.pay.length > 0,
+      // A strike settled while the bill is open (the mastery pool's self-settle, or the card), a new strike, a Folk let
+      // go or a wallet that changed: the bill is drawn again, so its lines and Confirm say what Confirm will do.
+      watch: () => {
+        const next = settleBill();
+        if (next.key === bill.key) return null;
+        bill = next;
+        return { body: settleBody(bill), ok: bill.pay.length > 0 };
+      },
       onConfirm: () => {
-        // payroll.settle asks again, so a settlement the bank no longer covers is left as it is.
-        const settled = pay.filter((f) => payroll.settle(f));
+        // The bill may be up to one refresh old: a Folk settled or let go since is left out (its own notice already
+        // said so), and payroll.settle asks again, so a settlement the bank no longer covers is left as it is.
+        const pay = bill.pay;
+        const still = pay.filter((f) => f.onStrike === true && hiring.crew.all.includes(f));
+        const settled = still.filter((f) => payroll.settle(f));
         if (settled.length > 0) notify('success', done('MOD_WF_BULK_SETTLED', settled));
-        if (settled.length < pay.length) notify('error', templateLangString('MOD_WF_BULK_SETTLE_FAILED', { names: names(pay.filter((f) => !settled.includes(f))) }));
+        if (settled.length < still.length) notify('error', templateLangString('MOD_WF_BULK_SETTLE_FAILED', { names: names(still.filter((f) => !settled.includes(f))) }));
         log(`settle all: ${settled.length} of ${pay.length}`);
       },
     });

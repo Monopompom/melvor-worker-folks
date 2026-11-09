@@ -402,24 +402,37 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
    with the namespace (`worker_folks:wageDifficulty`), hence the attribute selectors. The
    dropdown setting is a flex row (`form-inline flex-wrap-reverse`: validation message,
    `.dropdown`, label) whose label is itself a flex container, so everything sat tight.
-   Rebuilt as a stack: label, gap, hint, gap, full-width button. */
-label[for="worker_folks:wageDifficulty"] {
+   Rebuilt as a stack: label, gap, hint, gap, full-width button; the two food dropdowns (.219) the same, so
+   every dropdown in the window reads one way. */
+label[for="worker_folks:wageDifficulty"],
+label[for="worker_folks:eatAt"],
+label[for="worker_folks:healMode"] {
   display: block !important;
   flex: 0 0 100%;
   width: 100%;
   margin: 0.25rem 0 0 0 !important;
   line-height: 1.4;
 }
-label[for="worker_folks:wageDifficulty"] > .ms__force-wrap { display: none; }
-label[for="worker_folks:wageDifficulty"] > small {
+label[for="worker_folks:wageDifficulty"] > .ms__force-wrap,
+label[for="worker_folks:eatAt"] > .ms__force-wrap,
+label[for="worker_folks:healMode"] > .ms__force-wrap { display: none; }
+label[for="worker_folks:wageDifficulty"] > small,
+label[for="worker_folks:eatAt"] > small,
+label[for="worker_folks:healMode"] > small {
   display: block;
   margin: 0.75rem 0 1rem 0;
   line-height: 1.5;
 }
 /* column-reverse: the label (last child) on top, the dropdown under it, the validation message (first child) last */
-div.form-inline.flex-wrap-reverse:has(> .dropdown > [id="worker_folks:wageDifficulty"]) { display: flex; flex-direction: column-reverse; align-items: stretch; }
-div.form-inline.flex-wrap-reverse:has(> .dropdown > [id="worker_folks:wageDifficulty"]) > .dropdown { width: 100%; margin-bottom: 1rem; }
-[id="worker_folks:wageDifficulty"] {
+div.form-inline.flex-wrap-reverse:has(> .dropdown > [id="worker_folks:wageDifficulty"]),
+div.form-inline.flex-wrap-reverse:has(> .dropdown > [id="worker_folks:eatAt"]),
+div.form-inline.flex-wrap-reverse:has(> .dropdown > [id="worker_folks:healMode"]) { display: flex; flex-direction: column-reverse; align-items: stretch; }
+div.form-inline.flex-wrap-reverse:has(> .dropdown > [id="worker_folks:wageDifficulty"]) > .dropdown,
+div.form-inline.flex-wrap-reverse:has(> .dropdown > [id="worker_folks:eatAt"]) > .dropdown,
+div.form-inline.flex-wrap-reverse:has(> .dropdown > [id="worker_folks:healMode"]) > .dropdown { width: 100%; margin-bottom: 1rem; }
+[id="worker_folks:wageDifficulty"],
+[id="worker_folks:eatAt"],
+[id="worker_folks:healMode"] {
   display: flex;
   width: 100%;
   align-items: center;
@@ -428,8 +441,12 @@ div.form-inline.flex-wrap-reverse:has(> .dropdown > [id="worker_folks:wageDiffic
   padding: 0.6rem 1rem;
   margin: 0;
 }
-[id="worker_folks:wageDifficulty"]::after { margin-left: 0.75rem; }
-.dropdown-menu[aria-labelledby="worker_folks:wageDifficulty"] { width: 100%; }
+[id="worker_folks:wageDifficulty"]::after,
+[id="worker_folks:eatAt"]::after,
+[id="worker_folks:healMode"]::after { margin-left: 0.75rem; }
+.dropdown-menu[aria-labelledby="worker_folks:wageDifficulty"],
+.dropdown-menu[aria-labelledby="worker_folks:eatAt"],
+.dropdown-menu[aria-labelledby="worker_folks:healMode"] { width: 100%; }
 label[for="worker_folks:abyssalWagesInAP"] > small,
 label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bottom: 0.5rem; }
 
@@ -609,7 +626,7 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-dash-paymini { display: none; align-items: center; gap: 8px; font-size: 0.9rem; white-space: nowrap; }
 .wf-dash-paymini-cur .wf-line-icon { margin-right: 0; }
 #worker-folks-overview.wf-folded .wf-dash-paymini { display: flex; }
-.wf-dash-grid { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1.6fr); gap: 12px; height: 21rem; }
+.wf-dash-grid { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1.6fr); gap: 12px; height: 23rem; } /* 23rem: five two-line At work rows without a scroll (.225) */
 .wf-dash-band { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .wf-dash-pay { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--wf-thumb) transparent; }
 .wf-dash-head { color: var(--wf-head); font-weight: 600; margin-bottom: 8px; gap: 6px; flex: 0 0 auto; }
@@ -617,21 +634,29 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-dash-scroll { flex: 1 1 0; min-height: 0; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; scrollbar-color: var(--wf-thumb) transparent; }
 .wf-dash-line { margin-top: 4px; }
 .wf-dash-sub { margin: 2px 0 6px; }
-/* At work: one line a Folk, trouble first: the skill icon, the first name, the skill, then the status icon and word in
-   its colour (never an icon alone; scan A-07, build .112). The full name, skill and action in the row's
-   tooltip; the skill gives way first. */
-.wf-dash-row { display: flex; align-items: center; gap: 6px; padding: 4px 0; white-space: nowrap; }
+/* At work: two lines a Folk, trouble first (the user, 8 Nov 2026: one line left too little of the skill). The skill
+   icon at the left over both lines; the first name and the status icon and word in its colour on the first (never an
+   icon alone; scan A-07, build .112); the skill under them, across the row's whole width. The full name, skill and
+   action in the row's tooltip; a name or skill still longer than its room runs to its end and back. */
+.wf-dash-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "icon name status" "icon skill skill";
+  column-gap: 8px; align-items: center; padding: 4px 0; white-space: nowrap; }
 .wf-dash-row + .wf-dash-row { border-top: 1px solid var(--wf-row-line); }
-.wf-dash-row-name { font-weight: 600; flex: 0 1 auto; min-width: 2.5rem; overflow: hidden; text-overflow: ellipsis; }
-.wf-dash-row-skill { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.wf-dash-row > :first-child { grid-area: icon; width: 24px; height: 24px; margin-right: 0; }
+.wf-dash-row-name { grid-area: name; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 1.25; }
+.wf-dash-row-skill { grid-area: skill; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 0.8rem; line-height: 1.25; }
 .wf-dash-row-blank { display: inline-block; flex: none; }
-.wf-dash-row-status { display: inline-flex; align-items: center; gap: 4px; flex: none; margin-left: auto; font-weight: 600; font-size: 0.9rem; }
+.wf-dash-row-status { grid-area: status; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; font-size: 0.9rem; line-height: 1.25; }
 .wf-dash-row-status img { width: 18px; height: 18px; }
+/* Reduced motion: no run and no wrap in a one-line row; the cut text ends in an ellipsis again, the tooltip names it. */
+@media (prefers-reduced-motion: reduce) {
+  .wf-dash-row .wf-marquee { white-space: nowrap; text-overflow: ellipsis; }
+  .wf-dash-row .wf-marquee-text { display: inline; }
+}
 /* Stop / Restart / Restock / Settle all under the list (build .218): two to a row, never growing the band; a label
    too long for its half ends in an ellipsis, the tooltip names it whole. */
 .wf-dash-bulk { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 8px; flex: 0 0 auto; }
 .wf-dash-bulk-btn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 6px; padding-right: 6px; }
-.wf-dash-bulk-btn.disabled { opacity: 0.45; cursor: default; }
+.wf-dash-bulk-btn.disabled { cursor: default; } /* greyed by the shared .wf-ui .btn.disabled look */
 .wf-bulk .wf-bulk-line { margin: 4px 0; }
 .wf-bulk .wf-bulk-total { margin-top: 8px; }
 /* The bill's items in a centred row of fixed tiles, as the popup is centred (one tile sat at the far left). */
@@ -666,9 +691,14 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
    900px of block; under it At work and Payroll side by side with Made this session under them; under 600px one
    column, Payroll first. */
 #worker-folks-overview { container-type: inline-size; container-name: wf-overview; }
+/* Three across but narrow (900 to 1060px of block): At work as wide as Payroll, Made a little narrower, so At work's
+   buttons keep "Restart all" and "Restock all" whole at their normal size (under ~230px they were cut). */
+@container wf-overview (min-width: 900px) and (max-width: 1059.98px) {
+  .wf-dash-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr); }
+}
 @container wf-overview (max-width: 899.98px) {
   .wf-dash-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); height: auto; }
-  .wf-dash-work, .wf-dash-pay { height: 21rem; }
+  .wf-dash-work, .wf-dash-pay { height: 23rem; }
   .wf-dash-made { grid-column: 1 / -1; }
   .wf-dash-made .wf-dash-scroll { flex: 0 1 auto; }
   .wf-dash-items { max-height: 12rem; }

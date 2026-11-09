@@ -47,3 +47,29 @@ test('payable: a settlement of nothing is paid', () => {
 test('byReason groups names per reason', () => {
   assert.deepEqual(byReason([{ why: 'noSlot', name: 'A' }, { why: 'busy', name: 'B' }, { why: 'noSlot', name: 'C' }]), [['noSlot', ['A', 'C']], ['busy', ['B']]]);
 });
+
+test('counts: an empty crew has nothing to do', () => {
+  assert.deepEqual(counts([]), { stop: 0, restart: 0, restock: 0, settle: 0 });
+});
+
+test('counts: a striking Folk without a skill is only settled, a refused one is not restarted', () => {
+  assert.deepEqual(counts([row({ hasSkill: false, available: false, onStrike: true }), row({ available: false })]), { stop: 0, restart: 0, restock: 0, settle: 1 });
+});
+
+test('payable: nothing to pay, and amounts that add up to exactly the wallet', () => {
+  assert.deepEqual(payable([], () => 0), { pay: [], skip: [], total: {} });
+  const r = payable([{ key: 'a', parts: { gp: 0.1 } }, { key: 'b', parts: { gp: 0.2 } }], () => 0.30000000000000004);
+  assert.deepEqual(r.pay, ['a', 'b']);
+});
+
+test('payable: a wallet that cannot be read pays nothing', () => {
+  assert.deepEqual(payable([{ key: 'a', parts: { gp: 5 } }], () => NaN).skip, ['a']);
+});
+
+test('runningBank never goes below zero, and mergeItems skips bad counts', () => {
+  const bank = runningBank(() => 3);
+  bank.take('x', 10);
+  assert.equal(bank.qty('x'), 0);
+  assert.deepEqual(mergeItems([[{ id: 'a', qty: NaN }, { id: 'b', qty: -2 }, { id: 'a', qty: 1 }]]), [{ id: 'a', qty: 1 }]);
+  assert.deepEqual(mergeItems([]), []);
+});

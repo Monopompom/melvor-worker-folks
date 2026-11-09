@@ -76,3 +76,24 @@ test('one food at a time eats a single item under the line, even when still unde
   assert.deepEqual(eatPlan({ hp: 170, max: 300, healsFor: 20, qty: 5, mode: 'one' }), { eaten: 1, hp: 300, qtyLeft: 4 });
   assert.deepEqual(eatPlan({ hp: 200, max: 300, healsFor: 5, qty: 5, mode: 'one' }), { eaten: 0, hp: 200, qtyLeft: 5 });
 });
+
+test('the eat line is strict: exactly on it the Folk does not eat', () => {
+  assert.equal(shouldEat(210, 700, eatShare(30)), false);
+  assert.equal(shouldEat(209, 700, eatShare(30)), true);
+  assert.equal(shouldEat(629, 700, eatShare(90)), true);
+  assert.deepEqual(eatPlan({ hp: 420, max: 700, healsFor: 5, qty: 3, at: eatShare(60) }), { eaten: 0, hp: 420, qtyLeft: 3 });
+});
+
+test('eating with nothing to eat: no food, food that heals nothing, an odd count', () => {
+  assert.deepEqual(eatPlan({ hp: 10, max: 300, healsFor: 5, qty: 0 }), { eaten: 0, hp: 10, qtyLeft: 0 });
+  assert.deepEqual(eatPlan({ hp: 10, max: 300, healsFor: 0, qty: 4, mode: 'one' }), { eaten: 0, hp: 10, qtyLeft: 4 });
+  assert.deepEqual(eatPlan({ hp: 10, max: 300, healsFor: 5, qty: 2.7 }), { eaten: 2, hp: 110, qtyLeft: 0 });
+  assert.equal(eatPlan({ hp: 10, max: 300, healsFor: 5, qty: undefined }).eaten, 0);
+});
+
+test('the setting read from a save as text still counts', () => {
+  assert.equal(eatShare('40'), 0.4);
+  assert.equal(eatShare(null), 0.6);
+  assert.equal(eatShare(65), 0.6);
+  assert.equal(healMode(undefined), 'full');
+});
