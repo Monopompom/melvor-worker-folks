@@ -1,7 +1,7 @@
 // Folk record model, validation and save-root migrations. Pure: no game globals.
 
 export const TIERS = ['Newbie', 'Junior', 'Middle', 'Senior', 'Expert'];
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 /**
  * A Folk's travel state: 'idle' stays on its place, 'with' goes along with the player, 'walking' is on its way somewhere
  * alone (Voyage, phase 6). Only 'idle' works.
@@ -30,6 +30,13 @@ export function createFolk({ id, slot, tier, name, hiredAt = 0, paid = null }) {
     tier,
     name,
     skillId: null,
+    /**
+     * A job (v10): an assignment not keyed by a skill, such as the Quartermaster (src/jobs.mjs), by its id; null = none.
+     * A Folk holds a skill or a job, never both.
+     */
+    job: null,
+    /** What a job remembers between looks, by its own keys (the Quartermaster: the item each slot last held). */
+    jobMemory: {},
     loadout: {},
     debt: 0,
     debtCurrency: null,
@@ -110,6 +117,8 @@ export function normalizeFolk(raw) {
   if (typeof raw.name !== 'string' || raw.name.length === 0) return null;
   const folk = createFolk({ id: raw.id, slot: raw.slot, tier: raw.tier, name: raw.name, hiredAt: nonNegNumber(raw.hiredAt) });
   folk.skillId = typeof raw.skillId === 'string' ? raw.skillId : null;
+  folk.job = folk.skillId === null && typeof raw.job === 'string' && raw.job !== '' ? raw.job : null;
+  folk.jobMemory = normalizeJobMemory(raw.jobMemory);
   folk.loadout = normalizeLoadoutShape(raw.loadout);
   folk.debt = nonNegNumber(raw.debt);
   folk.debtCurrency = folk.debt > 0 && typeof raw.debtCurrency === 'string' ? raw.debtCurrency : null;
@@ -132,6 +141,14 @@ export function normalizeFolk(raw) {
   folk.townsfolk = raw.townsfolk === true;
   folk.demand = folk.onStrike ? normalizeDemands(raw.demand) : [];
   return folk;
+}
+
+/** A job's memory: plain string values by string keys; anything else is dropped. */
+export function normalizeJobMemory(raw) {
+  const out = {};
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const [k, v] of Object.entries(raw)) if (k !== '' && typeof v === 'string' && v !== '') out[k] = v;
+  return out;
 }
 
 /** A saved pick is a plain object of ids; what it names is checked when it is replayed (src/resume.mjs fromSaved). */
@@ -296,6 +313,12 @@ export const MIGRATIONS = {
     ...root,
     v: 9,
     folks: (Array.isArray(root.folks) ? root.folks : []).map((f) => ({ ...f, room: { haul: {}, stock: {}, town: {}, ...(f.room ?? {}), purse: {} }, restockAt: null })),
+  }),
+  // v10: jobs (joint order round 3): no Folk has one yet.
+  9: (root) => ({
+    ...root,
+    v: 10,
+    folks: (Array.isArray(root.folks) ? root.folks : []).map((f) => ({ ...f, job: null, jobMemory: {} })),
   }),
 };
 

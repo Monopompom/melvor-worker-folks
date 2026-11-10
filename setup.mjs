@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-11-10.231';
+export const BUILD = '2026-11-10.236';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -353,6 +353,19 @@ export async function setup(ctx) {
   qualification.install(ctx, {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     model: qualificationRules,
+    log,
+  });
+
+  // 5d3'. Jobs: a Folk's work that is not a skill, on a Shift Slot and a wage; the Quartermaster is the first (Hiring
+  //       45), its slot lines settings in the Hiring section.
+  const jobs = (await ctx.loadModule('src/jobs.mjs')).install(ctx, {
+    getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+    log,
+  });
+  (await ctx.loadModule('src/quartermaster.mjs')).install(ctx, {
+    getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+    jobs,
+    model: await ctx.loadModule('src/quartermaster-model.mjs'),
     log,
   });
 

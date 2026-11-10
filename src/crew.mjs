@@ -39,6 +39,9 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
     bySkill(skillId) {
       return folks.find((f) => f.skillId === skillId);
     },
+    byJob(jobId) {
+      return folks.find((f) => f.job === jobId);
+    },
     countByTier(tier) {
       return folks.reduce((n, f) => (f.tier === tier ? n + 1 : n), 0);
     },
@@ -138,7 +141,7 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
     /**
      * Assigns a skill (or null). One Folk per skill: a previous holder is unassigned. A Folk given a skill stops going
      * along with the player or walking (its travel becomes 'idle'): it works, so it stays put, and heals again. This
-     * also frees a Folk left on the road by a mod that is no longer loaded.
+     * also frees a Folk left on the road by a mod that is no longer loaded. A skill ends the Folk's job.
      */
     assign(id, skillId) {
       const folk = this.byId(id);
@@ -147,11 +150,34 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
         const holder = this.bySkill(skillId);
         if (holder !== undefined && holder !== folk) this.assign(holder.id, null);
         if (folk.travel !== 'idle') folk.travel = 'idle';
+        if (folk.job !== null) this.assignJob(folk.id, null);
       }
       const previous = folk.skillId;
       if (previous === skillId) return true;
       folk.skillId = skillId;
       bus.emit('folkAssigned', { folk, previous, skillId });
+      emitChange();
+      return true;
+    },
+    /**
+     * Gives a Folk a job (or null), as `assign` gives a skill: one Folk per job (a previous holder loses it), the Folk
+     * leaves its skill and stays put, unless the job `travels` (it works wherever the Folk is, along with the player
+     * included). A new job starts with an empty memory.
+     */
+    assignJob(id, jobId, { travels = false } = {}) {
+      const folk = this.byId(id);
+      if (folk === undefined) return false;
+      if (jobId !== null) {
+        const holder = this.byJob(jobId);
+        if (holder !== undefined && holder !== folk) this.assignJob(holder.id, null);
+        if (folk.skillId !== null) this.assign(folk.id, null);
+        if (!travels && folk.travel !== 'idle') folk.travel = 'idle';
+      }
+      const previous = folk.job;
+      if (previous === jobId) return true;
+      folk.job = jobId;
+      folk.jobMemory = {};
+      bus.emit('folkJobChanged', { folk, previous, jobId });
       emitChange();
       return true;
     },

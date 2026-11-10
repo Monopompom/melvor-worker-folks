@@ -51,7 +51,7 @@ test('api: version, read-only views, places and travel with a folkMoved event', 
   assert.equal(api.version, API_VERSION);
   const folk = hiring.crew.hire('Junior');
   const v = api.folkById(folk.id);
-  assert.deepEqual(v, { id: folk.id, name: folk.name, tier: 'Junior', slot: 0, skillId: null, status: 'idle', place: null, travel: 'idle', hp: null, maxHp: undefined, portrait: undefined, traits: [], mastery: undefined });
+  assert.deepEqual(v, { id: folk.id, name: folk.name, tier: 'Junior', slot: 0, skillId: null, job: null, status: 'idle', place: null, travel: 'idle', hp: null, maxHp: undefined, portrait: undefined, traits: [], mastery: undefined });
   assert.ok(Object.isFrozen(v));
   assert.equal(api.folkById('nobody'), undefined);
 
@@ -106,6 +106,37 @@ test('api: guards registered through it reach the skill and redraw its buttons',
   assert.equal(refreshed(), 2);
   assert.equal(hiring.guards.check('staff', { action: 'hire' }), undefined);
   assert.throws(() => api.registerGuard('staff'));
+});
+
+test('api v11: a job is registered with Folk views, listed with its holder, set through the job module; the view names it', () => {
+  const { hiring } = makeHiring();
+  const folk = hiring.crew.hire('Junior');
+  const registered = [];
+  const kinds = new Map();
+  hiring.jobs = {
+    register: (def) => { registered.push(def); kinds.set(def.id, { id: def.id, name: 'Courier', def }); },
+    unregister: (id) => kinds.delete(id),
+    kind: (id) => kinds.get(id),
+    get all() { return [...kinds.values()]; },
+    set: (f, jobId) => hiring.crew.assignJob(f.id, jobId),
+  };
+  const api = createApi({ getHiring: () => hiring, model });
+  assert.ok(api.version >= 11);
+  assert.throws(() => api.registerJob({ id: 'nonamespace', work: () => '', everyMs: () => 1 }));
+  const seen = [];
+  const off = api.registerJob({ id: 'voyage:Courier', name: 'Courier', everyMs: (v) => { seen.push(Object.isFrozen(v)); return 1000; }, work: (v, ms) => { seen.push(v.id, ms); return ''; } });
+  registered[0].everyMs(folk);
+  registered[0].work(folk, 500);
+  assert.deepEqual(seen, [true, folk.id, 500], 'the job sees a frozen view, never the record');
+  assert.equal(registered[0].refusal, undefined);
+  assert.deepEqual(api.jobs(), [{ id: 'voyage:Courier', name: 'Courier', holder: null }]);
+  assert.equal(api.setJob(folk.id, 'voyage:Nope'), false);
+  assert.equal(api.setJob('nobody', 'voyage:Courier'), false);
+  assert.equal(api.setJob(folk.id, 'voyage:Courier'), true);
+  assert.equal(api.folkById(folk.id).job, 'voyage:Courier');
+  assert.deepEqual(api.jobs(), [{ id: 'voyage:Courier', name: 'Courier', holder: folk.id }]);
+  off();
+  assert.deepEqual(api.jobs(), []);
 });
 
 test('folkView copies the place and leaves the record alone', () => {
@@ -409,7 +440,7 @@ test('api v10: mastery in the view, qualifies, and the haul calls go to the room
     emptyToBank: (folk, opts) => { calls.push(['empty', folk.id, opts.inputs]); return { items: [], left: [], purse: [] }; },
   };
   const api = createApi({ getHiring: () => hiring, model });
-  assert.equal(api.version, 10);
+  assert.ok(api.version >= 10);
   const junior = hiring.crew.hire('Junior');
   const newbie = hiring.crew.hire('Newbie');
   assert.equal(api.folkById(junior.id).mastery, 42);

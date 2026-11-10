@@ -60,10 +60,42 @@ test('serialize/load round-trip, slot cap on load and crewChanged emission', () 
   assert.equal(crew.size, 0);
 });
 
+test('assignJob keeps one Folk per job, ends its skill, and a skill ends its job', () => {
+  const { bus, crew } = make();
+  const events = [];
+  bus.on('folkJobChanged', ({ folk, previous, jobId }) => events.push(`${folk.id}:${previous}>${jobId}`));
+  const a = crew.hire('Junior');
+  const b = crew.hire('Junior');
+  crew.assign(a.id, 'melvorD:Mining');
+  crew.byId(a.id).travel = 'with';
+  assert.equal(crew.assignJob(a.id, 'worker_folks:Quartermaster'), true);
+  assert.equal(crew.byId(a.id).skillId, null, 'the job takes the Folk off its skill');
+  assert.equal(crew.byId(a.id).travel, 'idle');
+  crew.byId(a.id).jobMemory = { food0: 'melvorD:Shark' };
+  crew.assignJob(b.id, 'worker_folks:Quartermaster');
+  assert.equal(crew.byId(a.id).job, null, 'one Folk per job');
+  assert.deepEqual(crew.byId(a.id).jobMemory, {});
+  assert.equal(crew.byJob('worker_folks:Quartermaster').id, b.id);
+  crew.assign(b.id, 'melvorD:Fishing');
+  assert.equal(crew.byId(b.id).job, null, 'a skill ends the job');
+  assert.equal(crew.byJob('worker_folks:Quartermaster'), undefined);
+  assert.deepEqual(events, ['id1:null>worker_folks:Quartermaster', 'id1:worker_folks:Quartermaster>null', 'id2:null>worker_folks:Quartermaster', 'id2:worker_folks:Quartermaster>null']);
+  assert.equal(crew.assignJob('nobody', 'x'), false);
+});
+
+test('a job that travels leaves the Folk where it is, along with the player included', () => {
+  const { crew } = make();
+  const a = crew.hire('Junior');
+  crew.byId(a.id).travel = 'with';
+  crew.assignJob(a.id, 'worker_folks:Quartermaster', { travels: true });
+  assert.equal(crew.byId(a.id).travel, 'with');
+  assert.equal(crew.byId(a.id).job, 'worker_folks:Quartermaster');
+});
+
 test('load migrates a pre-version root', () => {
   const { crew } = make(4);
   const report = crew.load({ folks: [{ id: 'old', slot: 1, tier: 'Junior', name: 'Old' }] });
-  assert.deepEqual(report.applied, [0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.deepEqual(report.applied, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
   assert.equal(crew.bySlot(1).strikes, 0);
   assert.equal(crew.bySlot(1).paid, null);
 });

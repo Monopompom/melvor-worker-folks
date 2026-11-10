@@ -13,6 +13,7 @@ export const MILESTONES = [
   { level: 35, key: 'RESERVE_72', icon: 'reserve' },
   { level: 40, key: 'LICENCE_MIDDLE', icon: 'Middle' },
   { level: 45, key: 'SEVERANCE_HALF', icon: 'hiring' },
+  { level: 45, key: 'QUARTERMASTER', icon: 'hiring' },
   { level: 50, key: 'MARKS', icon: 'hiring' },
   { level: 50, key: 'ORDERS_REROLL', icon: 'hiring' },
   { level: 55, key: 'AUTO_RESTART', icon: 'hiring' },

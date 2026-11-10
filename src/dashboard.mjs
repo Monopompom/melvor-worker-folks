@@ -30,7 +30,7 @@ export function install(ctx, { getHiring, model, milestones, bulk, tips, marquee
 
   ctx.onModsLoaded(() => {
     hiring = getHiring();
-    for (const name of ['folkActionDone', 'crewChanged', 'folkStruck', 'folkInDebt', 'folkReleased', 'folkStarted', 'folkDied', 'folkMoved']) {
+    for (const name of ['folkActionDone', 'folkJobWorked', 'crewChanged', 'folkStruck', 'folkInDebt', 'folkReleased', 'folkStarted', 'folkDied', 'folkMoved']) {
       try { hiring.events.on(name, mark); } catch (err) { log('overview listener failed', name, err); }
     }
     hiring.events.on('folkMade', ({ item, quantity }) => { if (tally.addItem(item?.id, quantity)) dirty = true; });
@@ -150,8 +150,9 @@ export function install(ctx, { getHiring, model, milestones, bulk, tips, marquee
   const workView = () => {
     const rows = model.rosterOrder(hiring.crew.all.map((folk) => {
       const status = hiring.statusOf(folk);
-      const skill = hiring.skillOf(folk);
-      const action = hiring.currentAction(skill);
+      // Its skill, or its job (named and drawn as a skill; a job has no action line).
+      const skill = hiring.workOf(folk);
+      const action = skill?.isJob === true ? null : hiring.currentAction(skill);
       const skillText = skill === undefined ? getLangString('MOD_WF_UNASSIGNED') : hiring.skillName(skill);
       return {
         slot: folk.slot,
@@ -165,7 +166,7 @@ export function install(ctx, { getHiring, model, milestones, bulk, tips, marquee
         skillIcon: skill?.media,
         skillText,
         action: action?.name ?? '',
-        working: skill !== undefined && hiring.delegated.has(skill),
+        working: hiring.isWorking(folk),
       };
     }));
     return { rows, working: rows.filter((r) => r.working).length, total: rows.length, bulk: rows.length === 0 ? null : bulk?.view() ?? null };

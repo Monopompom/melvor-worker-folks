@@ -27,7 +27,7 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
       // Another mod may refuse the Folk this skill where it stands (Voyage's work guard): unavailable, with its reason.
       folkAvailable: folk === undefined || (hiring.folkAvailable(folk) && hiring.workRefusal(folk, skill) === ''),
       isDelegated: hiring.delegated.has(skill),
-      delegatedCount: hiring.delegated.size,
+      delegatedCount: hiring.slotsUsed,
       shiftSlots: hiring.shiftSlots,
     });
   };
@@ -113,7 +113,7 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
       case 'refuse':
         this.notifications.createErrorNotification(
           'worker_folks:noslot',
-          templateLangString('MOD_WF_NO_SHIFT_SLOT', { used: `${hiring.delegated.size}`, slots: `${hiring.shiftSlots}` }),
+          templateLangString('MOD_WF_NO_SHIFT_SLOT', { used: `${hiring.slotsUsed}`, slots: `${hiring.shiftSlots}` }),
         );
         return true;
       default:

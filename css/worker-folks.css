@@ -166,6 +166,13 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 .wf-auto-restock { display: flex; align-items: center; gap: 8px; }
 .wf-auto-restock > .wf-switch { flex: 1 1 auto; min-width: 0; }
 .wf-auto-restock-at { flex: none; }
+/* The Job picker (round 3): its label, then the game's dropdown at the right, as the auto-restock line. */
+.wf-job { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wf-job-pick { flex: none; min-width: 0; }
+.wf-job-pick .dropdown-item img { width: 16px; height: 16px; margin-right: 6px; vertical-align: -3px; }
+.wf-job-pick .dropdown-item.wf-job-off { opacity: 0.5; }
+/* The Job button and the Restock button above it take the same width, so their edges line up. */
+.wf-restock-fill, .wf-job-pick .dropdown-toggle { min-width: 5rem; }
 /* Health on one line: the HP text, its bar, the food (which wraps under when long). */
 .wf-band-health { display: flex; flex-wrap: wrap; align-items: center; column-gap: 10px; row-gap: 2px; }
 .wf-band-health .wf-hp-bar { flex: 1 1 60px; margin-bottom: 0; }

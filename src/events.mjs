@@ -38,6 +38,13 @@ export const EVENT_NAMES = [
   'roomFull',
   'roomDry',
   'roomChanged',
+  // Jobs (round 3): a Folk's job changed { folk, previous, jobId }; a job did a stretch of work, its wage charged
+  // { folk, jobId, ms, offline }; the Quartermaster refilled a slot { folk, item, quantity, offline } or found none of
+  // its item left in the bank { folk, item, offline }.
+  'folkJobChanged',
+  'folkJobWorked',
+  'folkRefilled',
+  'folkRefillOut',
 ];
 
 export function createEventBus(names = EVENT_NAMES, { onError } = {}) {

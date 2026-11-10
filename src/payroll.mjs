@@ -69,9 +69,11 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
       const out = {};
       hiring.crew.all.forEach((folk) => {
         const skill = hiring.skillOf(folk);
-        const working = skill !== undefined && hiring.delegated.has(skill);
+        // A running job (the Quartermaster) draws its wage like a skill, in GP.
+        const job = hiring.jobs?.isRunning(folk) === true;
+        const working = job || (skill !== undefined && hiring.delegated.has(skill));
         if (!working && !all) return;
-        const id = working ? api.currencyIdFor(skill) : GP_ID;
+        const id = working && !job ? api.currencyIdFor(skill) : GP_ID;
         out[id] = (out[id] ?? 0) + api.hourlyWageOf(folk);
       });
       return out;
@@ -156,8 +158,8 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
       folk.onStrike = false;
       folk.cooldownTicks = Math.floor(wages.cooldownAfterSettlement(folk.tier, { apology }) * (hiring.cooldownFactor?.(folk) ?? 1));
       log(`settled ${folk.name}${apology ? ' with apology' : ''}; cooldown ${folk.cooldownTicks} ticks`);
-      // Level 55: the Folk picks its skill back up once it may work again.
-      if (hiring.levels?.autoRestart() && folk.skillId !== null) {
+      // Level 55: the Folk picks its skill (or its job) back up once it may work again.
+      if (hiring.levels?.autoRestart() && (folk.skillId !== null || typeof folk.restartPick?.job === 'string')) {
         folk.restartWhenReady = true;
         if (folk.cooldownTicks === 0) restartFolk(folk);
       } else {
@@ -175,6 +177,17 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
   /** Starts the Folk's last skill again (online only); clears the flag either way. */
   const restartFolk = (folk) => {
     folk.restartWhenReady = false;
+    // A job the strike took: back on it (the job's own refusal, a toast, when it can't).
+    if (typeof folk.restartPick?.job === 'string') {
+      const jobId = folk.restartPick.job;
+      folk.restartPick = null;
+      const kind = hiring.jobs?.kind(jobId);
+      if (!game._isInOnlineLoop || !(hiring.levels?.autoRestart()) || kind === undefined || !hiring.folkAvailable(folk)) return false;
+      if (folk.skillId !== null || folk.job !== null || !hiring.jobs.set(folk, jobId)) return false;
+      game.notifications.createSuccessNotification('worker_folks:restart', templateLangString('MOD_WF_AUTO_RESTARTED', { name: folk.name, skill: kind.name }), hiring.portrait(folk.tier));
+      log(`${folk.name} back on its job ${jobId} after settlement`);
+      return true;
+    }
     const skill = folk.skillId === null ? undefined : game.skills.getObjectByID(folk.skillId);
     const pick = strikeSelection.get(folk.id) ?? fromSaved(skill, folk.restartPick, game);
     strikeSelection.delete(folk.id);
@@ -311,10 +324,16 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     folk.strikes += 1;
     log(`${folk.name} strikes on ${skill.id}, owed ${folk.debt} ${folk.debtCurrency}`);
     api.rollDemands(folk);
-    const pick = selectionOf(skill);
-    if (pick !== null) strikeSelection.set(folk.id, pick);
-    folk.restartPick = toSaved(pick);
-    hiring.forceStop(skill);
+    if (skill.isJob === true) {
+      // A job: the Folk leaves it (its Shift Slot back at once) and takes it up again after settling, from Hiring 55.
+      hiring.crew.assignJob(folk.id, null);
+      folk.restartPick = { job: skill.id };
+    } else {
+      const pick = selectionOf(skill);
+      if (pick !== null) strikeSelection.set(folk.id, pick);
+      folk.restartPick = toSaved(pick);
+      hiring.forceStop(skill);
+    }
     game.notifications.createErrorNotification(
       'worker_folks:strike',
       templateLangString('MOD_WF_STRIKE_NOTIFICATION', { name: folk.name, skill: hiring.skillName(skill) }),
@@ -403,6 +422,8 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     hiring.payroll = api;
     /** The wage for `ms` of a Folk's time that made nothing: a run to town for a Township commission (build .163). */
     api.chargeTime = (folk, skill, ms) => charge({ skill, folk, intervalMs: ms, run: true });
+    /** The wage for `ms` of a job's time (src/jobs.mjs): GP, as a skill's; Work Orders leave it out like a run. */
+    api.chargeJob = (folk, kind, ms) => charge({ skill: kind, folk, intervalMs: ms, run: true });
   });
   ctx.onCharacterLoaded(() => {
     hiring.events.on('folkActionDone', charge);

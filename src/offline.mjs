@@ -6,9 +6,9 @@
 export function install(ctx, { getHiring, time, log }) {
   let hiring;
   /** Per offline session: actions completed and skills released, by skill id; wages paid, by currency id. */
-  let tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], traits: [], wages: new Map(), wageMs: new Map(), orders: [], active: false };
+  let tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], traits: [], wages: new Map(), wageMs: new Map(), orders: [], refills: new Map(), refillOut: [], active: false };
   const reset = () => {
-    tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], traits: [], wages: new Map(), wageMs: new Map(), orders: [], active: true };
+    tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], traits: [], wages: new Map(), wageMs: new Map(), orders: [], refills: new Map(), refillOut: [], active: true };
   };
 
   ctx.onModsLoaded(() => {
@@ -50,7 +50,7 @@ export function install(ctx, { getHiring, time, log }) {
     const ticks = Math.floor(ms / TICK_INTERVAL);
     tracker.active = false;
     hiring.events.emit('offlineTicks', { ticks, ms });
-    if (info.offlineProgress === undefined || (tracker.actions.size === 0 && tracker.released.size === 0 && tracker.died.length === 0 && tracker.debts.length === 0 && tracker.struck.length === 0 && tracker.traits.length === 0 && tracker.wages.size === 0 && tracker.orders.length === 0 && !hiring.crew.all.some((f) => (hiring.room?.heldList(f).length ?? 0) > 0))) return;
+    if (info.offlineProgress === undefined || (tracker.actions.size === 0 && tracker.released.size === 0 && tracker.died.length === 0 && tracker.debts.length === 0 && tracker.struck.length === 0 && tracker.traits.length === 0 && tracker.wages.size === 0 && tracker.orders.length === 0 && tracker.refills.size === 0 && tracker.refillOut.length === 0 && !hiring.crew.all.some((f) => (hiring.room?.heldList(f).length ?? 0) > 0))) return;
     const container = info.offlineProgress.messageContainer;
     if (container === undefined) return;
     // Welcome Back lines in the game's own style (scan C-08, C-09, C-10, build .112):
@@ -94,6 +94,16 @@ export function install(ctx, { getHiring, time, log }) {
       // A few minutes of work read "<0.1", never "0.0" (as the room's band).
       const hours = worked > 0 && worked < 0.1 ? '<0.1' : time.hoursText(worked);
       lines.push({ media: currency?.media, html: templateLangString('MOD_WF_OFFLINE_WAGES', { amount: currency?.media ? icon(currency.media, paid) : esc(paid), currency: esc(currency?.name ?? currencyId), hours }) });
+    });
+    // A job's work (the Quartermaster): what each Folk refilled, one line a Folk, and what ran out in your bank, red.
+    tracker.refills.forEach(({ folk, items }) => {
+      const job = hiring.jobs?.of(folk);
+      const list = [...items.values()].map(({ item, qty }) => `${numberWithCommas(qty)} ${item.name}`).join(', ');
+      lines.push({ media: job?.media, html: fill('MOD_WF_OFFLINE_REFILLED', { name: folk.name, skill: job?.name ?? '', items: list }, { items: 'text-success' }, job?.media) });
+    });
+    tracker.refillOut.forEach(({ folk, item }) => {
+      const job = hiring.jobs?.of(folk);
+      lines.push({ media: job?.media, html: fill('MOD_WF_OFFLINE_REFILL_OUT', { name: folk.name, skill: job?.name ?? '', item: item.name }, { item: 'text-danger' }, job?.media) });
     });
     // Work Orders: a delivered one green with what it paid, one gone undelivered red; the order's size icon first.
     tracker.orders.forEach(({ order, text, delivered }) => {
@@ -186,6 +196,21 @@ export function install(ctx, { getHiring, time, log }) {
       // The hours of work wages are paid for, by the currency they're paid in.
       const currencyId = hiring.payroll?.enabled !== false ? hiring.payroll?.currencyIdFor(skill) : undefined;
       if (currencyId !== undefined && intervalMs > 0) tracker.wageMs.set(currencyId, (tracker.wageMs.get(currencyId) ?? 0) + intervalMs);
+    });
+    // A job's time counts toward the wages' hours like a skill's (in GP); its refills and run-outs get their lines.
+    hiring.events.on('folkJobWorked', ({ ms }) => {
+      if (!tracker.active || hiring.payroll?.enabled === false || !(ms > 0)) return;
+      tracker.wageMs.set('melvorD:GP', (tracker.wageMs.get('melvorD:GP') ?? 0) + ms);
+    });
+    hiring.events.on('folkRefilled', ({ folk, item, quantity }) => {
+      if (!tracker.active || item === undefined) return;
+      const entry = tracker.refills.get(folk.id) ?? { folk, items: new Map() };
+      const was = entry.items.get(item.id);
+      entry.items.set(item.id, { item, qty: (was?.qty ?? 0) + quantity });
+      tracker.refills.set(folk.id, entry);
+    });
+    hiring.events.on('folkRefillOut', ({ folk, item }) => {
+      if (tracker.active && item !== undefined) tracker.refillOut.push({ folk, item });
     });
     hiring.events.on('folkReleased', ({ skill }) => {
       if (!tracker.active) return;

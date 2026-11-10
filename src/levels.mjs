@@ -94,6 +94,12 @@ export function install(ctx, { getHiring, rules, log }) {
       toastCarry = carry;
       if (extra > 0) game.combat.notifications.add({ type: 'SkillXP', args: [hiring, extra] });
     });
+    // A job's time earns Hiring XP as a skill's does (time worked, waits included); the game's own "+N XP" toast stays
+    // with the skill actions, so a job's few seconds never toast.
+    hiring.events.on('folkJobWorked', ({ folk, ms }) => {
+      const xp = rules.hiringXPForWork(folk.tier, ms, xpRate());
+      if (xp > 0) hiring.addXP(xp);
+    });
     // Level-ups change gates everywhere: cards, reserve panel, shop requirements.
     const original = hiring.onLevelUp;
     hiring.onLevelUp = function (oldLevel, newLevel) {

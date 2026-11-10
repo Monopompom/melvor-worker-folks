@@ -137,6 +137,15 @@
           </div>
           <!-- The Folk's switches, always in sight (build .153): Overtime once mastery unlocks it, Own stock. -->
           <div class="wf-switches" data-wf="switches">
+            <!-- The Folk's job (round 3): None or a job such as the Quartermaster, the game's own dropdown; hidden until
+                 a job opens at its Hiring level. -->
+            <div class="wf-job d-none" data-wf="job">
+              <span class="font-w600 wf-min0" data-wf="job-label"></span>
+              <div class="dropdown wf-job-pick">
+                <button type="button" class="btn btn-sm btn-outline-info dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"></button>
+                <div class="dropdown-menu dropdown-menu-right font-size-sm"></div>
+              </div>
+            </div>
             <button type="button" class="wf-switch d-none" role="switch" aria-checked="false" data-wf="overtime">
               <span class="wf-switch-track" aria-hidden="true"><span class="wf-switch-knob"></span></span>
               <span class="wf-min0"><span class="d-block font-w600" data-wf="overtime-label"></span><small class="d-block wf-subtle" data-wf="overtime-sub"></small></span>

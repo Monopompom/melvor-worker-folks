@@ -158,6 +158,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       if (this.struck(folk)) return 'strike';
       if (folk.cooldownTicks > 0) return 'cooldown';
       if (this.owing(folk)) return 'debt';
+      // A job (src/jobs.mjs) works while it holds a Shift Slot; it has no Overtime.
+      if (folk.job !== null) return this.jobs?.isRunning(folk) ? 'working' : 'idle';
       const skill = this.skillOf(folk);
       if (skill === undefined || !this.delegated.has(skill)) return 'idle';
       return this.perksOf(folk).overtimeActive ? 'overtime' : 'working';
@@ -202,7 +204,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       if (this.delegated.has(skill)) return this.crew.bySkill(skill.id);
       const folk = pending ?? this.crew.bySkill(skill.id);
       if (folk === undefined) return undefined;
-      const way = rules.decideStart({ hasFolk: true, folkAvailable: this.folkAvailable(folk), isDelegated: false, delegatedCount: this.delegated.size, shiftSlots: this.shiftSlots });
+      const way = rules.decideStart({ hasFolk: true, folkAvailable: this.folkAvailable(folk), isDelegated: false, delegatedCount: this.slotsUsed, shiftSlots: this.shiftSlots });
       return way === 'delegate' ? folk : undefined;
     }
 
@@ -237,6 +239,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
     }
 
     stopFolk(folk) {
+      // A job's Stop ends the job: its Shift Slot and wage stop at once.
+      if (folk.job !== null) return this.jobs?.set(folk, null) ?? false;
       const skill = this.skillOf(folk);
       if (skill === undefined || !this.delegated.has(skill)) return false;
       const stopped = skill.stop();
@@ -385,6 +389,9 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       // Refused by another mod for this page's skill (Voyage: not on this hex): the reason on the tile, never a popup.
       const why = this.pickRefusal(folk, pageSkill);
       if (why !== '') lines.push({ text: why, cls: 'text-warning' });
+      // On a job: its icon and name, as a skill's line.
+      const job = this.jobs?.of(folk);
+      if (job !== undefined) lines.push({ segments: [{ icon: job.media, text: job.name }], cls });
       if (folk.skillId !== null) {
         // "⛏ Woodcutting (🌳 Oak Tree)": skill icon + name, then the current action in brackets.
         const segments = [{ icon: this.game.skills.getObjectByID(folk.skillId)?.media, text: this.skillName(folk.skillId) }];
@@ -482,6 +489,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
     }
 
     assignmentText(folk) {
+      const job = this.jobs?.of(folk);
+      if (job !== undefined) return job.name;
       if (folk.skillId === null) return getLangString('MOD_WF_UNASSIGNED');
       return this.skillName(folk.skillId);
     }
@@ -607,14 +616,32 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         assignmentText: (folk) => this.assignmentText(folk),
         // The assignment line says it on its own; the line under it says how (build .61, user layout).
         unassignedText: () => getLangString('MOD_WF_CARD_SKILL_NONE'),
-        skillMedia: (folk) => this.skillOf(folk)?.media,
-        rateText: (folk) => templateLangString('MOD_WF_CARD_RATE', { rate: `${produceRate.produceRate(folk.tier)}` }),
-        effects: (folk) => this.tierEffects(folk.tier),
-        isWorking: (folk) => {
-          const skill = this.skillOf(folk);
-          return skill !== undefined && this.delegated.has(skill);
+        skillMedia: (folk) => this.workOf(folk)?.media,
+        // A job Folk's card keeps its shape with the job's own content (the user, 10 Nov 2026: "hide them but smart"):
+        // the blue pill says how often it looks, the effects line what it does; the skill switches are hidden.
+        rateText: (folk) => {
+          const job = this.jobs?.of(folk);
+          if (job !== undefined) return this.jobText(job, 'badge', folk);
+          return templateLangString('MOD_WF_CARD_RATE', { rate: `${produceRate.produceRate(folk.tier)}` });
         },
+        effects: (folk) => {
+          const job = this.jobs?.of(folk);
+          return job !== undefined ? this.jobEffects(job, folk) : this.tierEffects(folk.tier);
+        },
+        isWorking: (folk) => this.isWorking(folk),
         detailText: (folk) => {
+          const job = this.jobs?.of(folk);
+          if (job !== undefined) {
+            if (this.struck(folk)) return templateLangString('MOD_WF_CARD_STOPPED_STRIKE', { skill: job.name });
+            if (!this.jobs.isRunning(folk)) {
+              if (!this.jobs.unlocked(job)) return this.jobs.refusal(folk, job.id);
+              const held = this.jobs.heldText(folk);
+              if (held !== '') return held;
+              return getLangString(folk.travel !== 'idle' && job.def.travels !== true ? 'MOD_WF_CARD_JOB_AWAY' : 'MOD_WF_CARD_JOB_NO_SLOT');
+            }
+            const wait = this.jobs.waitText(folk);
+            return wait !== '' ? wait : getLangString('MOD_WF_CARD_JOB_WORKING');
+          }
           const skill = this.skillOf(folk);
           if (skill === undefined) return getLangString('MOD_WF_CARD_SKILL_NONE_HINT');
           if (!this.delegated.has(skill)) {
@@ -633,13 +660,17 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         },
         /** True when the detail line is a refusal (amber): the Folk may not start its skill. */
         workRefused: (folk) => {
+          if (folk.job !== null) return this.jobs?.isRunning(folk) === true ? this.jobs.waitText(folk) !== '' : !this.struck(folk);
           const skill = this.skillOf(folk);
           return skill !== undefined && !this.delegated.has(skill) && !this.struck(folk) && this.workRefusal(folk, skill) !== '';
         },
         onStop: (folk) => this.stopFolk(folk),
         stopText: () => getLangString('MOD_WF_BUTTON_STOP'),
         // In the currency the Folk's skill pays right now (AP on an Abyssal action), like the Worker popup (build .55).
-        wageText: (folk) => this.wageLine(folk, this.skillOf(folk))?.text ?? '',
+        wageText: (folk) => this.wageLine(folk, this.workOf(folk))?.text ?? '',
+        /** The card's Job picker (src/jobs.mjs): hidden until a job opens; the jobs with why one can't be taken. */
+        job: (folk) => this.jobView(folk),
+        onPickJob: (folk, jobId) => { this.jobs?.set(folk, jobId); },
         strikeInfo: (folk) => {
           const payroll = this.payroll;
           if (payroll === undefined) return null;
@@ -647,8 +678,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
             const d = this.debtText(folk);
             if (d === null) return null;
             // Idle, the grace doesn't run: the debt waits for its next action (scan A-24, build .112).
-            const skill = this.skillOf(folk);
-            const working = skill !== undefined && this.delegated.has(skill);
+            const working = this.isWorking(folk);
             // The amount on one line, what happens next on its own line under it (the user, build .112).
             return {
               debtOnly: true,
@@ -727,14 +757,15 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         }),
         perkLines: (folk) => this.perkLines(folk),
         overtime: (folk) => {
+          if (folk.job !== null) return { unlocked: false, on: false, text: '', sub: '' };
           const p = this.perksOf(folk);
           // The switch exists only once mastery 30 unlocks it; the perk list says the rest.
           return { unlocked: p.overtimeUnlocked, on: p.overtimeActive, text: getLangString('MOD_WF_SWITCH_OVERTIME'), sub: getLangString('MOD_WF_SWITCH_OVERTIME_SUB') };
         },
         onToggleOvertime: (folk) => this.setOvertime(folk, !folk.overtime),
-        ownStock: (folk) => this.room?.ownStockView(folk),
+        ownStock: (folk) => (folk.job !== null ? undefined : this.room?.ownStockView(folk)),
         onToggleOwnStock: (folk) => this.room?.setOwnStock(folk, !folk.ownStock),
-        autoRestock: (folk) => this.room?.autoRestockView(folk),
+        autoRestock: (folk) => (folk.job !== null ? undefined : this.room?.autoRestockView(folk)),
         onToggleAutoRestock: (folk) => this.room?.toggleAutoRestock(folk),
         onPickRestockAt: (folk, hours) => this.room?.setRestockAt(folk, hours),
         onRestock: (folk, actions) => this.room?.restock(folk, actions ?? Infinity),
@@ -840,6 +871,45 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
     /** Shift Slots outside the licence cap: the dev console only (`workerFolksDev`). */
     get extraShiftSlots() {
       return this.devExtraShiftSlots;
+    }
+
+    /**
+     * The card's Job picker, or undefined while no job is open (and the Folk has none): the current job, then None and
+     * each job with why this Folk can't take it ('' = it can); the tooltip says what a job is and what this one does.
+     */
+    jobView(folk) {
+      const jobs = this.jobs;
+      if (jobs === undefined || jobs.all.length === 0) return undefined;
+      const current = jobs.of(folk);
+      if (current === undefined && !jobs.all.some((k) => jobs.unlocked(k))) return undefined;
+      const none = getLangString('MOD_WF_CARD_JOB_NONE');
+      let about = [];
+      try { about = current?.def.describe?.(folk) ?? []; } catch { about = []; }
+      return {
+        label: getLangString('MOD_WF_CARD_JOB'),
+        pickLabel: getLangString('MOD_WF_CARD_JOB_PICK'),
+        current: current?.id ?? null,
+        currentText: current?.name ?? none,
+        options: [{ id: null, text: none, why: '' }, ...jobs.all.map((k) => ({ id: k.id, text: k.name, media: k.media, why: k.id === folk.job ? '' : jobs.refusal(folk, k.id) }))],
+        tip: [getLangString('MOD_WF_CARD_JOB_TIP'), ...about.map((text) => ({ text, cls: 'font-w600' }))],
+      };
+    }
+
+    /** Shift Slots in use: the skills Folks run, and the jobs that run (src/jobs.mjs). */
+    get slotsUsed() {
+      return this.delegated.size + (this.jobs?.runningCount ?? 0);
+    }
+
+    /** What the Folk works at: its skill, or its job (named and drawn like a skill), or undefined. */
+    workOf(folk) {
+      return this.skillOf(folk) ?? this.jobs?.of(folk);
+    }
+
+    /** Working right now: its skill runs, or its job holds a Shift Slot. */
+    isWorking(folk) {
+      if (folk.job !== null) return this.jobs?.isRunning(folk) === true;
+      const skill = this.skillOf(folk);
+      return skill !== undefined && this.delegated.has(skill);
     }
 
     /** Folks allowed to work at once: 1 from the Trainee licence + bought Shift Slots + free level slots, within the licence cap, plus extras. */
@@ -1257,6 +1327,23 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
      * A tier's effects (Produce Rate is shown separately) as { before, value, after, tone } pieces, so the value can
      * stand out in its colour: 'good' green, 'bad' amber (build .73). The value's place comes from the language string.
      */
+    /** A job's text from its definition (`badge`): '' when it has none or it fails. */
+    jobText(job, key, folk) {
+      try { return String(job.def[key]?.(folk) ?? ''); } catch { return ''; }
+    }
+
+    /**
+     * A job's effects line, the tier effects' format: its definition's `effects(folk)` → strings, or { before, value,
+     * after } pieces (the value bold).
+     */
+    jobEffects(job, folk) {
+      let list = [];
+      try { list = job.def.effects?.(folk) ?? []; } catch { list = []; }
+      return (Array.isArray(list) ? list : []).map((e) => (typeof e === 'string'
+        ? { before: e, value: '', after: '', tone: 'good' }
+        : { before: String(e?.before ?? ''), value: String(e?.value ?? ''), after: String(e?.after ?? ''), tone: e?.tone === 'bad' ? 'bad' : 'good' }));
+    }
+
     tierEffects(tier) {
       const mods = produceRate.tierModifiers(tier, { preservationDisabled: !!this.game.currentGamemode.disablePreservation });
       const pct = (n) => `${n > 0 ? '+' : n < 0 ? '-' : ''}${Math.abs(n)}%`;

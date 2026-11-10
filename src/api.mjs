@@ -3,7 +3,7 @@
 // Pure: the Hiring skill and the Folk model are injected (mod modules cannot import their siblings).
 
 /** Bumped when something here changes in a way a caller must know about. Voyage refuses an older one. */
-export const API_VERSION = 10;
+export const API_VERSION = 11;
 /** The least of the hire price an outside hire pays (v7): a bargain, never a free Folk. */
 export const HIRE_SHARE_MIN = 0.25;
 
@@ -30,7 +30,8 @@ const placeCopy = (place) => (place === null || place === undefined ? null : Obj
  * A read-only view of a Folk. `hp` null means full health; `maxHp` (v3) is undefined where health isn't known;
  * `portrait` (build .124) is the URL of its rank's picture, as on its card; `traits` (v5) the ids of the traits it
  * holds (a trait waiting for a slot does nothing, so it isn't listed); `mastery` (v10) its Hiring mastery level, 1 to
- * 99, where known. A Folk has no skill levels of its own: it works every skill at your level.
+ * 99, where known. A Folk has no skill levels of its own: it works every skill at your level. `job` (v11) the id of
+ * its job (the Quartermaster, or one another mod registered), null for none; a Folk holds a skill or a job.
  */
 export function folkView(folk, status, maxHp, portrait, mastery) {
   return Object.freeze({
@@ -39,6 +40,7 @@ export function folkView(folk, status, maxHp, portrait, mastery) {
     tier: folk.tier,
     slot: folk.slot,
     skillId: folk.skillId,
+    job: folk.job ?? null,
     status,
     place: placeCopy(folk.place),
     travel: folk.travel,
@@ -206,6 +208,35 @@ export function createApi({ getHiring, model, pricing, rules, getBackup, version
       const off = hiring().guards.register(kind, fn);
       hiring().refreshGuarded();
       return () => { off(); hiring().refreshGuarded(); };
+    },
+    /**
+     * Registers a job (v11): a Folk assignment that is not a skill. `def`: { id ('namespace:Name'), name, media (strings
+     * or functions), everyMs(folkView) → ms between looks, work(folkView, ms, { offline }) → '' when it worked or the
+     * reason it waits (shown on the card; the wage runs either way), unlocked() → boolean, lockText() → why not yet,
+     * refusal(folkView) → '' or why this Folk can't take it, describe(folkView) → lines for the card's tooltip,
+     * travels: true when it works wherever the Folk is, along with the player too (else the Folk stays put for it),
+     * badge(folkView) → the card's blue pill (how often it looks, say), effects(folkView) → the line under it (strings,
+     * or { before, value, after }) }. A 'work' guard refusing { folk, jobId } holds the job off: no slot, no wage. The
+     * job takes a Shift Slot and its Folk's tier wage for its time; the Folk earns Hiring XP and mastery as on a skill.
+     * Its card lists it in the Job picker. Returns the function that removes it.
+     */
+    registerJob: (def) => {
+      if (def === null || typeof def !== 'object' || typeof def.id !== 'string' || !/^[A-Za-z0-9_]+:[A-Za-z0-9_]+$/.test(def.id)) throw new Error('job id must be namespace:Name');
+      const jobs = hiring().jobs;
+      if (jobs === undefined) throw new Error('jobs are not loaded');
+      const wrap = (fn) => (typeof fn === 'function' ? (folk, ...rest) => fn(view(folk), ...rest) : undefined);
+      jobs.register({ ...def, everyMs: wrap(def.everyMs), work: wrap(def.work), refusal: wrap(def.refusal), describe: wrap(def.describe), badge: wrap(def.badge), effects: wrap(def.effects) });
+      return () => jobs.unregister(def.id);
+    },
+    /** Every job, with the Folk on it: [{ id, name, holder }] (`holder` a Folk id or null) (v11). */
+    jobs: () => Object.freeze((hiring().jobs?.all ?? []).map((k) => Object.freeze({ id: k.id, name: k.name, holder: hiring().crew.byJob(k.id)?.id ?? null }))),
+    /** Gives a Folk a job as its card does, refusals included (null: none). False when refused or unknown (v11). */
+    setJob: (id, jobId) => {
+      const folk = record(id);
+      const jobs = hiring().jobs;
+      if (folk === undefined || jobs === undefined) return false;
+      if (jobId !== null && jobs.kind(jobId) === undefined) return false;
+      return jobs.set(folk, jobId) === true;
     },
     /** The Folk a start of this skill goes to now (it runs it, or would be given it), or undefined: the player (v2). */
     workerOf: (skillId) => {

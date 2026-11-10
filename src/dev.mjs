@@ -28,6 +28,19 @@ export function install({ hiring, log, tiers, masteryIndex }) {
     fire(id) {
       return hiring.crew.fire(ref(id), { reason: 'dev' });
     },
+    /** workerFolksDev.job(0, 'worker_folks:Quartermaster') — puts a Folk on a job (null: none), its rules applied. */
+    job(id, jobId = 'worker_folks:Quartermaster') {
+      const folk = hiring.crew.byId(ref(id));
+      if (folk === undefined || hiring.jobs === undefined) return false;
+      return hiring.jobs.set(folk, jobId);
+    },
+    /** Every registered job, with who holds it and whether it runs. */
+    jobs() {
+      return hiring.jobs?.all.map((k) => {
+        const holder = hiring.crew.all.find((f) => f.job === k.id);
+        return { id: k.id, name: k.name, holder: holder?.name ?? null, running: holder !== undefined && hiring.jobs.isRunning(holder), wait: holder ? hiring.jobs.waitText(holder) : '' };
+      }) ?? [];
+    },
     /** Sets a Folk's current HP (clamped to its tier max). */
     hp(id, hp) {
       const folk = hiring.crew.byId(ref(id));

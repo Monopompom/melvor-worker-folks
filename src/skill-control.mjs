@@ -228,7 +228,7 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
     button.onclick = () => openWorkerModal(skill);
 
     // "N of M Shift Slots in use", its own piece that never splits and never takes the status colour (scan B-09, B-22).
-    const slots = templateLangString('MOD_WF_CTRL_SLOTS', { used: `${hiring.delegated.size}`, slots: `${hiring.shiftSlots}` });
+    const slots = templateLangString('MOD_WF_CTRL_SLOTS', { used: `${hiring.slotsUsed}`, slots: `${hiring.shiftSlots}` });
     let status;
     let tone = 'wf-subtle';
     let showSlots = true;
