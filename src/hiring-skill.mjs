@@ -318,7 +318,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       tip.push({ text: getLangString('MOD_WF_CTRL_NET_LEFT_OUT'), cls: 'text-muted' });
       return {
         segments: [{ icon: gp?.media, text: templateLangString('MOD_WF_CTRL_NET', { amount: signed(p.net), currency }) }],
-        cls: p.net < 0 ? 'text-danger font-w600' : 'text-success font-w600',
+        // Coloured by the rounded net like its sign, so a net of -0.4 reads "+0" in green, never in red.
+        cls: Math.round(p.net) < 0 ? 'text-danger font-w600' : 'text-success font-w600',
         tip,
       };
     }

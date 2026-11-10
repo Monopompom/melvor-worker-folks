@@ -659,6 +659,13 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-dash-bulk-btn.disabled { cursor: default; } /* greyed by the shared .wf-ui .btn.disabled look */
 .wf-bulk .wf-bulk-line { margin: 4px 0; }
 .wf-bulk .wf-bulk-total { margin-top: 8px; }
+/* Settle all's bill: two columns meeting in the middle, names flush right, amounts flush left; a long name wraps in its
+   own column, an amount never breaks. The total sits apart under a rule. */
+.wf-bulk .wf-bulk-table { margin: 6px auto 4px; border-collapse: collapse; max-width: 100%; }
+.wf-bulk .wf-bulk-table td { padding: 3px 6px; vertical-align: middle; }
+.wf-bulk .wf-bulk-name { text-align: right; font-weight: 600; overflow-wrap: anywhere; }
+.wf-bulk .wf-bulk-amount { text-align: left; white-space: nowrap; }
+.wf-bulk .wf-bulk-table tr.wf-bulk-total td { padding-top: 8px; border-top: 1px solid var(--wf-line-soft); }
 /* The bill's items in a centred row of fixed tiles, as the popup is centred (one tile sat at the far left). */
 .wf-bulk .wf-item-grid { grid-template-columns: repeat(auto-fit, 44px); justify-content: center; }
 /* Payroll: one compact block per currency (the reserve's own field, presets and Deposit) */

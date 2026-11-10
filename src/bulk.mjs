@@ -107,7 +107,12 @@ export function install(ctx, { getHiring, model, time, popupDidRender, tips, log
   };
 
   const line = (text, cls = '') => el('div', `wf-bulk-line ${cls}`.trim(), text);
-  const hoursOf = (ms) => { const h = ms / 3_600_000; return h > 0 && h < 0.1 ? '<0.1' : time.hoursText(h); };
+  // Under 0.1 h the time is said in whole minutes ("+4 min"), never "+<0.1 h", which read as two signs in a row.
+  const workTime = (ms) => {
+    const h = ms / 3_600_000;
+    if (h > 0 && h < 0.1) return templateLangString('MOD_WF_BULK_RESTOCK_MIN', { minutes: `${Math.max(1, Math.ceil(ms / 60_000))}` });
+    return templateLangString('MOD_WF_BULK_RESTOCK_TIME', { hours: time.hoursText(h) });
+  };
 
   // A bill that can change while it is open (watch) is asked again this often; it is drawn again only when it changed.
   const WATCH_MS = 500;
@@ -169,7 +174,7 @@ export function install(ctx, { getHiring, model, time, popupDidRender, tips, log
       body.append(tiles);
       // A name bold, a time bold blue, as message popups write them.
       for (const f of bill.fill) {
-        const time = esc(templateLangString('MOD_WF_BULK_RESTOCK_TIME', { hours: hoursOf(f.ms) }));
+        const time = esc(workTime(f.ms));
         body.append(richLine('MOD_WF_BULK_RESTOCK_LINE', { name: `<span class="font-w600">${esc(f.folk.name)}</span>`, time: `<span class="font-w600 text-info">${time}</span>` }));
       }
     }
@@ -227,12 +232,25 @@ export function install(ctx, { getHiring, model, time, popupDidRender, tips, log
     if (pay.length === 0) body.append(line(getLangString('MOD_WF_BULK_SETTLE_NOTHING'), 'wf-subtle'));
     else {
       body.append(line(getLangString('MOD_WF_BULK_SETTLE_HEAD'), 'font-w600'));
+      // A table centred on its middle line (the user, 10 Nov 2026): names flush right against the amounts, amounts flush
+      // left, so the amounts start in one column however long the names are.
+      const table = el('table', 'wf-bulk-table');
+      const row = (nameHtml, amount, cls = '') => {
+        const tr = el('tr', cls);
+        const name = el('td', 'wf-bulk-name');
+        name.innerHTML = nameHtml;
+        const pays = el('td', 'wf-bulk-amount');
+        pays.innerHTML = amount;
+        tr.append(name, pays);
+        table.append(tr);
+      };
       for (const f of pay) {
-        const demands = (f.demand?.length ?? 0) > 0 ? getLangString('MOD_WF_BULK_SETTLE_DEMANDS') : '';
-        body.append(richLine('MOD_WF_BULK_SETTLE_LINE', { name: `<span class="font-w600">${esc(f.name)}</span>`, amount: amountHtml(parts.get(f)), demands: esc(demands) }));
+        const demands = (f.demand?.length ?? 0) > 0 ? ` ${esc(getLangString('MOD_WF_BULK_SETTLE_DEMANDS'))}` : '';
+        row(esc(f.name), `${amountHtml(parts.get(f))}${demands}`);
       }
       const total = model.payable(pay.map((f) => ({ key: f, parts: parts.get(f) })), () => Infinity).total;
-      if (pay.length > 1) body.append(richLine('MOD_WF_BULK_SETTLE_TOTAL', { amount: amountHtml(total) }, 'font-w600 wf-bulk-total'));
+      if (pay.length > 1) row(esc(getLangString('MOD_WF_BULK_SETTLE_TOTAL')), amountHtml(total), 'wf-bulk-total');
+      body.append(table);
     }
     if (left.length > 0) body.append(line(templateLangString('MOD_WF_BULK_SETTLE_LEFT', { names: names(left) }), 'wf-subtle'));
     return body;

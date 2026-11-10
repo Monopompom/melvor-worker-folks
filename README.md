@@ -14,7 +14,8 @@ while you fight, raid or train something else.
    never combat).
 3. Open any skill page (Woodcutting, Smithing, Cartography...). A **Worker** box sits under
    the skill header: press the Worker button and pick **You** or one of your Folks in the
-   window that opens (one tile per Folk with its Produce Rate, effects, wage and status). With a Folk chosen, start the
+   window that opens (one tile per Folk with its Produce Rate, effects, wage, status and an estimate of what it would
+   net an hour on the recipe open on the page). With a Folk chosen, start the
    skill exactly as you always do (click the tree, press Create, start the survey...) and the
    Folk takes the job. It keeps working while you do anything else. Press **Stop** in the
    Worker box to end the shift, or switch the box back to **You**: a working Folk then keeps
@@ -22,7 +23,9 @@ while you fight, raid or train something else.
    another skill does not interrupt it either: it moves over when you start the new skill.
    Skills added by other mods get a Worker box too, as long as they have a skill page.
 4. The **Hiring** page (sidebar, under the passive skills) is the crew overview. Its
-   **Overview** block shows who is at work (trouble first), what your Folks made this session,
+   **Overview** block shows who is at work (trouble first, each Folk with its skill and what it works on),
+   with **Stop all**, **Restart all**, **Restock all** and **Settle all** under the list (each shows what it
+   will do and cost before it does it), what your Folks made this session,
    the Payroll Reserve once unlocked, and your next Hiring unlock. Below it, a card per Folk
    with its status, the skill it holds, what it is working on, and a Stop button; what needs you
    (a strike, a debt, a Folk out of inputs or with bank and room full) sits right under its name,
@@ -397,7 +400,8 @@ Mod Settings → Worker Folks: wage difficulty, a preset from **No sweat** (free
 strikes; a strike or unpaid wages from before are only on hold and come back if you switch to a paid
 difficulty) through Easy (¼), Relaxed (½), **Standard** (full wages, the default), Tense (×1.5),
 Hard (×2), Brutal (×3) to **Evil hardcore** (×5); Abyssal
-Pieces wages on/off, **Strike demands** (off by default, see above), Hiring XP rate (default 100%), and **Hide Folks' gain popups**
+Pieces wages on/off, **Strike demands** (off by default, see above), when thieving Folks eat and how much
+(see Folk health), Hiring XP rate (default 100%), and **Hide Folks' gain popups**
 (off by default: when on, the XP, item, currency and mastery popups from your Folks' work stay hidden;
 level-ups, warnings and your own popups still show), and **Faster displays** (on by default:
 mastery bars and mastery pool bars are updated without searching the whole page on every mastery gain,
