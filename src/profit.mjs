@@ -60,7 +60,7 @@ export function install(ctx, { getHiring, model, rate, log }) {
 
   /** What the recipe on the page makes and costs, read as the Folk: the arguments of model.netPerHour, or null. */
   const readRecipe = (skill) => {
-    const yieldOf = (folk) => model.folkYield(rate.produceRate(folk.tier));
+    const yieldOf = (folk) => model.folkYield(hiring.rateOf(folk));
     if (typeof Thieving !== 'undefined' && skill instanceof Thieving) {
       const npc = skill.currentNPC;
       if (npc === undefined) return null;

@@ -5,7 +5,7 @@ import { createFolk, normalizeFolk, migrateRoot, parseRoot, serializeRoot, norma
 
 test('createFolk fills defaults and rejects bad input', () => {
   const f = createFolk({ id: 'a', slot: 0, tier: 'Newbie', name: 'Ada' });
-  assert.deepEqual(f, { id: 'a', slot: 0, tier: 'Newbie', name: 'Ada', skillId: null, job: null, jobMemory: {}, loadout: {}, debt: 0, debtCurrency: null, debtMs: 0, onStrike: false, cooldownTicks: 0, wageCarry: 0, overtime: false, strikes: 0, restartWhenReady: false, restartPick: null, hp: null, place: null, travel: 'idle', hiredAt: 0, traitState: { traits: [], waiting: [], counts: {} }, paid: null, room: { haul: {}, stock: {}, town: {}, purse: {} }, ownStock: false, restockAt: null, townsfolk: false, demand: [] });
+  assert.deepEqual(f, { id: 'a', slot: 0, tier: 'Newbie', name: 'Ada', skillId: null, job: null, jobMemory: {}, supplies: null, loadout: {}, debt: 0, debtCurrency: null, debtMs: 0, onStrike: false, cooldownTicks: 0, wageCarry: 0, overtime: false, strikes: 0, restartWhenReady: false, restartPick: null, hp: null, place: null, travel: 'idle', hiredAt: 0, traitState: { traits: [], waiting: [], counts: {} }, paid: null, room: { haul: {}, stock: {}, town: {}, purse: {} }, ownStock: false, restockAt: null, townsfolk: false, demand: [] });
   assert.equal(createFolk({ id: 'a', slot: 0, tier: 'Newbie', name: 'Ada', paid: 4200 }).paid, 4200);
   assert.throws(() => createFolk({ id: 'a', slot: -1, tier: 'Newbie', name: 'Ada' }));
   assert.throws(() => createFolk({ id: 'a', slot: 0, tier: 'Boss', name: 'Ada' }));
@@ -117,7 +117,7 @@ test('a real v3 save migrates to v10: every Folk kept as it was, with no place, 
   assert.equal(r.root.commissions, null);
   assert.equal(r.root.folks.length, before.folks.length);
   r.root.folks.forEach((folk, i) => {
-    const { place, travel, traitState, paid, room, ownStock, restockAt, townsfolk, restartPick, demand, job, jobMemory, ...rest } = folk;
+    const { place, travel, traitState, paid, room, ownStock, restockAt, townsfolk, restartPick, demand, job, jobMemory, supplies, ...rest } = folk;
     assert.equal(job, null);
     assert.deepEqual(jobMemory, {});
     assert.equal(restockAt, null);
@@ -221,6 +221,9 @@ test('a job survives a reload; a Folk on a skill holds no job; the memory keeps 
   assert.equal(normalizeFolk({ ...base, skillId: 'melvorD:Mining', job: 'worker_folks:Quartermaster' }).job, null);
   assert.equal(normalizeFolk({ ...base, job: '' }).job, null);
   assert.deepEqual(normalizeFolk({ ...base, jobMemory: ['x'] }).jobMemory, {});
+  assert.equal(normalizeFolk({ ...base, supplies: 'b' }).supplies, 'b');
+  assert.equal(normalizeFolk({ ...base, supplies: base.id }).supplies, null, 'never itself');
+  assert.equal(normalizeFolk({ ...base, supplies: 3 }).supplies, null);
 });
 
 test('the commissions state rides in the save as an object; anything else reads as none', () => {

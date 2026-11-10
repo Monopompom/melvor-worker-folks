@@ -42,6 +42,29 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
     byJob(jobId) {
       return folks.find((f) => f.job === jobId);
     },
+    /** Supply lines (round 3): [{ supplierId, receiverId }] for every Folk that supplies another in the crew. */
+    get links() {
+      return folks.filter((f) => f.supplies !== null && folks.some((r) => r.id === f.supplies)).map((f) => ({ supplierId: f.id, receiverId: f.supplies }));
+    },
+    /** The Folks that supply this one. */
+    suppliersOf(id) {
+      return folks.filter((f) => f.supplies === id);
+    },
+    /**
+     * Sets the Folk this one sends what it makes to (null: none). The rules (who may feed whom) are the caller's
+     * (src/supply.mjs); here only: a Folk in the crew, never itself.
+     */
+    setSupply(id, receiverId) {
+      const folk = this.byId(id);
+      if (folk === undefined || receiverId === id) return false;
+      if (receiverId !== null && this.byId(receiverId) === undefined) return false;
+      const previous = folk.supplies;
+      if (previous === receiverId) return true;
+      folk.supplies = receiverId;
+      bus.emit('folkSupplyChanged', { folk, previous, receiverId });
+      emitChange();
+      return true;
+    },
     countByTier(tier) {
       return folks.reduce((n, f) => (f.tier === tier ? n + 1 : n), 0);
     },
@@ -123,6 +146,9 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
       const folk = this.byId(id);
       if (folk === undefined) return false;
       folks = folks.filter((f) => f !== folk);
+      // Its supply lines go with it: what it sent, and what was sent to it.
+      folk.supplies = null;
+      folks.filter((f) => f.supplies === id).forEach((f) => this.setSupply(f.id, null));
       bus.emit('folkFired', { folk, reason, lost });
       emitChange();
       return true;
@@ -171,6 +197,8 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
         const holder = this.byJob(jobId);
         if (holder !== undefined && holder !== folk) this.assignJob(holder.id, null);
         if (folk.skillId !== null) this.assign(folk.id, null);
+        // A job makes nothing: its supply line ends.
+        if (folk.supplies !== null) this.setSupply(folk.id, null);
         if (!travels && folk.travel !== 'idle') folk.travel = 'idle';
       }
       const previous = folk.job;

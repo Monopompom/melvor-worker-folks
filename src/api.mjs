@@ -41,6 +41,7 @@ export function folkView(folk, status, maxHp, portrait, mastery) {
     slot: folk.slot,
     skillId: folk.skillId,
     job: folk.job ?? null,
+    supplies: folk.supplies ?? null,
     status,
     place: placeCopy(folk.place),
     travel: folk.travel,
@@ -230,6 +231,20 @@ export function createApi({ getHiring, model, pricing, rules, getBackup, version
     },
     /** Every job, with the Folk on it: [{ id, name, holder }] (`holder` a Folk id or null) (v11). */
     jobs: () => Object.freeze((hiring().jobs?.all ?? []).map((k) => Object.freeze({ id: k.id, name: k.name, holder: hiring().crew.byJob(k.id)?.id ?? null }))),
+    /** Supply lines (v11): [{ supplierId, receiverId }] for every Folk that supplies another. */
+    supplyLinks: () => Object.freeze(hiring().crew.links.map((l) => Object.freeze({ ...l }))),
+    /**
+     * Sets who a Folk supplies as its card does, refusals included (null: none): from Hiring 60, a receiver whose recipe
+     * uses what it makes and has no other supplier for it, and no staff guard refusing { action: 'link', folk,
+     * receiverId }. False when refused or unknown (v11).
+     */
+    setSupply: (id, receiverId) => {
+      const folk = record(id);
+      const supply = hiring().supply;
+      if (folk === undefined || supply === undefined) return false;
+      if (receiverId !== null && record(receiverId) === undefined) return false;
+      return supply.set(folk, receiverId) === true;
+    },
     /** Gives a Folk a job as its card does, refusals included (null: none). False when refused or unknown (v11). */
     setJob: (id, jobId) => {
       const folk = record(id);

@@ -37,6 +37,8 @@ export function createFolk({ id, slot, tier, name, hiredAt = 0, paid = null }) {
     job: null,
     /** What a job remembers between looks, by its own keys (the Quartermaster: the item each slot last held). */
     jobMemory: {},
+    /** A supply line (v10): the Folk id this Folk sends what it makes to, or null (src/supply.mjs). */
+    supplies: null,
     loadout: {},
     debt: 0,
     debtCurrency: null,
@@ -119,6 +121,7 @@ export function normalizeFolk(raw) {
   folk.skillId = typeof raw.skillId === 'string' ? raw.skillId : null;
   folk.job = folk.skillId === null && typeof raw.job === 'string' && raw.job !== '' ? raw.job : null;
   folk.jobMemory = normalizeJobMemory(raw.jobMemory);
+  folk.supplies = typeof raw.supplies === 'string' && raw.supplies !== '' && raw.supplies !== folk.id ? raw.supplies : null;
   folk.loadout = normalizeLoadoutShape(raw.loadout);
   folk.debt = nonNegNumber(raw.debt);
   folk.debtCurrency = folk.debt > 0 && typeof raw.debtCurrency === 'string' ? raw.debtCurrency : null;
@@ -318,7 +321,7 @@ export const MIGRATIONS = {
   9: (root) => ({
     ...root,
     v: 10,
-    folks: (Array.isArray(root.folks) ? root.folks : []).map((f) => ({ ...f, job: null, jobMemory: {} })),
+    folks: (Array.isArray(root.folks) ? root.folks : []).map((f) => ({ ...f, job: null, jobMemory: {}, supplies: null })),
   }),
 };
 

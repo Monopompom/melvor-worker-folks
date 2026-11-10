@@ -11,7 +11,7 @@
   --wf-working: #1e7b2e; --wf-idle: #5c6873; --wf-strike: #b42318; --wf-cooldown: #1d5fa8; --wf-debt: #8a5a00; --wf-alert: #d99a1e;
   --wf-dis-text: #6c757d; --wf-dis-line: #b6bec7;
   /* build .112 (scan A-36, B-18): band edges and dimmed icons are tokens too; a dimmed icon keeps more ink on white */
-  --wf-edge-strike: #bf1f1f; --wf-edge-debt: #d99a1e; --wf-dim: .65;
+  --wf-edge-strike: #bf1f1f; --wf-edge-debt: #d99a1e; --wf-edge-supply: #1e7b2e; --wf-dim: .65;
   --wf-dream: #f3e6c4; --wf-dream-edge: rgba(120,88,36,0.28); /* build .155: the daydream's thought bubble, a warm sepia */
 }
 body.darkMode {
@@ -21,7 +21,7 @@ body.darkMode {
   --wf-subtle: #b5bec7; --wf-head: #a0a8b4; --wf-hover: #fff; --wf-help: #8fa3b8; --wf-grip: #6c7a89;
   --wf-working: #5ccf6b; --wf-idle: #aab4be; --wf-strike: #ff6b6b; --wf-cooldown: #6fb3ff; --wf-debt: #f0b84a; --wf-alert: #f0b84a;
   --wf-dis-text: #8a949e; --wf-dis-line: #5c6873;
-  --wf-edge-strike: #bf1f1f; --wf-edge-debt: #c98a16; --wf-dim: .4;
+  --wf-edge-strike: #bf1f1f; --wf-edge-debt: #c98a16; --wf-edge-supply: #3fae55; --wf-dim: .4;
   --wf-dream: #cdb98b; --wf-dream-edge: transparent;
 }
 /* Super Dark (body.darkMode.superDark, build .105 after the design canvas): blocks are pure black, so a black well
@@ -171,6 +171,16 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 .wf-job-pick { flex: none; min-width: 0; }
 .wf-job-pick .dropdown-item img { width: 16px; height: 16px; margin-right: 6px; vertical-align: -3px; }
 .wf-job-pick .dropdown-item.wf-job-off { opacity: 0.5; }
+/* A receiver's supply panel (round 3): a green edge as the strike band's red one; "Supplied by" with the rate step at
+   the right, then each supplier's name and what it brings, item icon first. */
+.wf-supplied { padding: 8px 10px 8px 13px; border-radius: 6px; background: var(--wf-well); box-shadow: inset 3px 0 0 var(--wf-edge-supply); }
+.wf-supplied-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.wf-supplied-rate { font-size: 0.875rem; font-weight: 600; color: var(--wf-working); white-space: nowrap; }
+.wf-supplied-rate.wf-off { color: var(--wf-subtle); font-weight: 400; }
+.wf-supplied-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 4px; font-size: 0.875rem; }
+.wf-supplied-row > :first-child { min-width: 0; overflow-wrap: anywhere; }
+.wf-supplied-items { flex: none; color: var(--wf-subtle); white-space: nowrap; }
+.wf-supplied-items img { width: 16px; height: 16px; margin-right: 4px; vertical-align: -3px; }
 /* The Job button and the Restock button above it take the same width, so their edges line up. */
 .wf-restock-fill, .wf-job-pick .dropdown-toggle { min-width: 5rem; }
 /* Health on one line: the HP text, its bar, the food (which wraps under when long). */

@@ -146,6 +146,19 @@
                 <div class="dropdown-menu dropdown-menu-right font-size-sm"></div>
               </div>
             </div>
+            <!-- Supply lines (round 3, Hiring 60): who this Folk sends what it makes to. -->
+            <div class="wf-job d-none" data-wf="supply">
+              <span class="font-w600 wf-min0" data-wf="supply-label"></span>
+              <div class="dropdown wf-job-pick">
+                <button type="button" class="btn btn-sm btn-outline-info dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"></button>
+                <div class="dropdown-menu dropdown-menu-right font-size-sm"></div>
+              </div>
+            </div>
+            <!-- A receiver: who supplies it with what, and its Produce Rate step while one works. -->
+            <div class="wf-supplied d-none" data-wf="supplied">
+              <div class="wf-supplied-head"><span class="font-w600" data-wf="supplied-head"></span><span class="wf-supplied-rate" data-wf="supplied-rate"></span></div>
+              <div data-wf="supplied-rows"></div>
+            </div>
             <button type="button" class="wf-switch d-none" role="switch" aria-checked="false" data-wf="overtime">
               <span class="wf-switch-track" aria-hidden="true"><span class="wf-switch-knob"></span></span>
               <span class="wf-min0"><span class="d-block font-w600" data-wf="overtime-label"></span><small class="d-block wf-subtle" data-wf="overtime-sub"></small></span>

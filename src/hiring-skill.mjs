@@ -370,7 +370,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
      * then the status in colour with its icon, skill and action ("Idle · Fishing · Raw Shrimp").
      */
     folkLines(folk, pageSkill) {
-      const lines = [{ badges: [{ cls: 'badge badge-info', text: templateLangString('MOD_WF_CARD_RATE', { rate: `${produceRate.produceRate(folk.tier)}` }) }] }];
+      const lines = [{ badges: [{ cls: 'badge badge-info', text: templateLangString('MOD_WF_CARD_RATE', { rate: `${this.rateOf(folk)}` }) }] }];
       const wage = this.wageLine(folk, pageSkill);
       if (wage !== null) lines.push({ badges: [{ cls: 'badge badge-warning', text: wage.text }] });
       const net = this.netLine(folk, pageSkill);
@@ -622,7 +622,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         rateText: (folk) => {
           const job = this.jobs?.of(folk);
           if (job !== undefined) return this.jobText(job, 'badge', folk);
-          return templateLangString('MOD_WF_CARD_RATE', { rate: `${produceRate.produceRate(folk.tier)}` });
+          return templateLangString('MOD_WF_CARD_RATE', { rate: `${this.rateOf(folk)}` });
         },
         effects: (folk) => {
           const job = this.jobs?.of(folk);
@@ -671,6 +671,10 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         /** The card's Job picker (src/jobs.mjs): hidden until a job opens; the jobs with why one can't be taken. */
         job: (folk) => this.jobView(folk),
         onPickJob: (folk, jobId) => { this.jobs?.set(folk, jobId); },
+        /** The Supplies picker (src/supply.mjs): from Hiring 60, on a Folk with no job. */
+        supply: (folk) => this.supply?.view(folk),
+        onPickSupply: (folk, receiverId) => { this.supply?.set(folk, receiverId); },
+        supplied: (folk) => this.supply?.suppliedView(folk),
         strikeInfo: (folk) => {
           const payroll = this.payroll;
           if (payroll === undefined) return null;
@@ -1327,6 +1331,11 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
      * A tier's effects (Produce Rate is shown separately) as { before, value, after, tone } pieces, so the value can
      * stand out in its colour: 'good' green, 'bad' amber (build .73). The value's place comes from the language string.
      */
+    /** The Folk's Produce Rate now: its tier's, plus a supply line's step while a supplier of it works (round 3). */
+    rateOf(folk) {
+      return produceRate.produceRate(folk.tier) + (this.supply?.bonus(folk) ?? 0);
+    }
+
     /** A job's text from its definition (`badge`): '' when it has none or it fails. */
     jobText(job, key, folk) {
       try { return String(job.def[key]?.(folk) ?? ''); } catch { return ''; }

@@ -188,9 +188,10 @@ export function install(ctx, { getHiring, model, time, numbers, tips, popupDidRe
 
   // ---- counting ------------------------------------------------------------------------------------------------------
 
-  const onMade = ({ folk, item, quantity, town }) => {
-    // What a Folk makes for a Township commission goes to the town: no order counts it (the user, 4 Nov 2026).
-    if (paying || town === true || folk === undefined || board === null || item === undefined) return;
+  const onMade = ({ folk, item, quantity, town, supplied }) => {
+    // What a Folk makes for a Township commission goes to the town: no order counts it (the user, 4 Nov 2026). Nor
+    // what it sends down a supply line: the receiver uses it up, and what it makes from it counts.
+    if (paying || town === true || supplied === true || folk === undefined || board === null || item === undefined) return;
     const folkId = folk.id;
     let a = actions.get(folkId);
     if (a === undefined) { a = { matched: new Set(), added: false }; actions.set(folkId, a); }

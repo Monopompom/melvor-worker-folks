@@ -194,12 +194,15 @@ export function install(ctx, { getHiring, rate, createTablePool, log }) {
     });
     /** Runs fn with the Folk's modifiers in game.modifiers, no action and no roll: what the Folk would get. */
     hiring.asFolk = (folk, skill, fn) => {
-      if (hiring.acting !== undefined) return fn();
+      const outer = hiring.acting;
+      if (outer !== undefined && outer.folk === folk && outer.skill === skill) return fn();
+      // Inside another Folk's action (a supply line reads its receiver's recipe there): that Folk's modifiers for the
+      // read, then the action's own back.
       hiring.acting = { folk, skill, table: tableFor(folk, skill), outcome: 'ok', consumed: new Set() };
       try {
         return fn();
       } finally {
-        hiring.acting = undefined;
+        hiring.acting = outer;
       }
     };
   });
@@ -226,7 +229,7 @@ export function install(ctx, { getHiring, rate, createTablePool, log }) {
       return runAsFolk(this, () => {
         // No Folk on a delegated skill (it left between ticks): the action runs as the player's rather than throwing.
         if (hiring.acting === undefined) return original();
-        hiring.acting.outcome = rate.rollOutcome(rate.produceRate(hiring.acting.folk.tier));
+        hiring.acting.outcome = rate.rollOutcome(hiring.rateOf(hiring.acting.folk));
         hiring.lastOutcome = hiring.acting.outcome;
         if (rewardsInsideBody && hiring.acting.outcome === 'fail') {
           // Cartography resolves rewards inside mode-specific bodies: a failed

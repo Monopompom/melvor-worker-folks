@@ -83,6 +83,27 @@ test('assignJob keeps one Folk per job, ends its skill, and a skill ends its job
   assert.equal(crew.assignJob('nobody', 'x'), false);
 });
 
+test('supply lines: set on the supplier, never itself, ended by a job or by either Folk leaving', () => {
+  const { bus, crew } = make();
+  const events = [];
+  bus.on('folkSupplyChanged', ({ folk, receiverId }) => events.push(`${folk.id}>${receiverId}`));
+  const a = crew.hire('Junior');
+  const b = crew.hire('Junior');
+  const c = crew.hire('Junior');
+  assert.equal(crew.setSupply(a.id, a.id), false, 'never itself');
+  assert.equal(crew.setSupply(a.id, 'nobody'), false);
+  assert.equal(crew.setSupply(a.id, b.id), true);
+  assert.equal(crew.setSupply(c.id, b.id), true);
+  assert.deepEqual(crew.links, [{ supplierId: a.id, receiverId: b.id }, { supplierId: c.id, receiverId: b.id }]);
+  assert.deepEqual(crew.suppliersOf(b.id).map((f) => f.id), [a.id, c.id]);
+  crew.assignJob(c.id, 'worker_folks:Quartermaster');
+  assert.equal(crew.byId(c.id).supplies, null, 'a job ends its line');
+  crew.fire(b.id);
+  assert.equal(crew.byId(a.id).supplies, null, 'its receiver left');
+  assert.deepEqual(crew.links, []);
+  assert.deepEqual(events, [`${a.id}>${b.id}`, `${c.id}>${b.id}`, `${c.id}>null`, `${a.id}>null`]);
+});
+
 test('a job that travels leaves the Folk where it is, along with the player included', () => {
   const { crew } = make();
   const a = crew.hire('Junior');

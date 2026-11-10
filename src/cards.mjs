@@ -504,27 +504,27 @@ function fillCard(col, folk, view) {
   // The Job picker (round 3): the current job on the button, None and each job in its menu; a job this Folk can't
   // take now is greyed, its reason on hover and, when clicked, in the toast the pick gives (no text in the menu: the
   // user, 10 Nov 2026). The menu is rebuilt only when what it lists changes, so an open one stays.
-  const job = view.job?.(folk);
-  set('job', (el) => {
-    el.classList.toggle('d-none', job === undefined);
-    if (job === undefined) return;
-    const label = el.querySelector('[data-wf="job-label"]');
-    if (label !== null) setText(label, job.label);
-    view.tip(el, job.tip);
+  // The Supplies picker (round 3's supply lines) is drawn the same way, on a supplier's card from Hiring 60.
+  const picker = (pick, onPick) => (el) => {
+    el.classList.toggle('d-none', pick === undefined);
+    if (pick === undefined) return;
+    const label = el.querySelector('[data-wf$="-label"]');
+    if (label !== null) setText(label, pick.label);
+    view.tip(el, pick.tip);
     const button = el.querySelector('.dropdown-toggle');
     const menu = el.querySelector('.dropdown-menu');
     if (button !== null) {
-      setText(button, job.currentText);
-      setAttr(button, 'aria-label', `${job.pickLabel}: ${job.currentText}`);
+      setText(button, pick.currentText);
+      setAttr(button, 'aria-label', `${pick.pickLabel}: ${pick.currentText}`);
     }
-    const key = `${job.current}|${job.options.map((o) => `${o.id}:${o.text}:${o.why}`).join('|')}`;
+    const key = `${pick.current}|${pick.options.map((o) => `${o.id}:${o.text}:${o.why}`).join('|')}`;
     if (menu === null || menu.dataset.wfLines === key) return;
     menu.dataset.wfLines = key;
-    menu.replaceChildren(...job.options.map((o) => {
+    menu.replaceChildren(...pick.options.map((o) => {
       const b = document.createElement('button');
       b.type = 'button';
       const off = o.why !== '';
-      b.className = `dropdown-item${o.id === job.current ? ' active' : ''}${off ? ' wf-job-off' : ''}`;
+      b.className = `dropdown-item${o.id === pick.current ? ' active' : ''}${off ? ' wf-job-off' : ''}`;
       if (off) {
         b.setAttribute('aria-disabled', 'true');
         b.title = o.why;
@@ -536,9 +536,45 @@ function fillCard(col, folk, view) {
         b.append(img);
       }
       b.append(document.createTextNode(o.text));
-      // A greyed job still goes through the pick, which refuses it with its reason as a toast.
-      b.onclick = () => view.onPickJob(folk, o.id);
+      // A greyed option still goes through the pick, which refuses it with its reason as a toast.
+      b.onclick = () => onPick(folk, o.id);
       return b;
+    }));
+  };
+  set('job', picker(view.job?.(folk), (f, id) => view.onPickJob(f, id)));
+  set('supply', picker(view.supply?.(folk), (f, id) => view.onPickSupply?.(f, id)));
+  set('supplied', (el) => {
+    const v = view.supplied?.(folk);
+    el.classList.toggle('d-none', v === undefined);
+    if (v === undefined) return;
+    setText(el.querySelector('[data-wf="supplied-head"]'), v.head);
+    const rate = el.querySelector('[data-wf="supplied-rate"]');
+    setText(rate, v.rate);
+    rate.classList.toggle('wf-off', !v.on);
+    rate.title = v.rateTip;
+    const rows = el.querySelector('[data-wf="supplied-rows"]');
+    const key = JSON.stringify(v.rows);
+    if (rows.dataset.key === key) return;
+    rows.dataset.key = key;
+    rows.replaceChildren(...v.rows.map((r) => {
+      const row = document.createElement('div');
+      row.className = 'wf-supplied-row';
+      const name = document.createElement('span');
+      name.textContent = r.name;
+      const items = document.createElement('span');
+      items.className = 'wf-supplied-items';
+      r.items.forEach((item, i) => {
+        if (i > 0) items.append(', ');
+        if (item.media) {
+          const img = document.createElement('img');
+          img.src = item.media;
+          img.alt = '';
+          items.append(img);
+        }
+        items.append(item.name);
+      });
+      row.append(name, items);
+      return row;
     }));
   });
   set('mastery', (el) => {

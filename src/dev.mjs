@@ -34,6 +34,20 @@ export function install({ hiring, log, tiers, masteryIndex }) {
       if (folk === undefined || hiring.jobs === undefined) return false;
       return hiring.jobs.set(folk, jobId);
     },
+    /** workerFolksDev.supply(0, 1) — Folk 0 supplies Folk 1 (null: none), its rules applied. */
+    supply(id, receiver = null) {
+      const folk = hiring.crew.byId(ref(id));
+      if (folk === undefined || hiring.supply === undefined) return false;
+      return hiring.supply.set(folk, receiver === null ? null : ref(receiver));
+    },
+    /** Every supply line: supplier → receiver, what the supplier makes, the receiver's bonus now. */
+    links() {
+      return hiring.crew.links.map(({ supplierId, receiverId }) => {
+        const s = hiring.crew.byId(supplierId);
+        const r = hiring.crew.byId(receiverId);
+        return { supplier: s.name, receiver: r.name, makes: hiring.supply?.productsOf(s) ?? [], bonus: hiring.supply?.bonus(r) ?? 0, rate: hiring.rateOf(r) };
+      });
+    },
     /** Every registered job, with who holds it and whether it runs. */
     jobs() {
       return hiring.jobs?.all.map((k) => {

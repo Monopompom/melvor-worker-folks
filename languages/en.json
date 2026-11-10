@@ -1054,6 +1054,20 @@
   "MOD_WF_CARD_JOB_AWAY": "Back on it once it stays put",
   "MOD_WF_CARD_JOB_WORKING": "Keeping your supplies filled",
   "MOD_WF_CARD_JOB_TIP": "A job takes a Shift Slot and its wage like a skill. Picking one takes the Folk off its skill.",
+  "MOD_WF_MILESTONE_SUPPLY_LINES": "Supply lines: a Folk sends what it makes straight to another Folk’s recipe",
+  "MOD_WF_CARD_SUPPLY": "Supplies",
+  "MOD_WF_CARD_SUPPLY_PICK": "Who this Folk supplies",
+  "MOD_WF_CARD_SUPPLY_TIP": "What this Folk makes goes into the room of the Folk you pick here, as far as it holds; the rest goes to your bank. Each Folk supplies one other, and takes each input from one supplier. While a supplier works, the Folk it supplies gets +20 Produce Rate.",
+  "MOD_WF_CARD_SUPPLY_MAKES": "Makes now: ${items}",
+  "MOD_WF_CARD_SUPPLY_MAKES_NONE": "Makes nothing yet: give it a skill",
+  "MOD_WF_SUPPLY_OPTION": "${name}: ${items}",
+  "MOD_WF_SUPPLY_NO_JOB": "A Folk on a job makes nothing to send.",
+  "MOD_WF_SUPPLY_NOT_USED": "${name}’s recipe doesn’t use what this Folk makes, or another Folk already supplies it.",
+  "MOD_WF_OFFLINE_SUPPLIED": "${name} (${skill}) sent ${items} to ${receiver}",
   "MOD_WF_OFFLINE_REFILLED": "${name} (${skill}) refilled ${items}",
-  "MOD_WF_OFFLINE_REFILL_OUT": "${name} (${skill}) found no ${item} left in your bank"
+  "MOD_WF_OFFLINE_REFILL_OUT": "${name} (${skill}) found no ${item} left in your bank",
+  "MOD_WF_SUPPLY_BY_HEAD": "Supplied by",
+  "MOD_WF_SUPPLY_BY_RATE": "+${bonus} Produce Rate",
+  "MOD_WF_SUPPLY_BY_RATE_ON_TIP": "A supplier is working: +${bonus} Produce Rate.",
+  "MOD_WF_SUPPLY_BY_RATE_OFF_TIP": "No supplier is working: +${bonus} Produce Rate returns when one does."
 }

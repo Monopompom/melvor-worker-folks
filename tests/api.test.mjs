@@ -51,7 +51,7 @@ test('api: version, read-only views, places and travel with a folkMoved event', 
   assert.equal(api.version, API_VERSION);
   const folk = hiring.crew.hire('Junior');
   const v = api.folkById(folk.id);
-  assert.deepEqual(v, { id: folk.id, name: folk.name, tier: 'Junior', slot: 0, skillId: null, job: null, status: 'idle', place: null, travel: 'idle', hp: null, maxHp: undefined, portrait: undefined, traits: [], mastery: undefined });
+  assert.deepEqual(v, { id: folk.id, name: folk.name, tier: 'Junior', slot: 0, skillId: null, job: null, supplies: null, status: 'idle', place: null, travel: 'idle', hp: null, maxHp: undefined, portrait: undefined, traits: [], mastery: undefined });
   assert.ok(Object.isFrozen(v));
   assert.equal(api.folkById('nobody'), undefined);
 

@@ -6,9 +6,9 @@
 export function install(ctx, { getHiring, time, log }) {
   let hiring;
   /** Per offline session: actions completed and skills released, by skill id; wages paid, by currency id. */
-  let tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], traits: [], wages: new Map(), wageMs: new Map(), orders: [], refills: new Map(), refillOut: [], active: false };
+  let tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], traits: [], wages: new Map(), wageMs: new Map(), orders: [], refills: new Map(), refillOut: [], supplied: new Map(), active: false };
   const reset = () => {
-    tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], traits: [], wages: new Map(), wageMs: new Map(), orders: [], refills: new Map(), refillOut: [], active: true };
+    tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], traits: [], wages: new Map(), wageMs: new Map(), orders: [], refills: new Map(), refillOut: [], supplied: new Map(), active: true };
   };
 
   ctx.onModsLoaded(() => {
@@ -50,7 +50,7 @@ export function install(ctx, { getHiring, time, log }) {
     const ticks = Math.floor(ms / TICK_INTERVAL);
     tracker.active = false;
     hiring.events.emit('offlineTicks', { ticks, ms });
-    if (info.offlineProgress === undefined || (tracker.actions.size === 0 && tracker.released.size === 0 && tracker.died.length === 0 && tracker.debts.length === 0 && tracker.struck.length === 0 && tracker.traits.length === 0 && tracker.wages.size === 0 && tracker.orders.length === 0 && tracker.refills.size === 0 && tracker.refillOut.length === 0 && !hiring.crew.all.some((f) => (hiring.room?.heldList(f).length ?? 0) > 0))) return;
+    if (info.offlineProgress === undefined || (tracker.actions.size === 0 && tracker.released.size === 0 && tracker.died.length === 0 && tracker.debts.length === 0 && tracker.struck.length === 0 && tracker.traits.length === 0 && tracker.wages.size === 0 && tracker.orders.length === 0 && tracker.refills.size === 0 && tracker.refillOut.length === 0 && tracker.supplied.size === 0 && !hiring.crew.all.some((f) => (hiring.room?.heldList(f).length ?? 0) > 0))) return;
     const container = info.offlineProgress.messageContainer;
     if (container === undefined) return;
     // Welcome Back lines in the game's own style (scan C-08, C-09, C-10, build .112):
@@ -104,6 +104,12 @@ export function install(ctx, { getHiring, time, log }) {
     tracker.refillOut.forEach(({ folk, item }) => {
       const job = hiring.jobs?.of(folk);
       lines.push({ media: job?.media, html: fill('MOD_WF_OFFLINE_REFILL_OUT', { name: folk.name, skill: job?.name ?? '', item: item.name }, { item: 'text-danger' }, job?.media) });
+    });
+    // Supply lines: what each supplier sent down its line, one line a supplier and receiver.
+    tracker.supplied.forEach(({ folk, receiver, items }) => {
+      const skill = hiring.skillOf(folk);
+      const list = [...items.values()].map(({ item, qty }) => `${numberWithCommas(qty)} ${item.name}`).join(', ');
+      lines.push({ media: skill?.media, html: fill('MOD_WF_OFFLINE_SUPPLIED', { name: folk.name, skill: skill === undefined ? '' : hiring.skillName(skill), items: list, receiver: receiver.name }, { items: 'text-success' }, skill?.media) });
     });
     // Work Orders: a delivered one green with what it paid, one gone undelivered red; the order's size icon first.
     tracker.orders.forEach(({ order, text, delivered }) => {
@@ -208,6 +214,14 @@ export function install(ctx, { getHiring, time, log }) {
       const was = entry.items.get(item.id);
       entry.items.set(item.id, { item, qty: (was?.qty ?? 0) + quantity });
       tracker.refills.set(folk.id, entry);
+    });
+    hiring.events.on('folkSupplied', ({ folk, receiver, item, quantity }) => {
+      if (!tracker.active || item === undefined || receiver === undefined) return;
+      const key = `${folk.id}>${receiver.id}`;
+      const entry = tracker.supplied.get(key) ?? { folk, receiver, items: new Map() };
+      const was = entry.items.get(item.id);
+      entry.items.set(item.id, { item, qty: (was?.qty ?? 0) + quantity });
+      tracker.supplied.set(key, entry);
     });
     hiring.events.on('folkRefillOut', ({ folk, item }) => {
       if (tracker.active && item !== undefined) tracker.refillOut.push({ folk, item });

@@ -95,6 +95,11 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
   const onHaul = (folk) => accessOf(folk) === 'room';
   /** Takes its inputs from its stock: the own-stock switch, or away from a bank on the haul. */
   const usesStock = (folk) => folk !== undefined && folk.room !== undefined && (folk.ownStock === true || onHaul(folk));
+  /**
+   * Supply lines (round 3): a receiver not on its own stock takes its inputs from its stock (what its suppliers sent)
+   * first, then your bank.
+   */
+  const isMixed = (folk) => folk !== undefined && folk.room !== undefined && !usesStock(folk) && hiring?.supply?.fed(folk) === true;
   const touch = (folk) => { if (folk !== undefined) changed.add(folk.id); };
   const emitChanged = (folk) => {
     changed.delete(folk.id);
@@ -404,7 +409,7 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
   const stockFolk = () => {
     if (startFolk !== undefined) return startFolk;
     const folk = hiring?.acting?.folk;
-    return usesStock(folk) ? folk : undefined;
+    return usesStock(folk) || isMixed(folk) ? folk : undefined;
   };
   /** The Folk who would take this skill at a start click, when it works from its own stock. */
   const startingFolk = (skill) => {
@@ -412,7 +417,7 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     const pending = hiring.pendingFor?.(skill);
     if (pending === null) return undefined;
     const folk = pending ?? (hiring.decideStart?.(skill) === 'delegate' ? hiring.crew.bySkill(skill.id) : undefined);
-    return usesStock(folk) ? folk : undefined;
+    return usesStock(folk) || isMixed(folk) ? folk : undefined;
   };
   const asStart = (folk, fn) => {
     const outer = startFolk;
@@ -645,7 +650,8 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
       const noStock = model.isEmpty(folk.room, 'stock');
       const noTown = model.isEmpty(folk.room, 'town');
       const purse = model.purseEntries(folk.room);
-      if (model.isEmpty(folk.room) && noStock && noTown && purse.length === 0 && !full && !stockOn && !haul) return undefined;
+      // A supply line's receiver keeps its bar while fed, so the card doesn't jump as deliveries come and go.
+      if (model.isEmpty(folk.room) && noStock && noTown && purse.length === 0 && !full && !stockOn && !haul && !isMixed(folk)) return undefined;
       const out = !full && isDry(folk);
       const fill = model.fillView(folk.room, capOf(folk));
       // Each part a short label, then its items; an empty part says so on its label's line (build .208).
@@ -654,7 +660,7 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
         const items = tipLines(folk, side);
         lines.push(getLangString(items.length === 0 ? `${key}_EMPTY` : key), ...items);
       };
-      if (stockOn || !noStock) part('MOD_WF_ROOM_TIP_STOCK', 'stock');
+      if (stockOn || !noStock || isMixed(folk)) part('MOD_WF_ROOM_TIP_STOCK', 'stock');
       if (!noTown) lines.push(getLangString('MOD_WF_ROOM_TIP_TOWN'), ...tipLines(folk, 'town'));
       if (!model.isEmpty(folk.room) || (!stockOn && noTown) || haul) part(haul ? 'MOD_WF_ROOM_TIP_HAUL' : 'MOD_WF_ROOM_TIP', 'haul');
       if (purse.length > 0) lines.push(getLangString('MOD_WF_ROOM_TIP_PURSE'), ...purse.map(({ id, amount }) => {
@@ -759,6 +765,31 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     },
     /** The room's size and what it holds now, in ms of work. */
     capMs: (folk) => capOf(folk),
+    /** One action's inputs for the Folk's recipe now, as the Folk: { skill, perAction: [{ id, qty }], intervalMs }. */
+    inputsOf,
+    isMixed,
+    /** Puts a supply line's delivery on the receiver's stock side (the caller checked it fits). */
+    putStock(folk, itemId, qty, ms) {
+      if (folk?.room === undefined) return;
+      model.put(folk.room, itemId, qty, ms, 'stock');
+      touch(folk);
+      hiring.renderQueue.folks = true;
+    },
+    /**
+     * A receiver a delivery reached: stopped for want of inputs, it starts again once its stock and your bank cover an
+     * action (as after a Restock).
+     */
+    wake(folk) {
+      if (!dry.has(folk.id)) return;
+      const skill = hiring.skillOf(folk);
+      if (skill === undefined || hiring.delegated.has(skill)) return;
+      const { perAction } = inputsOf(folk);
+      const bankToo = !usesStock(folk);
+      const covered = perAction.every(({ id, qty }) => model.qtyOf(folk.room, id, 'stock') + (bankToo ? game.bank.getQty(game.items.getObjectByID(id)) : 0) >= qty);
+      if (!covered) return;
+      dry.delete(folk.id);
+      startWorker(folk);
+    },
     usedMs: (folk) => (folk?.room === undefined ? 0 : model.usedMs(folk.room)),
   };
 
@@ -778,6 +809,13 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
       hiring.events.emit('folkMade', { folk, skill: acting.skill, item, quantity, held: true, town: true });
       hiring.renderQueue.folks = true;
       return true;
+    }
+    // A supply line: what the receiver's recipe uses goes into its stock as far as its room holds (src/supply.mjs).
+    const sent = hiring.supply?.route(acting, item, quantity) ?? 0;
+    if (sent > 0) {
+      hiring.events.emit('folkMade', { folk, skill: acting.skill, item, quantity: sent, held: true, supplied: true });
+      quantity -= sent;
+      if (quantity <= 0) return true;
     }
     const ignoreSpace = rest[2] === true;
     const haul = folk?.room !== undefined && onHaul(folk);
@@ -807,13 +845,33 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     const folk = stockFolk();
     if (folk === undefined) return original();
     let owned = true;
+    // A receiver of a supply line counts your bank too.
+    const bankToo = !usesStock(folk);
     this._currencies.forEach((qty, currency) => { owned &&= currency.canAfford(qty); });
-    this._items.forEach((qty, item) => { owned &&= model.qtyOf(folk.room, item.id, 'stock') >= qty; });
+    this._items.forEach((qty, item) => { owned &&= model.qtyOf(folk.room, item.id, 'stock') + (bankToo ? game.bank.getQty(item) : 0) >= qty; });
     return owned;
   });
   ctx.patch(Costs, 'consumeCosts').replace(function (original) {
     const acting = hiring?.acting;
     const folk = acting?.folk;
+    if (isMixed(folk)) {
+      // A supply line's receiver: each input from its stock first, the rest from your bank through the game's own spending.
+      const items = this._items;
+      const fromBank = new Map();
+      items.forEach((qty, item) => {
+        const taken = qty > 0 ? model.take(folk.room, item.id, qty, 'stock').qty : 0;
+        if (qty - taken > 0) fromBank.set(item, qty - taken);
+      });
+      this._items = fromBank;
+      try {
+        original();
+      } finally {
+        this._items = items;
+      }
+      touch(folk);
+      hiring.renderQueue.folks = true;
+      return undefined;
+    }
     if (!usesStock(folk)) return original();
     // The game's own spending for the currencies, the items left out of it.
     const items = this._items;
@@ -850,6 +908,8 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
       window.notifyPlayer = (who, message, theme, ...rest) => {
         if (who !== skill || theme !== 'danger' || (message !== skill.noCostsMessage && message !== skill.noRunesMessage)) return notify(who, message, theme, ...rest);
         markDry(folk);
+        // A supply line's receiver: the game's own message (its stock and your bank both fall short; no Restock).
+        if (!usesStock(folk)) return notify(who, message, theme, ...rest);
         return notify(who, templateLangString('MOD_WF_DRY_NOTICE', { name: folk.name, skill: hiring.skillName(skill) }), theme, ...rest);
       };
       try {
@@ -867,7 +927,8 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     ctx.patch(Firemaking, 'burnLog').replace(function (original) {
       const folk = this.selectedRecipe === undefined ? undefined : startingFolk(this);
       if (folk === undefined) return original();
-      if (model.qtyOf(folk.room, this.activeRecipe.log.id, 'stock') > 0) {
+      const fuel = this.activeRecipe.log;
+      if (model.qtyOf(folk.room, fuel.id, 'stock') + (usesStock(folk) ? 0 : game.bank.getQty(fuel)) > 0) {
         asStart(folk, () => this.start());
         this.renderQueue.bonfireProgress = true;
         this.renderQueue.oilProgress = true;
@@ -920,6 +981,7 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
       queue.add = (n) => {
         const acting = hiring.acting;
         const folk = acting?.folk;
+        if (isMixed(folk) && n?.type === 'Player' && n.args?.[0] === acting.skill && n.args?.[2] === 'danger') markDry(folk);
         if (usesStock(folk) && n?.type === 'Player' && n.args?.[0] === acting.skill && n.args?.[2] === 'danger') {
           markDry(folk);
           return add({ ...n, args: [n.args[0], templateLangString('MOD_WF_DRY_NOTICE', { name: folk.name, skill: hiring.skillName(acting.skill) }), n.args[2]] });
