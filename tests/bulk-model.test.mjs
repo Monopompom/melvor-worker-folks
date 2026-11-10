@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { counts, mergeItems, runningBank, payable, byReason } from '../src/bulk-model.mjs';
+import { counts, mergeItems, runningBank, payable, byReason, settleWhy } from '../src/bulk-model.mjs';
 
 const row = (o) => ({ working: false, hasSkill: true, available: true, onStrike: false, ownStock: false, onHaul: false, ...o });
 
@@ -72,4 +72,11 @@ test('runningBank never goes below zero, and mergeItems skips bad counts', () =>
   assert.equal(bank.qty('x'), 0);
   assert.deepEqual(mergeItems([[{ id: 'a', qty: NaN }, { id: 'b', qty: -2 }, { id: 'a', qty: 1 }]]), [{ id: 'a', qty: 1 }]);
   assert.deepEqual(mergeItems([]), []);
+});
+
+test('settleWhy: a refusal first (walking or away), then demands, then money', () => {
+  assert.equal(settleWhy({ refused: true, walking: true, demandsPending: true }), 'walking');
+  assert.equal(settleWhy({ refused: true, walking: false, demandsPending: true }), 'away');
+  assert.equal(settleWhy({ refused: false, walking: true, demandsPending: true }), 'demands');
+  assert.equal(settleWhy({ refused: false, walking: false, demandsPending: false }), 'money');
 });

@@ -59,6 +59,17 @@ export function payable(candidates, have) {
   return { pay, skip, total: spent };
 }
 
+/**
+ * Why Settle all can't settle a striking Folk now, first match: 'walking' (on the road alone), 'away' (another mod
+ * refuses it, Voyage: out of your reach), 'demands' (strike demands not met), else 'money' (the bank can't cover it,
+ * alone or after the ones paid before it).
+ */
+export function settleWhy({ refused, walking, demandsPending }) {
+  if (refused) return walking ? 'walking' : 'away';
+  if (demandsPending) return 'demands';
+  return 'money';
+}
+
 /** Reasons a Folk was not started, counted: [[reason, [names]]], in the order each reason first comes. */
 export function byReason(misses) {
   const groups = new Map();

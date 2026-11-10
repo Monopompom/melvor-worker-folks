@@ -43,6 +43,8 @@ export function install(ctx, { getHiring, model, time, popupDidRender, tips, log
       onStrike: folk.onStrike === true,
       ownStock: room()?.usesStock(folk) === true,
       onHaul: room()?.onHaul(folk) === true,
+      // A gathering skill (Fishing, Woodcutting…) has no recipe costs: there is nothing to restock it with.
+      noInputs: skill !== undefined && typeof skill.getCurrentRecipeCosts !== 'function',
     };
   };
   const rows = () => hiring.crew.all.map(rowOf);
@@ -96,14 +98,17 @@ export function install(ctx, { getHiring, model, time, popupDidRender, tips, log
     const bank = model.runningBank((id) => hiring.game.bank.getQty(hiring.game.items.getObjectByID(id)));
     const fill = [];
     const nothing = [];
+    const noInputs = [];
     for (const r of rows()) {
       if (!r.ownStock || r.onHaul) continue;
+      // Said apart: "room full or no inputs in your bank" would send you to the bank for a skill that takes nothing.
+      if (r.noInputs) { noInputs.push(r); continue; }
       const plan = room().restockPlanOf(r.folk, bank.qty);
       if (plan === undefined || plan.actions === 0) { nothing.push(r.folk); continue; }
       plan.items.forEach(({ itemId, qty }) => bank.take(itemId, qty));
       fill.push({ folk: r.folk, actions: plan.actions, ms: plan.ms, items: plan.items.map(({ itemId, qty }) => ({ id: itemId, qty })) });
     }
-    return { fill, nothing, total: model.mergeItems(fill.map((f) => f.items)) };
+    return { fill, nothing, noInputs, total: model.mergeItems(fill.map((f) => f.items)) };
   };
 
   const line = (text, cls = '') => el('div', `wf-bulk-line ${cls}`.trim(), text);
@@ -179,6 +184,7 @@ export function install(ctx, { getHiring, model, time, popupDidRender, tips, log
       }
     }
     if (bill.nothing.length > 0) body.append(line(templateLangString('MOD_WF_BULK_RESTOCK_SKIP', { names: names(bill.nothing) }), 'wf-subtle'));
+    for (const r of bill.noInputs) body.append(line(templateLangString('MOD_WF_BULK_RESTOCK_NO_INPUTS', { name: r.folk.name, skill: hiring.skillName(r.skill) }), 'wf-subtle'));
     confirm({
       title: getLangString('MOD_WF_BULK_RESTOCK'),
       body,
@@ -221,16 +227,25 @@ export function install(ctx, { getHiring, model, time, popupDidRender, tips, log
     const open = strikers.filter((f) => payroll.canSettle(f) && hiring.refusal('staff', { action: 'settle', folk: f }) === '');
     const parts = new Map(open.map((f) => [f, payroll.settlementOf(f).parts]));
     const { pay } = model.payable(open.map((f) => ({ key: f, parts: parts.get(f) })), (id) => hiring.game.currencies.getObjectByID(id)?.amount ?? 0);
-    const left = strikers.filter((f) => !pay.includes(f));
+    // Each one left out says why (an in-game test, 10 Nov 2026: it named them and never said why).
+    const left = strikers.filter((f) => !pay.includes(f)).map((f) => ({
+      folk: f,
+      why: model.settleWhy({
+        refused: hiring.refusal('staff', { action: 'settle', folk: f }) !== '',
+        walking: f.travel === 'walking',
+        demandsPending: payroll.demandsPending(f),
+      }),
+    }));
     const at = (f) => hiring.crew.all.indexOf(f);
-    const key = JSON.stringify([pay.map((f) => [at(f), parts.get(f), (f.demand?.length ?? 0) > 0]), left.map(at)]);
+    const key = JSON.stringify([pay.map((f) => [at(f), parts.get(f), (f.demand?.length ?? 0) > 0]), left.map((l) => [at(l.folk), l.why])]);
     return { pay, left, parts, key };
   };
 
   const settleBody = ({ pay, left, parts }) => {
     const body = el('div', 'text-center wf-help-body wf-bulk');
-    if (pay.length === 0) body.append(line(getLangString('MOD_WF_BULK_SETTLE_NOTHING'), 'wf-subtle'));
-    else {
+    // With someone left out, its heading and reasons say it all; the "can't pay any" line only for a bill of nothing.
+    if (pay.length === 0 && left.length === 0) body.append(line(getLangString('MOD_WF_BULK_SETTLE_NOTHING'), 'wf-subtle'));
+    else if (pay.length > 0) {
       body.append(line(getLangString('MOD_WF_BULK_SETTLE_HEAD'), 'font-w600'));
       // A table centred on its middle line (the user, 10 Nov 2026): names flush right against the amounts, amounts flush
       // left, so the amounts start in one column however long the names are.
@@ -252,7 +267,18 @@ export function install(ctx, { getHiring, model, time, popupDidRender, tips, log
       if (pay.length > 1) row(esc(getLangString('MOD_WF_BULK_SETTLE_TOTAL')), amountHtml(total), 'wf-bulk-total');
       body.append(table);
     }
-    if (left.length > 0) body.append(line(templateLangString('MOD_WF_BULK_SETTLE_LEFT', { names: names(left) }), 'wf-subtle'));
+    // Who it leaves out, under a heading like "You pay:" (the user, 10 Nov 2026): one row a Folk, the name flush right
+    // and its reason flush left, as the table above.
+    if (left.length > 0) {
+      body.append(line(getLangString('MOD_WF_BULK_SETTLE_LEFT_HEAD'), 'font-w600 wf-bulk-head'));
+      const table = el('table', 'wf-bulk-table');
+      for (const { folk, why } of left) {
+        const tr = el('tr');
+        tr.append(el('td', 'wf-bulk-name', folk.name), el('td', 'wf-bulk-why wf-subtle', getLangString(`MOD_WF_BULK_SETTLE_WHY_${why}`)));
+        table.append(tr);
+      }
+      body.append(table);
+    }
     return body;
   };
 

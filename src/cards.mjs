@@ -536,6 +536,10 @@ function fillCard(col, folk, view) {
   });
   // Another mod's refusals (Voyage): the button greys, the reason is the line under the buttons.
   const refusals = view.refusals?.(folk) ?? { promote: '', fire: '', gear: '' };
+  const info = view.strikeInfo(folk);
+  // On strike, the refusal is said by the greyed Settle, high on the card (an in-game test, 10 Nov 2026: said only under
+  // Promote / Gear / Fire it was out of sight on a phone); the staff line then leaves it out, so it is said once.
+  const strikeReason = info !== null && info.debtOnly !== true ? info.reason ?? '' : '';
   // Gear and Traits on a phone (build .136): the icon and the count, the word hidden but read out; the button's text
   // "Gear 2/5" splits at its last space when it ends in a count.
   const iconAndWords = (el, icon, text) => {
@@ -590,7 +594,7 @@ function fillCard(col, folk, view) {
   });
   set('staff-why', (el) => {
     const promotable = view.canPromote(folk);
-    const text = [...new Set([promotable ? refusals.promote : '', refusals.gear, refusals.fire].filter((r) => r !== ''))].join(' ');
+    const text = [...new Set([promotable ? refusals.promote : '', refusals.gear, refusals.fire].filter((r) => r !== '' && r !== strikeReason))].join(' ');
     setMarquee(el, text);
     el.classList.toggle('d-none', text === '');
   });
@@ -621,7 +625,6 @@ function fillCard(col, folk, view) {
     setText(el, text);
     el.classList.toggle('d-none', text === '');
   });
-  const info = view.strikeInfo(folk);
   set('strike', (el) => {
     el.classList.toggle('d-none', info === null);
     if (info === null) return;
@@ -701,14 +704,12 @@ function fillCard(col, folk, view) {
         apology.onclick = () => { if (info.canApologise) info.onApologise(); };
       }
     }
-    // Another mod's refusal greys both buttons and is said under them; what is missing is in each button's tooltip.
+    // Another mod's refusal greys both buttons and is said under them (and in their tooltips); what is missing is in
+    // each button's tooltip.
     const why = el.querySelector('[data-wf="strike-why"]');
     if (why !== null) {
-      // The away reason is said once, under the buttons (build .136): the strike line keeps only its own.
-      const r0 = debtOnly ? '' : info.reason ?? '';
-      const reason = r0 !== '' && [refusals.promote, refusals.gear, refusals.fire].includes(r0) ? '' : r0;
-      setText(why, reason);
-      why.classList.toggle('d-none', reason === '');
+      setText(why, strikeReason);
+      why.classList.toggle('d-none', strikeReason === '');
     }
   });
   // Bank and room full, or the stock out: what it is, what to do, and the solid Restock while the Folk waits for it.

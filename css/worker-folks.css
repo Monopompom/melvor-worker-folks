@@ -271,11 +271,12 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 @media (max-width: 767.98px) { .wf-worker-popup { width: 96vw !important; } .wf-worker-grid { grid-template-columns: 1fr; } }
 .wf-worker-tile { display: flex; align-items: flex-start; gap: 8px; padding: 8px; border: 1px solid var(--wf-line); border-radius: 6px; background: var(--wf-tile); color: inherit; text-align: left; font-size: 1rem; }
 @media (hover: hover) { .wf-worker-tile:hover:not([aria-disabled="true"]) { border-color: #329389; background: rgba(50,147,137,0.12); } }
-/* An unavailable Folk (strike, cooldown): focusable with aria-disabled so its reason is reachable; only the portrait,
-   badges and effects fade, its status and how-to-fix lines keep full ink (scan B-03, C-34, build .112). */
+/* An unavailable Folk (strike, cooldown, away): focusable with aria-disabled so its reason is reachable; only the
+   portrait, badges, effects and the net GP/h fade, its status and how-to-fix lines keep full ink (scan B-03, C-34,
+   build .112; the net line since .229). */
 .wf-worker-tile[aria-disabled="true"] { cursor: not-allowed; }
 .wf-worker-tile[aria-disabled="true"] > .wf-worker-portrait, .wf-worker-tile[aria-disabled="true"] .wf-worker-badges,
-.wf-worker-tile[aria-disabled="true"] .wf-effects { opacity: var(--wf-dim); }
+.wf-worker-tile[aria-disabled="true"] .wf-effects, .wf-worker-tile[aria-disabled="true"] .wf-worker-net { opacity: var(--wf-dim); }
 .wf-worker-tile-active { border-color: #329389; box-shadow: inset 0 0 0 1px #329389; background: rgba(50,147,137,0.08); }
 .wf-worker-portrait { width: 48px; height: 48px; border-radius: 6px; object-fit: contain; flex: 0 0 auto; }
 .wf-worker-text { min-width: 0; line-height: 1.3; overflow-wrap: anywhere; }
@@ -665,6 +666,9 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-bulk .wf-bulk-table td { padding: 3px 6px; vertical-align: middle; }
 .wf-bulk .wf-bulk-name { text-align: right; font-weight: 600; overflow-wrap: anywhere; }
 .wf-bulk .wf-bulk-amount { text-align: left; white-space: nowrap; }
+/* Settle all's "Can't settle:" rows: the reason flush left like an amount, but it may wrap (a phone). */
+.wf-bulk .wf-bulk-why { text-align: left; }
+.wf-bulk .wf-bulk-head { margin-top: 10px; }
 .wf-bulk .wf-bulk-table tr.wf-bulk-total td { padding-top: 8px; border-top: 1px solid var(--wf-line-soft); }
 /* The bill's items in a centred row of fixed tiles, as the popup is centred (one tile sat at the far left). */
 .wf-bulk .wf-item-grid { grid-template-columns: repeat(auto-fit, 44px); justify-content: center; }

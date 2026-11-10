@@ -318,8 +318,9 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       tip.push({ text: getLangString('MOD_WF_CTRL_NET_LEFT_OUT'), cls: 'text-muted' });
       return {
         segments: [{ icon: gp?.media, text: templateLangString('MOD_WF_CTRL_NET', { amount: signed(p.net), currency }) }],
-        // Coloured by the rounded net like its sign, so a net of -0.4 reads "+0" in green, never in red.
-        cls: Math.round(p.net) < 0 ? 'text-danger font-w600' : 'text-success font-w600',
+        // Coloured by the rounded net like its sign, so a net of -0.4 reads "+0" in green, never in red. wf-worker-net:
+        // on a tile you can't pick it fades with the portrait and badges.
+        cls: `wf-worker-net ${Math.round(p.net) < 0 ? 'text-danger' : 'text-success'} font-w600`,
         tip,
       };
     }
@@ -672,8 +673,9 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
           // Strike demands (an option): what is still missing comes first in both tooltips, then the GP short.
           const demandWhy = payroll.demandsPending(folk) ? templateLangString('MOD_WF_SETTLE_DEMANDS', { list: this.demands.missingText(folk) }) : '';
           const need = (key, parts) => (shortOf(parts) === '' ? '' : templateLangString(key, { amount: shortOf(parts) }));
-          const settleWhy = blocked === '' && !canSettle ? [demandWhy, need('MOD_WF_SETTLE_NEED', plain.parts)].filter((l) => l !== '') : [];
-          const apologyWhy = blocked === '' && apologyOpen && !canApologise ? [demandWhy, need('MOD_WF_APOLOGY_NEED', apology.parts)].filter((l) => l !== '') : [];
+          // A refusal is the tooltip too: a greyed button with an empty tooltip said nothing (an in-game test, 10 Nov 2026).
+          const settleWhy = blocked !== '' ? [blocked] : !canSettle ? [demandWhy, need('MOD_WF_SETTLE_NEED', plain.parts)].filter((l) => l !== '') : [];
+          const apologyWhy = blocked !== '' ? (apologyOpen ? [blocked] : []) : apologyOpen && !canApologise ? [demandWhy, need('MOD_WF_APOLOGY_NEED', apology.parts)].filter((l) => l !== '') : [];
           return {
             reason: blocked,
             settleWhy,
