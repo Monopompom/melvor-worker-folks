@@ -124,12 +124,49 @@ what it makes, the coins it earns and its inputs in its room, its **haul**, unti
 and collect it. It stops when the haul is full or its inputs run out, and its wage keeps
 running while it stands. Auto-restock waits until the Folk is back at a bank.
 
+**Tent depots, with Voyage.** Folks working within a hex of one of your pitched tents share its
+depot, 48 h of work: what they make fills their own room first, then the depot, and their inputs
+come from their own stock first, then the depot's. The card shows the depot under the room bar.
+Voyage's tent row restocks the depot (each Folk an equal share of the free hours), and you collect
+it by coming by. Striking the tent sends what it holds to your bank; a kind with no free bank slot
+waits in the depot and follows as soon as there is room.
+
 **Bags.** A Folk wearing a bag in its Cape slot gets a bigger room, in place of a skillcape:
 the **Folk Satchel** (Crafting 20: 40 Leather, 1 Amulet of Looting) adds a third of the
 tier's bag room, the **Folk Pack** (Crafting 50: a Satchel, 10 Bobby's Pockets, 150
 Mithril Bars, 6 Amulets) two thirds, the **Folk Frame Pack** (Crafting 80: a Pack, 250 Black
 Dragonhide, 400 Runite Bars, 12 Amulets) all of it: up to 4 h for a Trainee and 12 h for a Foreman. The recipes
 are with the game's Bags in Crafting (full game). A bag does nothing for you.
+
+## Jobs
+
+From Hiring 45 a Folk can take a **job** instead of a skill, from the **Job** picker on its card.
+A job takes a Shift Slot and a wage like a skill; picking one takes the Folk off its skill, and
+picking a skill (or None) ends the job.
+
+**Quartermaster.** The Folk keeps your food, ammo, familiar tablets and consumable topped up from
+your bank, with the item already in each slot (or the one it last held), to the line you set for
+each kind in the settings: food 200, ammo 1,000, tablets 500 and consumable 100 by default. It
+looks every 30 s for a Trainee down to every 5 s for a Foreman. A Trainee keeps food only; an
+Apprentice adds ammo, a Journeyman the familiars, a Master and a Foreman the consumable. When your
+bank has none left of a slot's item it tells you and leaves that slot. Like you, it can't change
+your equipment in a dungeon or stronghold (unless the game allows it there), nor in the Golbin
+Raid. With Voyage it travels with you.
+
+## Supply lines
+
+From Hiring 60, **Supplies** on a Folk's card sends what it makes straight to another Folk whose
+current recipe uses it: a fisher feeding a cook, an Iron miner and a Coal miner feeding a smith on
+Steel Bars. Each Folk supplies one other, and a receiver takes each input from one supplier.
+
+- What a supplier sends goes into the receiver's room as far as it holds; the rest goes to your
+  bank, as do the supplier's other finds (gems and the like).
+- The receiver takes its inputs from what it was sent first, then from your bank (with Own stock
+  on, never from the bank). A receiver that ran dry starts again once a delivery covers an action.
+- While at least one of its suppliers works, the receiver gets **+20 Produce Rate**; its card
+  shows who supplies it.
+- With Voyage, a line needs you by the supplier and the two Folks within a hex of each other (or
+  by one tent); a move that breaks that ends the line.
 
 ## Folk health
 
@@ -245,8 +282,8 @@ Orders pay more, Township Commissions a little. Open
 features: the Payroll Reserve at 5 (24 h of the whole crew's wages, growing to 72 h at 35,
 7 days at 65 and 30 days at 95), the Work Orders board at 8 (more orders at 30 and 70, the
 reroll at 50), promotions at 10, forgetting a trait at 15, Licences at 20 / 40 / 60 / 80, the
-apology bonus at 25, Township Commissions at 30, half the firing severance at 45, Summoning marks for Folks at 50,
-automatic restart of a Folk's skill after a settlement at 55, Auto-restock at 75, cheaper Overtime (×1.5 wages)
+apology bonus at 25, Township Commissions at 30, the Quartermaster job and half the firing severance at 45, Summoning marks for Folks at 50,
+automatic restart of a Folk's skill after a settlement at 55, supply lines at 60, Auto-restock at 75, cheaper Overtime (×1.5 wages)
 at 85, no firing severance at 90, a free Shift Slot and a +20% Foreman crew bonus cap at 99
 and, with Throne of the Herald, -10%
 wages at 100, a second free Shift Slot at 110 and 50% promotion fees at 120. Locked
@@ -428,7 +465,7 @@ another one. With Multitasking loaded, Worker Folks switches itself off, shows a
 explaining why, and registers nothing; disable one of the two in the Mod Manager and reload.
 
 With **Voyage**, your Folks stand at places on its map: one out of reach of a bank keeps a
-haul in its room (see A Folk's room). Without Voyage nothing of that applies.
+haul in its room, and Folks by a pitched tent share its depot (see A Folk's room). Without Voyage nothing of that applies.
 
 Other mods' custom skills get a Worker box where their skill follows the game's skill
 classes. Mods that only add items, modifiers or UI are unaffected.
@@ -436,8 +473,8 @@ classes. Mods that only add items, modifiers or UI are unaffected.
 ## Backups
 
 At the foot of the Hiring page, **Back up Worker Folks** makes a code to copy or download: your
-Hiring level, XP, mastery and relics, every Folk with its gear, room, place and wages, the Payroll
-Reserve, Work Orders, Township Commissions, Worker Folks' items in your bank and worn, its shop
+Hiring level, XP, mastery and relics, every Folk with its gear, room, place, wages, job and supply
+line, the tent depots, the Payroll Reserve, Work Orders, Township Commissions, Worker Folks' items in your bank and worn, its shop
 purchases, its Township buildings, its pet and your settings. Keep it somewhere safe: the game
 drops all of that the first time it saves while the mod is off.
 
