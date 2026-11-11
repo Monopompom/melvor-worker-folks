@@ -527,7 +527,8 @@ function fillCard(col, folk, view) {
     const button = el.querySelector('.dropdown-toggle');
     const menu = el.querySelector('.dropdown-menu');
     if (button !== null) {
-      setText(button, pick.currentText);
+      // The text sits in its own span, so a long name is cut with an ellipsis and the caret stays.
+      setText(button.querySelector('.wf-pick-text') ?? button, pick.currentText);
       setAttr(button, 'aria-label', `${pick.pickLabel}: ${pick.currentText}`);
     }
     const key = `${pick.current}|${pick.options.map((o) => `${o.id}:${o.text}:${o.why}`).join('|')}`;

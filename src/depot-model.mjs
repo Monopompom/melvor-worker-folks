@@ -77,6 +77,14 @@ export function shares(freeMs, members) {
 }
 
 /**
+ * Why a Restock all moved nothing, from each member's restock plan: 'noRoom' when a member's share was under one
+ * action (the depot is the limit, however full the bank), else 'noBank' (the bank lacked the inputs).
+ */
+export function restockRefusal(plans) {
+  return (plans ?? []).some((p) => p?.actions === 0 && p?.short === null) ? 'noRoom' : 'noBank';
+}
+
+/**
  * Where an action's goods go for a Folk with a depot: 'room' while its own room has space for the action's work,
  * else 'depot' while the depot has, else 'over' (both full: the goods go in the Folk's room all the same and it stops).
  */

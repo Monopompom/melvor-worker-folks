@@ -169,10 +169,12 @@ export function install(ctx, { getHiring, model, roomModel, log }) {
     const share = model.shares(capOf(d) - usedMs(d), members.length);
     if (share <= 0) return Object.freeze({ ok: false, why: 'noRoom' });
     const per = [];
+    const plans = [];
     const total = new Map();
     members.forEach(({ folk, perAction, intervalMs }) => {
       // Each member reads the bank as the ones before it left it.
       const plan = roomModel.restockPlan({ perAction, intervalMs, freeMs: share, bankQty: (itemId) => game.bank.getQty(itemOf(itemId)) });
+      plans.push(plan);
       if (plan.actions === 0) return;
       plan.items.forEach(({ id: itemId, qty, ms }) => {
         game.bank.removeItemQuantity(itemOf(itemId), qty, false);
@@ -181,7 +183,7 @@ export function install(ctx, { getHiring, model, roomModel, log }) {
       });
       per.push(Object.freeze({ folkId: folk.id, actions: plan.actions, items: Object.freeze(plan.items.map(({ id: itemId, qty }) => Object.freeze({ itemId, qty }))) }));
     });
-    if (per.length === 0) return Object.freeze({ ok: false, why: 'noBank' });
+    if (per.length === 0) return Object.freeze({ ok: false, why: model.restockRefusal(plans) });
     touched(id);
     hiring.room?.wakeDepot(id);
     log(`depot ${id} restocked for ${per.length} Folk(s)`);

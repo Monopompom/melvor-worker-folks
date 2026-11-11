@@ -157,10 +157,14 @@ export function install(ctx, { getHiring, model, log }) {
         currentText: current?.name ?? getLangString('MOD_WF_CARD_JOB_NONE'),
         options,
         tip: [
+          // The receiver's whole name first: on a narrow card the button cuts it.
+          ...(current === null ? [] : [{ text: templateLangString('MOD_WF_CARD_SUPPLY_TO', { name: current.name }), cls: 'font-w600' }]),
           getLangString('MOD_WF_CARD_SUPPLY_TIP'),
           made.length > 0
             ? { text: templateLangString('MOD_WF_CARD_SUPPLY_MAKES', { items: names(made) }), cls: 'font-w600' }
-            : { text: getLangString('MOD_WF_CARD_SUPPLY_MAKES_NONE'), cls: 'font-w600' },
+            // No skill (a line left from before): give it one. A skill with no product (Thieving, or no recipe picked)
+            // says so instead.
+            : { text: getLangString(folk.skillId === null ? 'MOD_WF_CARD_SUPPLY_MAKES_NONE' : 'MOD_WF_CARD_SUPPLY_MAKES_NO_ITEM'), cls: 'font-w600' },
         ],
       };
     },

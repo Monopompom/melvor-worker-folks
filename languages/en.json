@@ -1057,9 +1057,11 @@
   "MOD_WF_MILESTONE_SUPPLY_LINES": "Supply lines: a Folk sends what it makes straight to another Folk’s recipe",
   "MOD_WF_CARD_SUPPLY": "Supplies",
   "MOD_WF_CARD_SUPPLY_PICK": "Who this Folk supplies",
+  "MOD_WF_CARD_SUPPLY_TO": "Supplies ${name}",
   "MOD_WF_CARD_SUPPLY_TIP": "What this Folk makes goes into the room of the Folk you pick here, as far as it holds; the rest goes to your bank. Each Folk supplies one other, and takes each input from one supplier. While a supplier works, the Folk it supplies gets +20 Produce Rate.",
   "MOD_WF_CARD_SUPPLY_MAKES": "Makes now: ${items}",
   "MOD_WF_CARD_SUPPLY_MAKES_NONE": "Makes nothing yet: give it a skill",
+  "MOD_WF_CARD_SUPPLY_MAKES_NO_ITEM": "Makes nothing to send: its skill makes no item, or no recipe is picked",
   "MOD_WF_SUPPLY_OPTION": "${name}: ${items}",
   "MOD_WF_SUPPLY_NO_JOB": "A Folk on a job makes nothing to send.",
   "MOD_WF_SUPPLY_NOT_USED": "${name}’s recipe doesn’t use what this Folk makes, or another Folk already supplies it.",
@@ -1075,5 +1077,5 @@
   "MOD_WF_ROOM_TIP_DEPOT_STOCK": "Inputs, after this Folk’s own stock:",
   "MOD_WF_ROOM_TIP_DEPOT_HAUL": "Made, after this Folk’s room filled:",
   "MOD_WF_ROOM_TIP_DEPOT_EMPTY": "Empty",
-  "MOD_WF_CARD_DEPOT": "${name}: ${used} of ${cap} h"
+  "MOD_WF_CARD_DEPOT": "${name}: ${used} of ${cap} h"
 }

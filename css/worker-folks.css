@@ -168,7 +168,14 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 .wf-auto-restock-at { flex: none; }
 /* The Job picker (round 3): its label, then the game's dropdown at the right, as the auto-restock line. */
 .wf-job { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.wf-job-pick { flex: none; min-width: 0; }
+/* The label keeps its word; a long pick (a receiver's full name on a phone) stays on one line, cut with an ellipsis
+   before the caret, and the row's tooltip names it whole. */
+.wf-job > [data-wf$="-label"] { flex: none; }
+.wf-job-pick { flex: 0 1 auto; min-width: 0; }
+/* Job and Supplies one above the other: a step of room between their buttons. */
+.wf-job:not(.d-none) + .wf-job { margin-top: 8px; }
+.wf-job-pick .dropdown-toggle { display: inline-flex; align-items: center; justify-content: center; max-width: 100%; }
+.wf-pick-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wf-job-pick .dropdown-item img { width: 16px; height: 16px; margin-right: 6px; vertical-align: -3px; }
 .wf-job-pick .dropdown-item.wf-job-off { opacity: 0.5; }
 /* A tent depot's line under the room (round 3): the same bar, a step dimmer, so the Folk's own room reads first. */

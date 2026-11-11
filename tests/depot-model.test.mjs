@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as D from '../src/depot-model.mjs';
-import { normalizeAnswer } from '../src/room-model.mjs';
+import { normalizeAnswer, restockPlan } from '../src/room-model.mjs';
 import { parseRoot, serializeRoot } from '../src/folk.mjs';
 import { heldBy } from '../src/backup-model.mjs';
 
@@ -46,6 +46,17 @@ test('Restock all gives each member an equal share of the free hours', () => {
   assert.equal(D.shares(90_000, 3), 30_000);
   assert.equal(D.shares(90_000, 0), 0);
   assert.equal(D.shares(0, 2), 0);
+});
+
+test('a Restock all that moves nothing says the depot is full when a share is under one action', () => {
+  const plan = (freeMs, bank) => restockPlan({ perAction: [{ id: 'a', qty: 1 }], intervalMs: 2400, freeMs, bankQty: () => bank });
+  // 850 ms each of a nearly full depot, the bank holding plenty: the room is the limit.
+  assert.equal(D.restockRefusal([plan(850, 100_000), plan(850, 100_000)]), 'noRoom');
+  // Room for hours, an empty bank: the bank is the limit.
+  assert.equal(D.restockRefusal([plan(3_600_000, 0), plan(3_600_000, 0)]), 'noBank');
+  // Both short at once: the depot is full first.
+  assert.equal(D.restockRefusal([plan(850, 0)]), 'noRoom');
+  assert.equal(D.restockRefusal([]), 'noBank');
 });
 
 test('the bank-access answer may name a depot, only for a Folk on its room', () => {
