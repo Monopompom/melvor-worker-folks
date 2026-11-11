@@ -389,9 +389,12 @@ export function parseRoot(input) {
   // Township Commissions' state, likewise checked by its own model (src/commissions-model.mjs).
   const town = migrated.root.commissions;
   const commissions = town !== null && typeof town === 'object' && !Array.isArray(town) ? town : null;
-  return { root: { v: SAVE_VERSION, folks, reserve, frozen, board, lost, commissions }, applied: migrated.applied, dropped, corrupt: false };
+  // Tent depots (save v10), kept as saved: src/depot-model.mjs checks them (none yet: {}).
+  const kept = migrated.root.depots;
+  const depots = kept !== null && typeof kept === 'object' && !Array.isArray(kept) ? kept : {};
+  return { root: { v: SAVE_VERSION, folks, reserve, frozen, board, lost, commissions, depots }, applied: migrated.applied, dropped, corrupt: false };
 }
 
-export function serializeRoot(folks, reserve = {}, frozen = {}, board = null, lost = {}, commissions = null) {
-  return JSON.stringify({ v: SAVE_VERSION, folks, reserve, frozen, board, lost, commissions });
+export function serializeRoot(folks, reserve = {}, frozen = {}, board = null, lost = {}, commissions = null, depots = {}) {
+  return JSON.stringify({ v: SAVE_VERSION, folks, reserve, frozen, board, lost, commissions, depots });
 }

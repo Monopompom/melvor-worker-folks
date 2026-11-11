@@ -48,6 +48,26 @@ export function install({ hiring, log, tiers, masteryIndex }) {
         return { supplier: s.name, receiver: r.name, makes: hiring.supply?.productsOf(s) ?? [], bonus: hiring.supply?.bonus(r) ?? 0, rate: hiring.rateOf(r) };
       });
     },
+    /**
+     * workerFolksDev.access(0, { access: 'room', depot: 'tent1' }) — answers for a Folk ahead of the bank-access hook
+     * (null: the hook again); with depot(…) tests depots without Voyage.
+     */
+    access(id, answer = null) {
+      const folk = hiring.crew.byId(ref(id));
+      if (folk === undefined) return false;
+      hiring.room?.setDevAccess(folk, answer);
+      return hiring.room?.roomOf(folk);
+    },
+    /** workerFolksDev.depot('tent1', 48, 'Test tent') — registers a depot; depot('tent1', null) drops it to the bank. */
+    depot(id, hours = 48, name = 'Test tent') {
+      if (hours === null) return hiring.depots?.drop(id);
+      hiring.depots?.register(id, { hours, name });
+      return hiring.depots?.view(id);
+    },
+    /** A depot's view; restockDepot / collectDepot / emptyDepot through workerFolksDev.depotCall('restock', id). */
+    depotCall(action, id) {
+      return hiring.depots?.[action]?.(id);
+    },
     /** Every registered job, with who holds it and whether it runs. */
     jobs() {
       return hiring.jobs?.all.map((k) => {

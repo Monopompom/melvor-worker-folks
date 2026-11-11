@@ -38,7 +38,7 @@
 const CHECK_TICKS = 20;
 const CAPE_SLOT = 'melvorD:Cape';
 
-export function install(ctx, { getHiring, model, resume, time, tips, log }) {
+export function install(ctx, { getHiring, model, depotModel, resume, time, tips, log }) {
   let hiring;
   /** Folks whose bank and room were both full at their last item: the card says so until the room has space. */
   const blocked = new Set();
@@ -56,6 +56,8 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
   const access = new Map();
   /** Folks whose room changed since the last roomChanged event. */
   const changed = new Set();
+  /** Dev: answers set by workerFolksDev.access(), ahead of the hook (testing depots without the other mod). */
+  const devAccess = new Map();
 
   const capOf = (folk) => model.capacityMs(folk.tier, model.bagHours(folk.tier, folk.loadout?.[CAPE_SLOT]?.id));
   /** The work an action is worth: the timer that just ran (any skill has one, mod skills too), at least a tick. */
@@ -77,22 +79,43 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     told.forEach((key) => { if (key.startsWith(`${folk.id}|`)) told.delete(key); });
   };
 
-  /** 'bank' or 'room' for this Folk now (API v10): asked of the haul's hook once, then kept until refreshAccess. */
-  const accessOf = (folk) => {
+  const BANK = Object.freeze({ access: 'bank', depot: null });
+  /**
+   * The haul's hook answer for this Folk now: { access: 'bank' | 'room', depot } (API v10; a depot id since round 3),
+   * asked once, then kept until refreshAccess. A dev override (`devAccess`) answers first.
+   */
+  const answerOf = (folk) => {
+    if (folk === undefined) return BANK;
+    if (devAccess.has(folk.id)) return devAccess.get(folk.id);
     const hook = hiring?.accessHook;
-    if (typeof hook !== 'function' || folk === undefined) return 'bank';
+    if (typeof hook !== 'function') return BANK;
     const kept = access.get(folk.id);
     if (kept !== undefined) return kept;
-    let answer = 'bank';
+    let answer = BANK;
     try {
-      answer = model.normalizeAccess(hook(folk));
+      answer = Object.freeze(model.normalizeAnswer(hook(folk)));
     } catch (err) {
       log('bank access hook failed', err);
     }
     access.set(folk.id, answer);
     return answer;
   };
+  /** 'bank' or 'room' for this Folk now (API v10). */
+  const accessOf = (folk) => answerOf(folk).access;
   const onHaul = (folk) => accessOf(folk) === 'room';
+  /** The depot id this Folk's answer names (null: none), registered or not. */
+  const depotIdOf = (folk) => answerOf(folk).depot;
+  /** The registered depot a Folk on the haul shares now ({ id, name, room, capMs }), else undefined. */
+  const depotOf = (folk) => {
+    const id = folk?.room === undefined || !onHaul(folk) ? null : depotIdOf(folk);
+    return id === null ? undefined : hiring?.depots?.roomFor(id);
+  };
+  const depotFree = (depot) => (depot === undefined ? undefined : Math.max(0, depot.capMs - model.usedMs(depot.room)));
+  /** An input's count for a Folk's actions: its stock, plus its depot's stock (round 3). */
+  const stockQty = (folk, id) => {
+    const depot = depotOf(folk);
+    return model.qtyOf(folk.room, id, 'stock') + (depot === undefined ? 0 : model.qtyOf(depot.room, id, 'stock'));
+  };
   /** Takes its inputs from its stock: the own-stock switch, or away from a bank on the haul. */
   const usesStock = (folk) => folk !== undefined && folk.room !== undefined && (folk.ownStock === true || onHaul(folk));
   /**
@@ -112,10 +135,11 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     list.forEach((f) => {
       const before = access.get(f.id);
       access.delete(f.id);
-      const now = accessOf(f);
-      if (before !== undefined && before !== now) {
+      const now = answerOf(f);
+      if (before !== undefined && (before.access !== now.access || before.depot !== now.depot)) {
         blocked.delete(f.id);
-        log(`room: ${f.name} now uses ${now === 'room' ? 'its room' : 'the bank'}`);
+        dry.delete(f.id);
+        log(`room: ${f.name} now uses ${now.access === 'room' ? 'its room' : 'the bank'}${now.depot === null ? '' : ` and depot ${now.depot}`}`);
         emitChanged(f);
       }
     });
@@ -128,11 +152,26 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     if (folk?.room === undefined) return false;
     // An action's work is charged once, to the first item it puts in the room.
     const charge = acting.roomCharged === true ? 0 : intervalOf(acting.skill);
-    const over = acting.roomCharged !== true && !model.fits(folk.room, capOf(folk), charge);
+    const haul = onHaul(folk);
+    // A Folk sharing a depot (round 3): its own room first, then the depot; the whole action's goods go to one place.
+    const depot = haul ? depotOf(folk) : undefined;
+    if (acting.roomCharged !== true) {
+      acting.roomTarget = depot === undefined
+        ? (model.fits(folk.room, capOf(folk), charge) ? 'room' : 'over')
+        : depotModel.target({ roomFreeMs: capOf(folk) - model.usedMs(folk.room), depotFreeMs: depotFree(depot), chargeMs: charge });
+    }
+    if (acting.roomTarget === 'depot' && depot !== undefined) {
+      model.put(depot.room, item.id, quantity, charge);
+      acting.roomCharged = true;
+      blocked.delete(folk.id);
+      hiring.depots.touched(depot.id);
+      hiring.renderQueue.folks = true;
+      return true;
+    }
+    const over = acting.roomTarget === 'over';
     model.put(folk.room, item.id, quantity, charge);
     acting.roomCharged = true;
     touch(folk);
-    const haul = onHaul(folk);
     if (over || acting.roomOver === true) {
       // No space for this action's work: its items are kept all the same, and the Folk stops after it (acting.mjs
       // stops the timer the action would restart).
@@ -142,6 +181,7 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
         blocked.add(folk.id);
         notify(templateLangString(haul ? 'MOD_WF_HAUL_FULL_NOTICE' : 'MOD_WF_ROOM_FULL_NOTICE', { name: folk.name }));
         hiring.events.emit('roomFull', { folk });
+        if (depot !== undefined) hiring.depots.full(depot.id);
       }
       hiring.renderQueue.folks = true;
       return true;
@@ -353,8 +393,13 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
   };
 
   /** Bank and room full: the last action found no space, or (after a load, which forgets that) the room is at its size. */
-  const isFull = (folk) => folk?.room !== undefined
-    && (blocked.has(folk.id) || (!model.isEmpty(folk.room) && model.usedMs(folk.room) >= capOf(folk)));
+  const isFull = (folk) => {
+    if (folk?.room === undefined) return false;
+    if (blocked.has(folk.id)) return true;
+    if (model.isEmpty(folk.room) || model.usedMs(folk.room) < capOf(folk)) return false;
+    const depot = depotOf(folk);
+    return depot === undefined || depotFree(depot) <= 0;
+  };
 
   /**
    * Cooking before its first Cook click has no active category, so no current recipe: the first category's chosen
@@ -395,7 +440,7 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     const skill = hiring.skillOf(folk);
     if (skill === undefined || hiring.delegated.has(skill)) return false;
     const { perAction } = inputsOf(folk);
-    return perAction.length > 0 && !model.stockCovers(folk.room, perAction);
+    return perAction.length > 0 && !perAction.every(({ id, qty }) => stockQty(folk, id) >= qty);
   };
   const markDry = (folk) => {
     if (dry.has(folk.id)) return;
@@ -578,6 +623,7 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
       purse: Object.freeze(model.purseEntries(folk.room).map(({ id, amount }) => Object.freeze({ currencyId: id, amount }))),
       state: model.stateOf({ full, dry: !full && isDry(folk) }),
       access: accessOf(folk),
+      depot: depotOf(folk)?.id ?? null,
     });
   };
 
@@ -616,7 +662,7 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     };
   };
 
-  const tipLines = (folk, side) => model.entries(folk.room, side).map(({ id, qty }) => {
+  const tipLines = (folk, side, room = folk.room) => model.entries(room, side).map(({ id, qty }) => {
     const item = game.items.getObjectByID(id);
     return { item: item ?? undefined, text: `${item?.name ?? id} ×${numberWithCommas(qty)}` };
   });
@@ -668,7 +714,27 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
         return { text: `${currency?.name ?? id} ×${numberWithCommas(Math.floor(amount))}` };
       }));
       const text = templateLangString('MOD_WF_CARD_ROOM', { used: hoursOf(fill.usedHours), cap: time.hoursText(fill.capHours) });
+      // A shared depot (round 3): its own line and bar under the room's, its stacks in their tooltip.
+      const shared = depotOf(folk);
+      let depot;
+      if (shared !== undefined) {
+        const d = model.fillView(shared.room, shared.capMs);
+        const name = shared.name || getLangString('MOD_WF_DEPOT');
+        const stock = tipLines(folk, 'stock', shared.room);
+        const haulLines = tipLines(folk, 'haul', shared.room);
+        const tip = [templateLangString('MOD_WF_ROOM_TIP_DEPOT', { name })];
+        if (stock.length > 0) tip.push(getLangString('MOD_WF_ROOM_TIP_DEPOT_STOCK'), ...stock);
+        if (haulLines.length > 0) tip.push(getLangString('MOD_WF_ROOM_TIP_DEPOT_HAUL'), ...haulLines);
+        if (stock.length === 0 && haulLines.length === 0) tip.push(getLangString('MOD_WF_ROOM_TIP_DEPOT_EMPTY'));
+        depot = {
+          text: templateLangString('MOD_WF_CARD_DEPOT', { name, used: hoursOf(d.usedHours), cap: time.hoursText(d.capHours) }),
+          percent: d.percent,
+          full: model.usedMs(shared.room) >= shared.capMs || hiring.depots.isFull(shared.id),
+          tip,
+        };
+      }
       return {
+        depot,
         percent: fill.percent,
         full,
         out,
@@ -732,6 +798,31 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     accessOf,
     onHaul,
     refreshAccess,
+    depotIdOf,
+    depotOf,
+    /** Folks sharing this depot now (their answer names it and they are on the haul). */
+    membersOf: (depotId) => (hiring?.crew.all ?? []).filter((f) => f.room !== undefined && onHaul(f) && depotIdOf(f) === depotId),
+    /**
+     * After a depot changed (restocked, collected, emptied): its members stopped full or dry try again, as a Restock or
+     * a collect starts a Folk.
+     */
+    wakeDepot(depotId) {
+      api.membersOf(depotId).forEach((folk) => {
+        const was = blocked.delete(folk.id) | dry.delete(folk.id);
+        if (was && !isFull(folk) && !isDry(folk)) startWorker(folk);
+        touch(folk);
+      });
+      hiring.renderQueue.folks = true;
+    },
+    /** Dev: answer for this Folk ahead of the hook (null: back to the hook). */
+    setDevAccess(folk, answer) {
+      if (folk === undefined) return;
+      if (answer === null) devAccess.delete(folk.id);
+      else devAccess.set(folk.id, Object.freeze(model.normalizeAnswer(answer)));
+      blocked.delete(folk.id);
+      dry.delete(folk.id);
+      hiring.renderQueue.folks = true;
+    },
     collect,
     emptyToBank,
     roomOf,
@@ -848,7 +939,7 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
     // A receiver of a supply line counts your bank too.
     const bankToo = !usesStock(folk);
     this._currencies.forEach((qty, currency) => { owned &&= currency.canAfford(qty); });
-    this._items.forEach((qty, item) => { owned &&= model.qtyOf(folk.room, item.id, 'stock') + (bankToo ? game.bank.getQty(item) : 0) >= qty; });
+    this._items.forEach((qty, item) => { owned &&= stockQty(folk, item.id) + (bankToo ? game.bank.getQty(item) : 0) >= qty; });
     return owned;
   });
   ctx.patch(Costs, 'consumeCosts').replace(function (original) {
@@ -882,8 +973,14 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
       this._items = items;
     }
     let short = false;
+    const depot = depotOf(folk);
     items.forEach((qty, item) => {
-      if (qty > 0 && model.take(folk.room, item.id, qty, 'stock').qty < qty) short = true;
+      if (qty <= 0) return;
+      const own = model.take(folk.room, item.id, qty, 'stock').qty;
+      // A Folk sharing a depot: what its stock lacks from the depot's (round 3).
+      const shared = own < qty && depot !== undefined ? model.take(depot.room, item.id, qty - own, 'stock').qty : 0;
+      if (shared > 0) hiring.depots.touched(depot.id);
+      if (own + shared < qty) short = true;
     });
     touch(folk);
     // Cartography's paper making never checks its logs before it spends them: a stock that falls short stops the Folk.
@@ -928,7 +1025,7 @@ export function install(ctx, { getHiring, model, resume, time, tips, log }) {
       const folk = this.selectedRecipe === undefined ? undefined : startingFolk(this);
       if (folk === undefined) return original();
       const fuel = this.activeRecipe.log;
-      if (model.qtyOf(folk.room, fuel.id, 'stock') + (usesStock(folk) ? 0 : game.bank.getQty(fuel)) > 0) {
+      if (stockQty(folk, fuel.id) + (usesStock(folk) ? 0 : game.bank.getQty(fuel)) > 0) {
         asStart(folk, () => this.start());
         this.renderQueue.bonfireProgress = true;
         this.renderQueue.oilProgress = true;

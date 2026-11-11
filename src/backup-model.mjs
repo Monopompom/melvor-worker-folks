@@ -181,6 +181,13 @@ export function heldBy(record) {
     }
   }
   if (isObj(root?.reserve)) for (const [id, n] of Object.entries(root.reserve)) bump(currencies, id, n);
+  // Tent depots (round 3): their stacks are the crew's too, so a restore neither doubles nor loses them.
+  if (isObj(root?.depots)) {
+    for (const d of Object.values(root.depots)) {
+      if (!isObj(d?.room)) continue;
+      for (const side of ['haul', 'stock']) if (isObj(d.room[side])) for (const [id, e] of Object.entries(d.room[side])) if (isObj(e)) bump(items, id, e.qty);
+    }
+  }
   return { items, currencies };
 }
 

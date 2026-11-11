@@ -419,6 +419,19 @@ function fillCard(col, folk, view) {
       setText(text, room.text);
       view.tip(text, room.tip);
     }
+    const depot = el.querySelector('[data-wf="room-depot"]');
+    if (depot !== null) {
+      const d = room.depot;
+      depot.classList.toggle('d-none', d === undefined);
+      if (d !== undefined) {
+        setText(depot.querySelector('[data-wf="room-depot-text"]'), d.text);
+        const dBar = depot.querySelector('[data-wf="room-depot-bar"]');
+        dBar.style.width = `${d.percent}%`;
+        const cls = `progress-bar ${d.full ? 'bg-danger' : 'bg-info'}`;
+        if (dBar.className !== cls) dBar.className = cls;
+        view.tip(depot, d.tip);
+      }
+    }
   });
   // The switches under the work, always in sight (build .153; they were in Details): Overtime once unlocked, Own stock.
   const ot = view.overtime(folk);

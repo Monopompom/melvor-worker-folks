@@ -104,6 +104,19 @@ test('supply lines: set on the supplier, never itself, ended by a job or by eith
   assert.deepEqual(events, [`${a.id}>${b.id}`, `${c.id}>${b.id}`, `${c.id}>null`, `${a.id}>null`]);
 });
 
+test('load ends a supply line whose receiver is not in the crew', () => {
+  const { crew } = make(3);
+  const a = crew.hire('Junior');
+  const b = crew.hire('Junior');
+  const c = crew.hire('Junior');
+  crew.setSupply(a.id, c.id);
+  crew.setSupply(b.id, a.id);
+  const { crew: small } = make(2);
+  small.load(crew.serialize());
+  assert.equal(small.byId(a.id).supplies, null, 'its receiver was past the slot cap');
+  assert.equal(small.byId(b.id).supplies, a.id);
+});
+
 test('a job that travels leaves the Folk where it is, along with the player included', () => {
   const { crew } = make();
   const a = crew.hire('Junior');

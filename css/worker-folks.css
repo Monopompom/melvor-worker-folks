@@ -171,6 +171,9 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 .wf-job-pick { flex: none; min-width: 0; }
 .wf-job-pick .dropdown-item img { width: 16px; height: 16px; margin-right: 6px; vertical-align: -3px; }
 .wf-job-pick .dropdown-item.wf-job-off { opacity: 0.5; }
+/* A tent depot's line under the room (round 3): the same bar, a step dimmer, so the Folk's own room reads first. */
+.wf-depot { margin-top: 8px; }
+.wf-depot-bar .progress-bar.bg-info { opacity: 0.7; }
 /* A receiver's supply panel (round 3): a green edge as the strike band's red one; "Supplied by" with the rate step at
    the right, then each supplier's name and what it brings, item icon first. */
 .wf-supplied { padding: 8px 10px 8px 13px; border-radius: 6px; background: var(--wf-well); box-shadow: inset 3px 0 0 var(--wf-edge-supply); }

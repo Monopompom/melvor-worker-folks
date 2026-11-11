@@ -214,6 +214,19 @@ export function normalizeAccess(answer) {
   return answer === 'room' ? 'room' : 'bank';
 }
 
+/**
+ * The hook's whole answer (round 3): 'bank' / 'room', or { access, depot } naming the depot (another mod's id) a Folk
+ * on the room shares. { access, depot } with depot null for none; a depot on 'bank' means nothing and is left out.
+ */
+export function normalizeAnswer(answer) {
+  if (answer !== null && typeof answer === 'object') {
+    const access = normalizeAccess(answer.access);
+    const depot = access === 'room' && typeof answer.depot === 'string' && answer.depot !== '' && answer.depot.length <= 120 ? answer.depot : null;
+    return { access, depot };
+  }
+  return { access: normalizeAccess(answer), depot: null };
+}
+
 /** The room's state for other mods: 'full' (no space for the next action), 'dry' (out of inputs) or 'ok'. */
 export function stateOf({ full = false, dry = false } = {}) {
   return full ? 'full' : dry ? 'dry' : 'ok';

@@ -47,6 +47,8 @@ export const EVENT_NAMES = [
   'folkRefillOut',
   'folkSupplyChanged',
   'folkSupplied',
+  'depotChanged',
+  'depotFull',
 ];
 
 export function createEventBus(names = EVENT_NAMES, { onError } = {}) {

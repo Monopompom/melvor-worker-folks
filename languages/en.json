@@ -1069,5 +1069,11 @@
   "MOD_WF_SUPPLY_BY_HEAD": "Supplied by",
   "MOD_WF_SUPPLY_BY_RATE": "+${bonus} Produce Rate",
   "MOD_WF_SUPPLY_BY_RATE_ON_TIP": "A supplier is working: +${bonus} Produce Rate.",
-  "MOD_WF_SUPPLY_BY_RATE_OFF_TIP": "No supplier is working: +${bonus} Produce Rate returns when one does."
+  "MOD_WF_SUPPLY_BY_RATE_OFF_TIP": "No supplier is working: +${bonus} Produce Rate returns when one does.",
+  "MOD_WF_DEPOT": "Tent depot",
+  "MOD_WF_ROOM_TIP_DEPOT": "${name}, shared with the Folks by it:",
+  "MOD_WF_ROOM_TIP_DEPOT_STOCK": "Inputs, after this Folk’s own stock:",
+  "MOD_WF_ROOM_TIP_DEPOT_HAUL": "Made, after this Folk’s room filled:",
+  "MOD_WF_ROOM_TIP_DEPOT_EMPTY": "Empty",
+  "MOD_WF_CARD_DEPOT": "${name}: ${used} of ${cap} h"
 }

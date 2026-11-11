@@ -380,7 +380,9 @@ export function createApi({ getHiring, model, pricing, rules, getBackup, version
      * waits in its room and its purse, its inputs come only from its stock; it stops "Haul full" or "Out of inputs" and
      * its wages keep running while stopped). Anything else reads 'bank'. One hook at a time; none means 'bank' for
      * every Folk. The answer is kept per Folk and asked again on folkMoved, a load and refreshBankAccess(). Returns
-     * the function that removes it.
+     * the function that removes it. Since v11 it may answer { access: 'room', depot: id } for a Folk sharing a
+     * registered tent depot (registerDepot): its goods fill its own room, then the depot; its inputs come from its
+     * stock, then the depot's. A depot id not registered: its own room only.
      */
     registerBankAccess: (fn) => {
       if (typeof fn !== 'function') throw new Error('bank access must be a function');
@@ -407,7 +409,7 @@ export function createApi({ getHiring, model, pricing, rules, getBackup, version
     /**
      * A Folk's room (v10), frozen: { sizeMs, usedMs, haul, stock, town, purse, state, access }. haul / stock / town are
      * [{ itemId, qty, ms }] (town: a Township commission's goods, not yours to move), purse [{ currencyId, amount }],
-     * state 'ok' | 'full' | 'dry', access 'bank' | 'room'.
+     * state 'ok' | 'full' | 'dry', access 'bank' | 'room', depot the shared depot's id or null (v11).
      */
     room: (id) => roomCall(id, (room, folk) => room.roomOf(folk)),
     /**
@@ -438,6 +440,33 @@ export function createApi({ getHiring, model, pricing, rules, getBackup, version
       const folk = record(id);
       return folk === undefined ? undefined : room.emptyToBank(folk, { inputs });
     },
+    /**
+     * Tent depots (v11): a shared room kept by your id, sized in hours of work (48 by default). Register every standing
+     * one on each character load (before offline progress); one not registered again is emptied to the bank once the
+     * game is up. Its Folks are those your bank-access hook answers { access: 'room', depot: id } for.
+     */
+    registerDepot: (id, opts = {}) => hiring().depots?.register(id, opts) === true,
+    /**
+     * The depot is gone (the tent struck): everything in it to the bank; what the bank can't take yet waits and goes
+     * as space comes. { items, left, purse } as emptyToBank.
+     */
+    dropDepot: (id) => hiring().depots?.drop(id),
+    /**
+     * A depot, frozen: { id, name, sizeMs, usedMs, haul, stock, members, state }; haul (what its Folks made) and stock
+     * (inputs for them) are [{ itemId, qty, ms }], members Folk ids, state 'ok' | 'full' | 'unregistered' | 'dropped'.
+     * undefined for an unknown id.
+     */
+    depot: (id) => hiring().depots?.view(id),
+    /** What its Folks made, and stock none of their recipes uses now, to the bank. { items, left, purse }. */
+    collectDepot: (id) => hiring().depots?.collect(id),
+    /**
+     * Restock all at the depot: each member with a recipe gets an equal share of the free hours in its inputs, from the
+     * bank. { ok: true, members: [{ folkId, actions, items }], items } or { ok: false, why } ('unknown' | 'noMembers' |
+     * 'noRoom' | 'noBank'). Members stopped for want of inputs start again. Your staff guard is not asked.
+     */
+    restockDepot: (id) => hiring().depots?.restock(id),
+    /** Everything in the depot to the bank, the depot staying up. { items, left, purse }. */
+    emptyDepot: (id) => hiring().depots?.empty(id),
     /** Asks for the guarded buttons and the Shop's lines to be drawn again (call after the player moves). */
     refresh: () => hiring().refreshGuarded(),
   });

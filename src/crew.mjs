@@ -16,6 +16,8 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
   let board = null;
   /** Township Commissions' state (commissions.mjs owns its shape); null until the board opens. */
   let commissions = null;
+  /** Tent depots (depots.mjs owns their shape): { [depotId]: { name, hours, room, dropped } }. */
+  let depots = {};
 
   const emitChange = () => bus.emit('crewChanged', { folks: crew.all });
 
@@ -237,21 +239,30 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
     get commissions() {
       return commissions;
     },
+    get depots() {
+      return depots;
+    },
+    set depots(value) {
+      depots = value !== null && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    },
     set commissions(value) {
       commissions = value !== null && typeof value === 'object' ? value : null;
     },
     serialize() {
-      return serializeRoot(folks, reserve, frozen, board, lost, commissions);
+      return serializeRoot(folks, reserve, frozen, board, lost, commissions, depots);
     },
     /** Replaces the crew from a serialised root. Returns the parse report. */
     load(input) {
       const report = parseRoot(input);
       folks = report.root.folks.filter((f) => f.slot < this.maxSlots);
+      // A supply line to a Folk not in the crew (left past the slot cap, or not in a restored backup) ends.
+      folks.forEach((f) => { if (f.supplies !== null && !folks.some((r) => r.id === f.supplies)) f.supplies = null; });
       reserve = normalizeReserve(report.root.reserve);
       frozen = normalizeFrozen(report.root.frozen, now());
       lost = normalizeLost(report.root.lost, frozen);
       board = report.root.board ?? null;
       commissions = report.root.commissions ?? null;
+      depots = report.root.depots ?? {};
       report.dropped += report.root.folks.length - folks.length;
       emitChange();
       return report;
@@ -263,6 +274,7 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
       lost = {};
       board = null;
       commissions = null;
+      depots = {};
       emitChange();
     },
     /** Announces an in-place change to Folk fields (debt, cooldown...). */

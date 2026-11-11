@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-11-10.239';
+export const BUILD = '2026-11-11.242';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -122,6 +122,8 @@ export async function setup(ctx) {
   const thievingRate = await ctx.loadModule('src/thieving-rate.mjs');
   const roomRules = await ctx.loadModule('src/room-model.mjs');
   const room = await ctx.loadModule('src/room.mjs');
+  const depotModel = await ctx.loadModule('src/depot-model.mjs');
+  const depots = await ctx.loadModule('src/depots.mjs');
   const shopData = await ctx.loadModule('src/shop-data.mjs');
   const gearData = await ctx.loadModule('src/gear-data.mjs');
   const discoveryRules = await ctx.loadModule('src/discovery-model.mjs');
@@ -376,6 +378,14 @@ export async function setup(ctx) {
     log,
   });
 
+  // 5d3'''. Tent depots (with Voyage): shared rooms another mod registers; the room shares them with their Folks.
+  depots.install(ctx, {
+    getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+    model: depotModel,
+    roomModel: roomRules,
+    log,
+  });
+
   // 5d4. Mastery displays found without searching the whole page (setting in the Hiring section).
   const masteryIndex = (await ctx.loadModule('src/mastery-index.mjs')).install(ctx, { log });
   // 5d5. Wage and completion log draws held to a few a second while Folks work (the same setting).
@@ -428,6 +438,7 @@ export async function setup(ctx) {
   room.install(ctx, {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     model: roomRules,
+    depotModel,
     resume,
     time,
     tips,
