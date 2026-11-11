@@ -183,3 +183,19 @@ test('fileName: safe letters, accents folded, the local date', () => {
   assert.equal(B.fileName('Ölaf the Bold!', at), 'folks-backup-Olaf-the-Bold-2026-11-05.txt');
   assert.equal(B.fileName('', at), 'folks-backup-character-2026-11-05.txt');
 });
+
+test('a restore neither doubles nor loses what a tent depot holds', () => {
+  const tent = (haul, stock = {}) => ({ tent1: { name: 'Camp', hours: 48, room: { haul, stock }, dropped: false } });
+  const withDepots = (depots) => serializeRoot([folk('a', 0)], {}, {}, null, {}, null, depots);
+  const coal = (qty) => ({ 'melvorD:Coal_Ore': { qty, ms: 1 } });
+  // Gathered in the depot since the backup: handed back to the bank, the backup's 40 come back in the depot.
+  const then = withDepots(tent(coal(40)));
+  assert.deepEqual(B.returns(withDepots(tent(coal(100))), then).items, [['melvorD:Coal_Ore', 60]]);
+  // A backup from before depots: everything a depot holds now goes to the bank.
+  assert.deepEqual(B.returns(withDepots(tent(coal(25), { 'melvorD:Iron_Ore': { qty: 5, ms: 1 } })), record([folk('a', 0)])).items,
+    [['melvorD:Coal_Ore', 25], ['melvorD:Iron_Ore', 5]]);
+  // The depot collected (or dropped) into the bank since the backup: its 40 come back in the depot and leave the bank.
+  const backup = { record: then, bank: { 'melvorD:Coal_Ore': 10 } };
+  assert.deepEqual(B.takes(withDepots({}), backup, { 'melvorD:Coal_Ore': 50 }), [['melvorD:Coal_Ore', 40]]);
+  assert.deepEqual(B.returns(withDepots({}), then).items, []);
+});

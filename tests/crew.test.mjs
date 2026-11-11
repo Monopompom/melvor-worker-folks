@@ -251,3 +251,18 @@ test('a Folk going along with the player stops going along when given a skill', 
   crew.assign(b.id, 'melvorD:Fishing');
   assert.equal(b.travel, 'idle', 'a walking Folk given a skill has arrived');
 });
+
+test('load replaces the depots whole: a backup\'s or none', () => {
+  const { crew } = make();
+  crew.hire('Junior');
+  crew.depots = { tent1: { name: 'Camp', hours: 48, room: { haul: {}, stock: {} }, dropped: false } };
+  const saved = crew.serialize();
+  crew.depots = { tent2: { name: 'Hill', hours: 24, room: { haul: {}, stock: {} }, dropped: false } };
+  crew.load(saved);
+  assert.deepEqual(Object.keys(crew.depots), ['tent1']);
+  const { crew: older } = make();
+  older.hire('Junior');
+  const before = older.serialize();
+  crew.load(before);
+  assert.deepEqual(crew.depots, {}, 'a record from before depots');
+});
