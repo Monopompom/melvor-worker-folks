@@ -3,7 +3,6 @@
 
 const GP_ID = 'melvorD:GP';
 const AP_ID = 'melvorItA:AbyssalPieces';
-const ABYSSAL_REALM = 'melvorItA:Abyssal';
 
 export function install(ctx, { getHiring, wages, pricing, milestones, resume, log }) {
   const { selectionOf, startAgain, toSaved, fromSaved } = resume;
@@ -38,6 +37,15 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
   ]);
   const multiplier = () => wages.presetMultiplier(section.get('wageDifficulty'));
   const currency = (id) => game.currencies.getObjectByID(id);
+  // The realm of the tree, rock, recipe or NPC the skill works on. A skill with nothing picked throws on some
+  // getters (a recipe skill's activeRecipe): no realm, so GP.
+  const workRealmOf = (skill) => {
+    try {
+      return skill?.masteryAction?.realm?.id;
+    } catch {
+      return undefined;
+    }
+  };
 
   const api = {
     get enabled() {
@@ -56,10 +64,15 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
       folk.demand = api.demandsOn ? hiring.demands.roll(folk) : [];
       if (folk.demand.length > 0) log(`${folk.name} demands ${folk.demand.map((d) => `${d.qty} ${d.id}`).join(', ')}`);
     },
-    /** Currency a skill's wages are charged in right now. */
+    /** Currency a skill's wages are charged in: by the realm of what it works on, whichever realm the player is in. */
     currencyIdFor(skill) {
-      if (section.get('abyssalWagesInAP') && skill?.currentRealm?.id === ABYSSAL_REALM && currency(AP_ID) !== undefined) return AP_ID;
-      return GP_ID;
+      return wages.wageCurrencyId({
+        workRealmId: workRealmOf(skill),
+        apWages: section.get('abyssalWagesInAP') === true,
+        apExists: currency(AP_ID) !== undefined,
+        gpId: GP_ID,
+        apId: AP_ID,
+      });
     },
     hourlyWageOf(folk) {
       return wages.hourlyWage(folk.tier, { multiplier: multiplier() * (hiring.wageFactor?.(folk) ?? 1), discount: hiring.wageDiscount?.(folk) ?? 0 });

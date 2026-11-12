@@ -137,3 +137,14 @@ export function depositPlan({ amount, bank, room = Infinity }) {
   if (want > bank) return { deposit: most, outcome: 'bank' };
   return { deposit: want, outcome: 'ok' };
 }
+
+export const ABYSSAL_REALM_ID = 'melvorItA:Abyssal';
+
+/**
+ * The currency a Folk's wage is charged in: Abyssal Pieces for work in the Abyssal realm (its tree, rock, recipe or
+ * NPC is an Abyssal one) with the option on and the currency there, GP for everything else. It follows the work, not
+ * the realm the player has open: switching realms used to move Melvor work onto AP, which ran up a debt and a strike.
+ */
+export function wageCurrencyId({ workRealmId, apWages, apExists, gpId, apId }) {
+  return apWages && apExists && workRealmId === ABYSSAL_REALM_ID ? apId : gpId;
+}

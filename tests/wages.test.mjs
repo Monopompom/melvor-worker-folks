@@ -4,7 +4,19 @@ import {
   depositPlan, hourlyWage, wageForAction, wholeCharge, splitPayment, hoursCovered, onUnpaid,
   severance, settlement, cooldownAfterSettlement, tickCooldown, COOLDOWN_TICKS,
   WAGE_PRESETS, DEFAULT_WAGE_PRESET, presetMultiplier, repayDebt, graceLeftMs, reserveLow, STRIKE_GRACE_MS,
+  wageCurrencyId,
 } from '../src/wages.mjs';
+
+test('wages follow the realm of the work, not the realm the player has open', () => {
+  const ids = { gpId: 'GP', apId: 'AP', apExists: true, apWages: true };
+  assert.equal(wageCurrencyId({ ...ids, workRealmId: 'melvorD:Melvor' }), 'GP');
+  assert.equal(wageCurrencyId({ ...ids, workRealmId: 'melvorItA:Abyssal' }), 'AP');
+  // Nothing picked (no realm known): GP.
+  assert.equal(wageCurrencyId({ ...ids, workRealmId: undefined }), 'GP');
+  // The option off, or no Abyssal Pieces in this game: GP even for Abyssal work.
+  assert.equal(wageCurrencyId({ ...ids, apWages: false, workRealmId: 'melvorItA:Abyssal' }), 'GP');
+  assert.equal(wageCurrencyId({ ...ids, apExists: false, workRealmId: 'melvorItA:Abyssal' }), 'GP');
+});
 
 test('debt from the grace period is repaid once money is back, reserve first, and clears the counter', () => {
   const owed = { debt: 100, debtMs: 6000 };

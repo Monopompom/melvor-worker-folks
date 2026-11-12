@@ -218,8 +218,9 @@ pays for itself with some to spare, a Folk on anything else runs at a loss, and 
 can out-eat even a fully built Township. A fresh Folk earns 40% of its tier wage and gets
 raises with mastery: 55% at 50, 74% at 90 and the full wage at 99, so the crew costs more
 as it gets better.
-Wages come from the **Payroll Reserve** on the Hiring page first, then from your bank. In
-the Abyssal Realm wages are charged in Abyssal Pieces.
+Wages come from the **Payroll Reserve** on the Hiring page first, then from your bank. Work
+on Abyssal Realm actions is paid in Abyssal Pieces, everything else in GP, whichever realm
+you have open: switching realms changes nothing for a Folk at work.
 
 If neither can pay, the Folk keeps working unpaid for a grace of **15 minutes of work** (30
 from Folk mastery 25, 15 more from the 25% mastery pool checkpoint) and then **strikes**.
