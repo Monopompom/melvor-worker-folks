@@ -631,6 +631,9 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-history-img { width: 56px; height: 56px; object-fit: contain; flex: none; }
 .wf-comm .wf-comm-held { opacity: 0.45; }
 .wf-comm-foot { gap: 6px; margin-top: auto; padding-top: 8px; }
+/* Decline and Send (build .248): the pair at the foot's right, the outline first; Send gives way on a narrow card. */
+.wf-comm-pair { gap: 6px; width: 100%; min-width: 0; }
+.wf-comm-pair .btn-info { flex: 0 1 auto; }
 .wf-comm-folk { gap: 8px; width: 100%; }
 .wf-comm-folk-name { font-size: 0.9rem; line-height: 1.2; }
 .wf-comm-standing { font-size: 0.8rem; white-space: nowrap; }

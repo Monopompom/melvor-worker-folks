@@ -527,3 +527,69 @@ test('the stories package: a deed and a one-per-town decoration for each, built 
 test('a full town raises the heirloom find chance by 200%: five Halls, five Squares, five stories', () => {
   assert.equal(HALL_MAX * HALL_HEIRLOOM_FIND + SQUARE_MAX * SQUARE_HEIRLOOM_FIND + STORIES.length * STORY_HEIRLOOM_FIND, 200);
 });
+
+test('materials counted: the amount is the whole chain per item when a candidate carries it', async () => {
+  const m = await import('../src/commissions-model.mjs');
+  // 16 h of Divine Platelegs at about 233 s of chain each: about 250, not 28,800.
+  assert.equal(m.quantityFor({ hours: 16, intervalMs: 2000, unitMs: 233000 }), 250);
+  assert.equal(m.quantityFor({ hours: 16, intervalMs: 2000 }), 29000);
+  assert.equal(m.quantityFor({ hours: 16, intervalMs: 2000, unitMs: Infinity }), 29000);
+  const c = m.rollCommission({ candidates: [cand('melvorD:Smithing', 'melvorD:Bar', 99, 2000, { unitMs: 233000 })], townshipLevel: 30, rng: () => 0, makeId });
+  assert.equal(c.qty, m.quantityFor({ hours: c.hours, unitMs: 233000 }));
+});
+
+test('shrink: an old card gets smaller, never larger, never below what came; enough already is delivered', async () => {
+  const m = await import('../src/commissions-model.mjs');
+  const card = (over = {}) => ({ state: 'open', qty: 19200, delivered: 0, folkId: 'f1', ...over });
+  const a = card();
+  assert.equal(m.shrink(a, 82), false);
+  assert.equal(a.qty, 82);
+  const b = card({ qty: 50 });
+  assert.equal(m.shrink(b, 80), false);
+  assert.equal(b.qty, 50);
+  const c = card({ delivered: 300 });
+  assert.equal(m.shrink(c, 82), true);
+  assert.equal(c.qty, 300);
+  assert.equal(c.state, 'done');
+  assert.equal(c.folkId, null);
+  const d = card({ state: 'withdrawn' });
+  assert.equal(m.shrink(d, 5), false);
+  assert.equal(d.qty, 19200);
+});
+
+test('decline: only with no Folk on it, a quarter of its Standing, a story ends, the flag survives a save', async () => {
+  const m = await import('../src/commissions-model.mjs');
+  const state = m.createState();
+  state.standing.points = 100;
+  const [c] = m.fill(state, { candidates: CANDIDATES, townshipLevel: 30, rng: () => 0, makeId }, 1);
+  c.folkId = 'f1';
+  assert.equal(m.canDecline(c), false);
+  assert.equal(m.decline(state, c), null);
+  c.folkId = null;
+  c.delivered = Math.floor(c.qty / 2);
+  const price = c.standing * m.DECLINE_STANDING;
+  assert.equal(m.declinePrice(state, c), price);
+  const r = m.decline(state, c);
+  assert.equal(r.price, price);
+  assert.equal(r.resources, m.proRata(c).resources);
+  assert.ok(r.resources > 0);
+  assert.equal(state.standing.points, 100 - price);
+  assert.equal(c.state, 'withdrawn');
+  assert.equal(c.declined, true);
+  assert.equal(m.canDecline(c), false);
+  // Never below 0.
+  const poor = m.createState();
+  poor.standing.points = 1;
+  const [p] = m.fill(poor, { candidates: CANDIDATES, townshipLevel: 30, rng: () => 0, makeId }, 1);
+  assert.equal(m.decline(poor, p).price, 1);
+  assert.equal(poor.standing.points, 0);
+  // Saved and loaded: declined stays, and only on a withdrawn card.
+  assert.equal(m.normalizeCommission(JSON.parse(JSON.stringify(c))).declined, true);
+  assert.equal(m.normalizeCommission({ ...JSON.parse(JSON.stringify(c)), state: 'open', delivered: 0 }).declined, undefined);
+  // A story step declined ends the story.
+  const s = m.createState();
+  s.stories.active = { id: 'Mill_Bridge', step: 1, folks: [] };
+  const step = { state: 'open', folkId: null, standing: 8, qty: 10, delivered: 0, resources: 100, story: { id: 'Mill_Bridge', step: 1 } };
+  m.decline(s, step);
+  assert.equal(s.stories.active, null);
+});

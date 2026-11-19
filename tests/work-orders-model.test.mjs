@@ -162,3 +162,18 @@ test('pickWeighted', () => {
   assert.equal(pickWeighted([], () => 1), undefined);
   assert.equal(pickWeighted(['a', 'b'], (x) => (x === 'a' ? 0 : 1), () => 0), 'b');
 });
+
+test('materials counted: orders use the chain per item; shrink keeps what came', async () => {
+  const m = await import('../src/work-orders-model.mjs');
+  assert.equal(m.quantityFor({ hours: 2, intervalMs: 2000, unitMs: 233000 }), 31);
+  assert.equal(m.quantityFor({ hours: 2, intervalMs: 2000 }), 3600);
+  const o = m.rollOrder({ candidates: [{ skillId: 'melvorD:Smithing', itemId: 'x', itemIds: ['x'], level: 99, intervalMs: 2000, perAction: 1, unitMs: 233000 }], level: 8, rng: () => 0, makeId: () => 'o1' });
+  assert.equal(o.qty, 31);
+  const big = { state: 'open', qty: 3600, delivered: 10 };
+  assert.equal(m.shrink(big, 31), false);
+  assert.equal(big.qty, 31);
+  const near = { state: 'open', qty: 3600, delivered: 40 };
+  assert.equal(m.shrink(near, 31), true);
+  assert.equal(near.qty, 40);
+  assert.equal(near.state, 'done');
+});

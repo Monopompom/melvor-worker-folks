@@ -13,7 +13,7 @@ const CONTAINER_ID = 'worker-folks-container';
 export const BLOCK_ID = 'worker-folks-orders';
 const GP_ID = 'melvorD:GP';
 
-export function install(ctx, { getHiring, model, time, numbers, tips, popupDidRender, log }) {
+export function install(ctx, { getHiring, model, costs = null, time, numbers, tips, popupDidRender, log }) {
   let hiring;
   let board = null;
   let seenLevel = -1;
@@ -75,8 +75,14 @@ export function install(ctx, { getHiring, model, time, numbers, tips, popupDidRe
       return true;
     } catch { return false; }
   };
-  /** Recipes you have unlocked, on skills a Folk may work, in the normal realm (no Abyssal products for now). */
-  const candidates = () => {
+  /**
+   * Recipes you have unlocked, on skills a Folk may work, in the normal realm (no Abyssal products for now). Each with
+   * `unitMs`, the whole chain per item from raw materials (build .248, a player's report: a 16 h commission asked for
+   * 76,000 Zephyte Bolts, a gem a vein gives about once in two hours of Mining), so a card's hours are the hours it
+   * takes; `askable` false for what no Folk can get (a monster drop in the chain) or what 8 h make fewer than ten of.
+   * Without the cost book (it failed to build) a candidate has no `unitMs` and the boards count the Folk's own time.
+   */
+  const allCandidates = () => {
     const out = [];
     for (const skill of hiring.delegableSkills ?? []) {
       if (skill?.actions === undefined) continue;
@@ -86,6 +92,8 @@ export function install(ctx, { getHiring, model, time, numbers, tips, popupDidRe
         if (items.length === 0 || !unlocked(skill, action)) return;
         const intervalMs = intervalOf(skill, action);
         if (!(intervalMs > 0)) return;
+        let cost = null;
+        try { cost = costs?.actionCost(skill, action) ?? null; } catch (err) { log('material cost failed', err); }
         out.push({
           skillId: skill.id,
           itemId: items[0].id,
@@ -93,10 +101,47 @@ export function install(ctx, { getHiring, model, time, numbers, tips, popupDidRe
           level: action.level ?? 0,
           intervalMs,
           perAction: Math.max(1, Number(action.baseQuantity) || 1),
+          ...(cost === null ? {} : { unitMs: cost.unitMs, knownMs: cost.knownMs, askable: cost.askable }),
         });
       });
     }
     return out;
+  };
+  const candidates = () => allCandidates().filter((c) => c.askable !== false);
+  /** The candidate an item on a card comes from (asked or not), or undefined. */
+  const candidateFor = (skillId, itemId) => allCandidates().find((c) => c.skillId === skillId && c.itemIds.includes(itemId));
+  /**
+   * Items in `hours` of work on a card's item now: the chain per item, or, for an item no Folk can get in full (a
+   * monster drop in it), the part a Folk can. null when it can't be told (then the card stays as it is).
+   */
+  const amountFor = (c, hours) => {
+    if (c === undefined) return null;
+    const ms = Number.isFinite(c.unitMs) ? c.unitMs : c.knownMs;
+    return ms > 0 && Number.isFinite(ms) ? model.quantityFor({ hours, unitMs: ms }) : null;
+  };
+  /**
+   * Orders posted before materials counted (build .248): each open one shrinks to the hours it asks for, never below
+   * what came (an order that already has as much is delivered); one nobody started on an item no board asks for now
+   * goes, and the board fills its place. Every load: an order posted since already has its amount.
+   */
+  const resizeOld = () => {
+    if (board === null) return;
+    const gone = [];
+    for (const o of board.orders) {
+      if (o.state !== 'open') continue;
+      const c = candidateFor(o.skillId, o.itemId);
+      if (c?.askable === false && o.delivered === 0) { gone.push(o); continue; }
+      const qty = amountFor(c, model.SIZE[o.size].hours);
+      if (qty === null) continue;
+      const before = o.qty;
+      if (model.shrink(o, qty)) due.push(o);
+      if (o.qty !== before) log(`work order ${o.id} ${o.itemId}: ${before} → ${o.qty}`);
+    }
+    if (gone.length > 0) {
+      board.orders = board.orders.filter((o) => !gone.includes(o));
+      log(`work orders withdrawn: ${gone.map((o) => o.itemId).join(', ')}`);
+    }
+    while (due.length > 0) payout(due.shift());
   };
   const diplomaId = () => {
     const tier = hiring.highestLicence;
@@ -471,6 +516,8 @@ export function install(ctx, { getHiring, model, time, numbers, tips, popupDidRe
     render,
     markDirty,
     candidates: () => candidates(),
+    candidateFor: (skillId, itemId) => candidateFor(skillId, itemId),
+    amountFor: (skillId, itemId, hours) => amountFor(candidateFor(skillId, itemId), hours),
     refreshNow: () => { refreshNow(); },
     /** Dev aid: the board's clock moved by `ticks`. */
     advance: (ticks) => { if (board !== null && model.advance(board, ticks)) refreshNow(); markDirty(); },
@@ -487,6 +534,8 @@ export function install(ctx, { getHiring, model, time, numbers, tips, popupDidRe
     board = saved === null ? null : model.normalizeBoard(saved);
     hiring.crew.board = board;
     seenLevel = level();
+    costs?.reset();
+    try { resizeOld(); } catch (err) { log('old orders not resized', err); }
     fillNow();
     // After payroll's: the wage of the action that just ran is in by then.
     hiring.events.on('folkPaid', onPaid);

@@ -296,9 +296,13 @@ are marked "raise level cap", and Hiring can appear among the random cap increas
 From Hiring 8 the Hiring page has a **Work Orders** board: orders for items your Folks make.
 Only what a Folk's work puts in your bank counts, from the moment the order appears; what you
 make yourself doesn't, and selling or using the items later changes nothing. An order asks for
-about 2 (Small), 6 (Medium) or 16 (Large) hours of one Folk's work on a recipe you have
-unlocked, picked from the newest recipes of the skills a Folk can work (none from the Abyssal
-realm for now).
+about 2 (Small), 6 (Medium) or 16 (Large) hours of work on a recipe you have unlocked, picked
+from the newest recipes of the skills a Folk can work (none from the Abyssal realm for now).
+The hours count the whole chain from raw materials at base speed: gathering the logs, ore or
+fish, every step in between and the Folk's own. A gem vein, a superior gem or a meteorite counts
+at the game's own find rate, farm produce at one harvest per growth on the plots you own, and a
+shop item as no work (it costs GP). Nothing is asked for that needs a monster drop, nor gear so
+slow that 8 hours make fewer than ten.
 
 A delivered order pays at once:
 
@@ -325,7 +329,8 @@ requests to your guild. The **Township Commissions** board on the Hiring page sh
 them, four from Trusted Standing. Each comes from one figure of the town with a trade of its own:
 the Miller (Woodcutting), Mason (Mining), Smith (Smithing), Baker (Cooking or Fishing), Healer
 (Herblore), Tailor (Crafting), Fletcher (Fletching) and Runewright (Runecrafting). It asks for
-one item worth about 8 to 24 hours of one Folk's work, with a deadline.
+one item worth about 8 to 24 hours of work, with a deadline, counted from raw materials the way
+Work Orders are.
 
 **Send** the Folk that works that skill (one commission per Folk). From then on what it makes of
 that item goes to its room instead of your bank. When the room holds the rest, or has no space
@@ -342,6 +347,10 @@ A delivered commission pays, never in GP:
 - **Town Standing**, one point per hour of work asked.
 - **Hiring XP**: a fortieth of a level's worth per 8 hours, at your Hiring level when it is
   delivered.
+
+**Decline** turns down a commission no Folk is on, for a quarter of its Standing (taken from
+what you hold). The figure withdraws it and pays for what came, without the bonus; its place
+stays empty until the board refreshes.
 
 Late (past the deadline) it still counts for one more day at half the resources and four fifths
 of the Standing. After that the figure withdraws and pays for what came, without the bonus,

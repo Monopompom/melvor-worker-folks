@@ -145,9 +145,56 @@ export function niceQuantity(raw) {
   return Math.round(n / unit) * unit;
 }
 
-/** How many items `hours` of one Folk's work makes: actions at `intervalMs`, `perAction` items each. */
-export function quantityFor({ hours, intervalMs, perAction = 1 }) {
+/**
+ * How many items `hours` of work makes. With `unitMs` (build .248): the whole chain per item, gathering and every step
+ * included, so the hours a card shows are the hours it takes. Without it: the Folk's own actions at `intervalMs`,
+ * `perAction` items each (a card from before).
+ */
+export function quantityFor({ hours, intervalMs, perAction = 1, unitMs }) {
+  if (Number.isFinite(unitMs) && unitMs > 0) return niceQuantity((hours * 3600000) / unitMs);
   return niceQuantity(((hours * 3600000) / Math.max(1, intervalMs)) * Math.max(1, perAction));
+}
+
+/**
+ * A card posted before materials counted shrinks to `qty` (build .248): never larger than it was, never below what
+ * came. Returns true when what came is now the whole amount: the card is delivered and must be paid.
+ */
+export function shrink(c, qty) {
+  if (c.state !== 'open' || !(qty >= 1)) return false;
+  const next = Math.max(c.delivered, Math.min(c.qty, Math.floor(qty)));
+  if (next >= c.qty) return false;
+  c.qty = Math.max(1, next);
+  if (c.delivered < c.qty) return false;
+  c.state = 'done';
+  c.folkId = null;
+  return true;
+}
+
+/**
+ * Declining a commission (build .248, a player's report: "un-withdrawn-able"): only one no Folk is on, at a quarter of
+ * its Standing, taken from what you hold (never below 0). The figure withdraws it as if late: what came is paid without
+ * the bonus, and its place stays empty until the board refreshes. A declined story step ends the story.
+ */
+export const DECLINE_STANDING = 0.25;
+
+export function canDecline(c) {
+  return c !== undefined && c !== null && c.state === 'open' && c.folkId === null;
+}
+
+/** The Standing a decline costs now: a quarter of the card's, as far as you hold it. */
+export function declinePrice(state, c) {
+  return Math.min(Math.max(0, state.standing.points), Math.max(0, c.standing) * DECLINE_STANDING);
+}
+
+/** Declines `c`: returns { price, resources } (resources: what came, paid without the bonus), or null when it can't. */
+export function decline(state, c) {
+  if (!canDecline(c)) return null;
+  const price = declinePrice(state, c);
+  state.standing.points = Math.max(0, state.standing.points - price);
+  c.state = 'withdrawn';
+  c.declined = true;
+  if (c.story !== undefined && state.stories?.active?.id === c.story.id) state.stories.active = null;
+  return { price, resources: proRata(c).resources };
 }
 
 /** What a commission pays when delivered on time: resources, Standing points and Hiring XP in levels' worth. */
@@ -225,7 +272,7 @@ function makeCommission({ figure, c, townshipLevel, rng, makeId, story = null })
     skillId: c.skillId,
     itemId: c.itemId,
     itemIds: [...new Set([c.itemId, ...(c.itemIds ?? [])])],
-    qty: quantityFor({ hours, intervalMs: c.intervalMs, perAction: c.perAction }),
+    qty: quantityFor({ hours, intervalMs: c.intervalMs, perAction: c.perAction, unitMs: c.unitMs }),
     hours,
     delivered: 0,
     folkId: null,
@@ -247,7 +294,14 @@ export function createState() {
 }
 
 const normalizePaid = (raw) => (isObject(raw) && Number.isFinite(raw.resources) && Number.isFinite(raw.standing)
-  ? { resources: Math.max(0, raw.resources), lost: Number.isFinite(raw.lost) && raw.lost > 0 ? Math.floor(raw.lost) : 0, standing: Math.max(0, raw.standing), late: raw.late === true }
+  ? {
+    resources: Math.max(0, raw.resources),
+    lost: Number.isFinite(raw.lost) && raw.lost > 0 ? Math.floor(raw.lost) : 0,
+    standing: Math.max(0, raw.standing),
+    late: raw.late === true,
+    // What declining it cost in Standing (build .248).
+    ...(Number.isFinite(raw.price) && raw.price > 0 ? { price: raw.price } : {}),
+  }
   : null);
 
 /** A story step's mark on a commission ({ id, step }), checked against the stories; null when it isn't one. */
@@ -288,6 +342,7 @@ export function normalizeCommission(raw, stories = []) {
     deadline: isCount(raw.deadline) && raw.deadline > 0 ? raw.deadline : Math.round((DEADLINE.perHour * hours + DEADLINE.extraHours) * TICKS_PER_HOUR),
     late: raw.late === true,
     state: state === 'open' && delivered >= qty ? 'done' : state,
+    ...(state === 'withdrawn' && raw.declined === true ? { declined: true } : {}),
     resourceId: figureOf(figure).resource,
     resources: isCount(raw.resources) ? raw.resources : 0,
     standing: Number.isFinite(raw.standing) && raw.standing >= 0 ? raw.standing : hours,

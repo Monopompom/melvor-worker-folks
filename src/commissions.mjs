@@ -306,6 +306,80 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
     markDirty();
   };
 
+  /**
+   * Declining a commission no Folk is on (build .248): a quarter of its Standing, asked first. The figure withdraws it:
+   * what came is paid without the bonus, and its place stays empty until the board refreshes.
+   */
+  const decline = (c) => {
+    if (state === null) return;
+    const r = model.decline(state, c);
+    if (r === null) return;
+    const paid = addResources(c.resourceId, r.resources);
+    const lost = Math.max(0, Math.floor(r.resources) - paid);
+    c.paid = { resources: paid, lost, standing: 0, late: false, price: r.price };
+    notify('error', templateLangString('MOD_WF_COMM_DECLINED', { figure: figureName(c.figure), what: askText(c), points: standingText(r.price) }), portraitOf(c.figure));
+    if (lost > 0) notify('error', templateLangString('MOD_WF_COMM_STORAGE_FULL', { lost: resourceText(c.resourceId, lost) }));
+    if (c.story !== undefined) notify('error', templateLangString('MOD_WF_STORY_ENDED', { story: storyTitle(c.story.id), figure: figureName(c.figure) }));
+    hiring.events.emit('commissionWithdrawn', { commission: c, folk: undefined, declined: true, offline: false });
+    log(`commission declined: ${c.id} ${c.figure} ${c.itemId}, ${r.price} Standing`);
+    markDirty();
+  };
+  /** Standing points as a card shows them: a whole number, or one decimal under 10 (a quarter of 8 h is 2). */
+  const standingText = (points) => numberWithCommas(points >= 10 ? Math.round(points) : Math.round(points * 10) / 10);
+  const swalClass = (c) => (typeof createSwalCustomClass === 'function' ? createSwalCustomClass(c) : c);
+  const openDecline = (c) => {
+    if (state === null || !model.canDecline(c)) return;
+    const price = model.declinePrice(state, c);
+    const body = `<div class="text-center">${templateLangString('MOD_WF_COMM_DECLINE_TEXT', { figure: `<span class="font-w600">${figureName(c.figure)}</span>`, what: askText(c) })}</div>`
+      + `<div class="text-center mt-2">${templateLangString('MOD_WF_COMM_DECLINE_COST', { points: `<span class="font-w600 text-warning">${standingText(price)}</span>` })}</div>`;
+    SwalLocale.fire({
+      didRender: popupDidRender,
+      title: getLangString('MOD_WF_COMM_DECLINE_TITLE'),
+      html: body,
+      imageUrl: portraitOf(c.figure),
+      imageWidth: 64,
+      imageHeight: 64,
+      imageAlt: '',
+      // Standing goes for good: red confirm, blue-outline cancel, like Forget.
+      customClass: swalClass({ popup: 'wf-ui', confirmButton: 'btn btn-danger m-1', cancelButton: 'btn btn-outline-info m-1' }),
+      showCancelButton: true,
+      confirmButtonText: getLangString('MOD_WF_COMM_DECLINE'),
+      cancelButtonText: getLangString('MOD_WF_BUTTON_CANCEL'),
+    }).then((result) => {
+      // Asked again: a Folk may have been sent while the popup was open.
+      if (result.isConfirmed && model.canDecline(c)) decline(c);
+    });
+  };
+
+  /**
+   * Commissions posted before materials counted (build .248): each open one shrinks to the hours it asks for, never
+   * below what came (one that already has as much is delivered and paid); an untouched one on an item the town no
+   * longer asks for (a monster drop in its chain) goes, and the board fills its place. Every load: a commission
+   * posted since already has its amount.
+   */
+  const resizeOld = () => {
+    if (state === null) return;
+    const gone = [];
+    for (const c of state.commissions) {
+      if (c.state !== 'open') continue;
+      const cand = hiring.workOrders?.candidateFor(c.skillId, c.itemId);
+      if (cand?.askable === false && c.delivered === 0 && c.folkId === null && c.story === undefined) { gone.push(c); continue; }
+      const qty = hiring.workOrders?.amountFor(c.skillId, c.itemId, c.hours) ?? null;
+      if (qty === null) continue;
+      const folk = byId(c.folkId);
+      const before = c.qty;
+      if (model.shrink(c, qty)) {
+        if (folk !== undefined && state.runs[folk.id] === undefined) hiring.room?.townHome(folk);
+        payDelivered(c, folk);
+      }
+      if (c.qty !== before) log(`commission ${c.id} ${c.itemId}: ${before} → ${c.qty}`);
+    }
+    if (gone.length > 0) {
+      state.commissions = state.commissions.filter((c) => !gone.includes(c));
+      log(`commissions withdrawn: ${gone.map((c) => c.itemId).join(', ')}`);
+    }
+  };
+
   const nextMs = (folk, intervalMs) => (intervalMs > 0 ? intervalMs : (hiring.skillOf(folk)?.actionTimer?.maxTicks ?? 0) * TICK_INTERVAL);
 
   const afterAction = ({ folk, intervalMs }) => {
@@ -586,7 +660,8 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
     // Every line of a card stays one line: one longer than the card slides to its end and back (the user, 4 Nov 2026).
     who.append(marquee('div', 'font-w600', templateLangString('MOD_WF_COMM_FIGURE_TITLE', { figure: figureName(c.figure) })));
     top.append(who);
-    const stateKey = c.state === 'done' ? 'MOD_WF_COMM_STATE_DONE' : c.state === 'withdrawn' ? 'MOD_WF_COMM_STATE_WITHDRAWN' : c.late ? 'MOD_WF_COMM_STATE_LATE' : 'MOD_WF_COMM_STATE_OPEN';
+    const stateKey = c.state === 'done' ? 'MOD_WF_COMM_STATE_DONE' : c.declined === true ? 'MOD_WF_COMM_STATE_DECLINED'
+      : c.state === 'withdrawn' ? 'MOD_WF_COMM_STATE_WITHDRAWN' : c.late ? 'MOD_WF_COMM_STATE_LATE' : 'MOD_WF_COMM_STATE_OPEN';
     const badgeCls = c.state === 'done' ? 'badge-success' : c.state === 'withdrawn' ? 'badge-secondary' : c.late ? 'badge-warning' : 'badge-info';
     top.append(el('span', `badge ${badgeCls} wf-order-state`, getLangString(stateKey)));
     card.append(top);
@@ -675,6 +750,8 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
       }
     }
     if (c.state !== 'withdrawn') rewardRow(list, township()?.media, templateLangString('MOD_WF_COMM_REWARD_STANDING', { points: n(shown.standing) }));
+    // What declining it cost, as a loss.
+    else if (c.declined === true && (c.paid?.price ?? 0) > 0) rewardRow(list, township()?.media, templateLangString('MOD_WF_COMM_DECLINE_PAID', { points: standingText(c.paid.price) }), undefined, 'text-danger');
     if (!done) {
       const xp = Math.max(1, Math.ceil(c.xpLevels * xpToNext()));
       rewardRow(list, hiring.media, templateLangString('MOD_WF_COMM_REWARD_XP', { xp: n(xp) }), templateLangString('MOD_WF_COMM_REWARD_XP', { xp: full(xp) }));
@@ -709,17 +786,26 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
       } else {
         const holder = hiring.crew.bySkill(c.skillId);
         const busy = holder === undefined ? undefined : model.commissionOf(state, holder.id);
+        // Decline at the left of every card (the user, 19 Nov 2026), then Send at the right, or the line that says why
+        // no Folk can go.
+        const no = el('button', 'btn btn-sm btn-outline-danger flex-shrink-0 wf-comm-decline', getLangString('MOD_WF_COMM_DECLINE'));
+        no.type = 'button';
+        no.addEventListener('click', () => openDecline(c));
+        tips?.set(no, templateLangString('MOD_WF_COMM_DECLINE_TIP', { points: standingText(model.declinePrice(state, c)) }));
+        const pair = el('div', 'd-flex align-items-center wf-comm-pair');
+        pair.append(no);
         if (holder === undefined) {
-          foot.append(marquee('small', 'wf-subtle wf-min0 flex-fill', templateLangString('MOD_WF_COMM_NO_FOLK', { skill: hiring.skillName(c.skillId) })));
+          pair.append(marquee('small', 'wf-subtle wf-min0 flex-fill', templateLangString('MOD_WF_COMM_NO_FOLK', { skill: hiring.skillName(c.skillId) })));
         } else if (busy !== undefined) {
-          foot.append(marquee('small', 'wf-subtle wf-min0 flex-fill', templateLangString('MOD_WF_COMM_BUSY', { name: holder.name, figure: figureName(busy.figure) })));
+          pair.append(marquee('small', 'wf-subtle wf-min0 flex-fill', templateLangString('MOD_WF_COMM_BUSY', { name: holder.name, figure: figureName(busy.figure) })));
         } else {
-          const go = el('button', 'btn btn-sm btn-info text-truncate mw-100', templateLangString('MOD_WF_COMM_SEND', { name: holder.name }));
+          const go = el('button', 'btn btn-sm btn-info text-truncate wf-min0 ml-auto', templateLangString('MOD_WF_COMM_SEND', { name: holder.name }));
           go.type = 'button';
           go.addEventListener('click', () => send(c));
           tips?.set(go, templateLangString('MOD_WF_COMM_SEND_TIP', { name: holder.name, figure: figureName(c.figure) }));
-          foot.append(go);
+          pair.append(go);
         }
+        foot.append(pair);
       }
       card.append(foot);
     }
@@ -991,6 +1077,7 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
     });
     due.clear();
     picks.clear();
+    try { resizeOld(); } catch (err) { log('old commissions not resized', err); }
     fillNow();
     hiring.events.on('folkActionDone', afterAction);
     hiring.events.on('folkHired', onHired);

@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-11-12.247';
+export const BUILD = '2026-11-19.249';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -138,6 +138,8 @@ export async function setup(ctx) {
   const traits = await ctx.loadModule('src/traits.mjs');
   const qualificationRules = await ctx.loadModule('src/qualification-model.mjs');
   const qualification = await ctx.loadModule('src/qualification.mjs');
+  const materialRules = await ctx.loadModule('src/material-cost-model.mjs');
+  const materialCosts = await ctx.loadModule('src/material-cost.mjs');
   const workOrderRules = await ctx.loadModule('src/work-orders-model.mjs');
   const workOrders = await ctx.loadModule('src/work-orders.mjs');
   const commissionRules = await ctx.loadModule('src/commissions-model.mjs');
@@ -477,9 +479,11 @@ export async function setup(ctx) {
   });
 
   // 10. Work Orders: the board on the Hiring page, after payroll (an order's wages are the ones its actions paid).
+  // Board amounts count the whole chain from raw materials (build .248).
   workOrders.install(ctx, {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     model: workOrderRules,
+    costs: materialCosts.create({ model: materialRules, log }),
     time,
     numbers,
     tips,

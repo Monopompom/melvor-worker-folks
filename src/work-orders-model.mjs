@@ -85,10 +85,28 @@ export function niceQuantity(raw) {
   return Math.round(n / unit) * unit;
 }
 
-/** How many items `hours` of one Folk's work makes: actions at `intervalMs`, `perAction` items each. */
-export function quantityFor({ hours, intervalMs, perAction = 1 }) {
+/**
+ * How many items `hours` of work makes. With `unitMs` (build .248): the whole chain per item, gathering and every step
+ * included. Without it: the Folk's own actions at `intervalMs`, `perAction` items each (an order from before).
+ */
+export function quantityFor({ hours, intervalMs, perAction = 1, unitMs }) {
+  if (Number.isFinite(unitMs) && unitMs > 0) return niceQuantity((hours * 3600000) / unitMs);
   const actions = (hours * 3600000) / Math.max(1, intervalMs);
   return niceQuantity(actions * Math.max(1, perAction));
+}
+
+/**
+ * An order posted before materials counted shrinks to `qty` (build .248): never larger than it was, never below what
+ * came. Returns true when what came is now the whole amount: the order is delivered and must be paid.
+ */
+export function shrink(order, qty) {
+  if (order.state !== 'open' || !(qty >= 1)) return false;
+  const next = Math.max(order.delivered, Math.min(order.qty, Math.floor(qty)));
+  if (next >= order.qty) return false;
+  order.qty = Math.max(1, next);
+  if (order.delivered < order.qty) return false;
+  order.state = 'done';
+  return true;
 }
 
 /**
@@ -144,7 +162,7 @@ export function rollOrder({ candidates, level, rng = Math.random, makeId, onBoar
     skillId,
     itemId: c.itemId,
     itemIds: [...new Set([c.itemId, ...(c.itemIds ?? [])])],
-    qty: quantityFor({ hours: SIZE[size].hours, intervalMs: c.intervalMs, perAction: c.perAction }),
+    qty: quantityFor({ hours: SIZE[size].hours, intervalMs: c.intervalMs, perAction: c.perAction, unitMs: c.unitMs }),
     delivered: 0,
     size,
     gpRate: rollGpRate(rng),
