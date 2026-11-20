@@ -23,10 +23,11 @@ while you fight, raid or train something else.
    another skill does not interrupt it either: it moves over when you start the new skill.
    Skills added by other mods get a Worker box too, as long as they have a skill page.
 4. The **Hiring** page (sidebar, under the passive skills) is the crew overview. Its
-   **Overview** block shows who is at work (trouble first, each Folk with its skill and what it works on),
-   with **Stop all**, **Restart all**, **Restock all** and **Settle all** under the list (each shows what it
-   will do and cost before it does it), what your Folks made this session,
-   the Payroll Reserve once unlocked, and your next Hiring unlock. Below it, a card per Folk
+   **Overview** block shows who is at work (trouble first, then the Folks at work grouped by skill, idle last;
+   each Folk with its skill and what it works on), with **Stop all**, **Restart all**, **Restock all** and
+   **Settle all** under the list (each shows what it will do and cost before it does it) and **Open shop**,
+   what your Folks made this session, the Payroll Reserve once unlocked, and your next Hiring unlock. Drag the
+   bar under the block to make it taller or shorter (double-click it for the usual height). Below it, a card per Folk
    with its status, the skill it holds, what it is working on, and a Stop button; what needs you
    (a strike, a debt, a Folk out of inputs or with bank and room full) sits right under its name,
    with the button that fixes it. A card shorter than its neighbours fills the space with the

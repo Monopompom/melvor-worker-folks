@@ -13,6 +13,7 @@
   /* build .112 (scan A-36, B-18): band edges and dimmed icons are tokens too; a dimmed icon keeps more ink on white */
   --wf-edge-strike: #bf1f1f; --wf-edge-debt: #d99a1e; --wf-edge-supply: #1e7b2e; --wf-dim: .65;
   --wf-dream: #f3e6c4; --wf-dream-edge: rgba(120,88,36,0.28); /* build .155: the daydream's thought bubble, a warm sepia */
+  --wf-shop: #8a5d00; --wf-shop-tint: rgba(217,154,30,0.12); --wf-shop-line: rgba(176,122,10,0.55); /* .251: Open shop, GP gold */
 }
 body.darkMode {
   --wf-band: rgba(255,255,255,0.045); --wf-tile: rgba(255,255,255,0.03); --wf-well: rgba(0,0,0,0.2);
@@ -23,6 +24,7 @@ body.darkMode {
   --wf-dis-text: #8a949e; --wf-dis-line: #5c6873;
   --wf-edge-strike: #bf1f1f; --wf-edge-debt: #c98a16; --wf-edge-supply: #3fae55; --wf-dim: .4;
   --wf-dream: #cdb98b; --wf-dream-edge: transparent;
+  --wf-shop: #f2c55c; --wf-shop-tint: rgba(242,197,92,0.1); --wf-shop-line: rgba(242,197,92,0.5);
 }
 /* Super Dark (body.darkMode.superDark, build .105 after the design canvas): blocks are pure black, so a black well
    vanishes and Dark's faint tints barely show: wells, bands, lines and tracks are a step stronger light tints, and the
@@ -657,7 +659,13 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-dash-paymini { display: none; align-items: center; gap: 8px; font-size: 0.9rem; white-space: nowrap; }
 .wf-dash-paymini-cur .wf-line-icon { margin-right: 0; }
 #worker-folks-overview.wf-folded .wf-dash-paymini { display: flex; }
-.wf-dash-grid { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1.6fr); gap: 12px; height: 23rem; } /* 23rem: five two-line At work rows without a scroll (.225) */
+.wf-dash-grid { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1.6fr); gap: 12px; height: var(--wf-dash-h, 34.5rem); } /* 23rem holds five two-line At work rows; the grip sets 23 to 69rem (.250) */
+/* The grip under the bands (.250): a full-width strip with a short knob, dragged up or down; hidden on a phone,
+   where the bands stack at their own height. */
+.wf-dash-resize { display: flex; justify-content: center; align-items: center; height: 14px; margin: 6px 0 -10px; cursor: ns-resize; touch-action: none; border-radius: 4px; outline: none; }
+.wf-dash-resize-knob { width: 48px; height: 4px; border-radius: 2px; background: var(--wf-thumb); opacity: 0.6; transition: opacity 0.15s, width 0.15s; }
+.wf-dash-resize:hover .wf-dash-resize-knob, .wf-dash-resize.wf-dragging .wf-dash-resize-knob { opacity: 1; width: 72px; }
+.wf-dash-resize:focus-visible { box-shadow: 0 0 0 2px var(--wf-line); }
 .wf-dash-band { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .wf-dash-pay { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--wf-thumb) transparent; }
 .wf-dash-head { color: var(--wf-head); font-weight: 600; margin-bottom: 8px; gap: 6px; flex: 0 0 auto; }
@@ -688,6 +696,16 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-dash-bulk { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 8px; flex: 0 0 auto; }
 .wf-dash-bulk-btn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 6px; padding-right: 6px; }
 .wf-dash-bulk-btn.disabled { cursor: default; } /* greyed by the shared .wf-ui .btn.disabled look */
+/* Open shop (.250, its look .251): last in the grid; when it starts a row (odd place) it takes the whole row, beside
+   Settle all it fills the free cell. The game's Shop icon on a GP-gold tint, brighter on hover, so it reads as the way
+   to another page and not one more crew action. */
+.wf-dash-bulk > .wf-dash-shop:nth-child(odd) { grid-column: 1 / -1; }
+.wf-dash-shop { display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: var(--wf-shop); border: 1px solid var(--wf-shop-line);
+  background: linear-gradient(180deg, var(--wf-shop-tint), transparent 140%), var(--wf-shop-tint); font-weight: 600; transition: background-color 0.15s, box-shadow 0.15s, color 0.15s; }
+.wf-dash-shop:hover, .wf-dash-shop:focus-visible { color: var(--wf-shop); border-color: var(--wf-shop); background-color: var(--wf-shop-tint); box-shadow: inset 0 0 0 1px var(--wf-shop-line), 0 0 8px var(--wf-shop-tint); }
+.wf-dash-shop-icon { width: 18px; height: 18px; flex: none; object-fit: contain; transition: transform 0.15s; }
+.wf-dash-shop:hover .wf-dash-shop-icon { transform: translateY(-1px) rotate(-8deg); }
+.wf-dash-shop-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .wf-bulk .wf-bulk-line { margin: 4px 0; }
 .wf-bulk .wf-bulk-total { margin-top: 8px; }
 /* Settle all's bill: two columns meeting in the middle, names flush right, amounts flush left; a long name wraps in its
@@ -739,7 +757,7 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 }
 @container wf-overview (max-width: 899.98px) {
   .wf-dash-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); height: auto; }
-  .wf-dash-work, .wf-dash-pay { height: 23rem; }
+  .wf-dash-work, .wf-dash-pay { height: var(--wf-dash-h, 34.5rem); }
   .wf-dash-made { grid-column: 1 / -1; }
   .wf-dash-made .wf-dash-scroll { flex: 0 1 auto; }
   .wf-dash-items { max-height: 12rem; }
@@ -750,6 +768,7 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
   .wf-dash-pay { order: -1; overflow: visible; }
   .wf-dash-scroll { flex: 0 1 auto; }
   .wf-dash-roster { max-height: 14rem; }
+  .wf-dash-resize { display: none; }
 }
 /* A block's title row (Overview, Work Orders, Commissions) is one line only while the title, the right-hand group and
    the grip all fit; layout.mjs measures it with .wf-head-measure (one line, nothing shrinks) and sets .wf-head-stack

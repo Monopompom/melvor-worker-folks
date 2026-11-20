@@ -56,10 +56,16 @@ export function progressTo(xp, fromXP, toXP) {
   return Math.min(1, Math.max(0, (xp - fromXP) / (toXP - fromXP)));
 }
 
-/** Roster order (build .98): trouble first, so a strike or debt is never scrolled out of sight; slot order within. */
-export const STATUS_RANK = { strike: 0, debt: 1, cooldown: 2, idle: 3, overtime: 4, working: 5 };
+/**
+ * Roster order (build .98; reordered in .250 from a player's report: idle on top and the workers at the bottom read
+ * badly). Trouble first, so a strike or debt is never scrolled out of sight; then the Folks at work, overtime among them,
+ * grouped by skill (by `skillText`) so Folks on one skill sit together; idle last. Slot order within.
+ */
+export const STATUS_RANK = { strike: 0, debt: 1, cooldown: 2, working: 3, overtime: 3, idle: 4 };
 
 export function rosterOrder(rows) {
-  const rank = (r) => STATUS_RANK[r.status] ?? 3;
-  return [...rows].sort((a, b) => rank(a) - rank(b) || a.slot - b.slot);
+  const rank = (r) => STATUS_RANK[r.status] ?? STATUS_RANK.idle;
+  const atWork = STATUS_RANK.working;
+  const bySkill = (a, b) => (rank(a) === atWork ? `${a.skillText ?? ''}`.localeCompare(`${b.skillText ?? ''}`) : 0);
+  return [...rows].sort((a, b) => rank(a) - rank(b) || bySkill(a, b) || a.slot - b.slot);
 }

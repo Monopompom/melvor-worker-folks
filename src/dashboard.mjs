@@ -11,8 +11,16 @@
 // redraws At work, Made and the pill when something changed and the page is shown; markDirty() asks for that.
 
 const CONTAINER_ID = 'worker-folks-container';
-/** Milestones whose name starts with a plain word: the Next pill shows them lower case after its colon. */
 export const BLOCK_ID = 'worker-folks-overview';
+/**
+ * The bands' height, set by dragging the grip under them (build .250, a player's report: five Folks were too few to
+ * read). In rem: today's 23 at least, three times that at most, half as tall again by default. Kept per browser.
+ */
+const HEIGHT_KEY = 'worker_folks:overview-height';
+const HEIGHT_MIN = 23;
+const HEIGHT_MAX = 69;
+const HEIGHT_DEFAULT = 34.5;
+const HEIGHT_STEP = 2;
 
 export function install(ctx, { getHiring, model, milestones, bulk, tips, marquee, popupDidRender, log }) {
   let hiring;
@@ -62,6 +70,80 @@ export function install(ctx, { getHiring, model, milestones, bulk, tips, marquee
     return img;
   };
   const n = (v) => numberWithCommas(Math.floor(v));
+
+  /**
+   * Redraws a band and keeps its scroll boxes where the player left them: a band is rebuilt whenever its view
+   * changes, and Made this session changes with every action, so its item box jumped back to the top (build .250).
+   */
+  const keepScroll = (band, draw) => {
+    const at = [...band.querySelectorAll('.wf-dash-scroll')].map((box) => box.scrollTop);
+    draw();
+    band.querySelectorAll('.wf-dash-scroll').forEach((box, i) => { if (at[i] > 0) box.scrollTop = at[i]; });
+  };
+
+  // ---- The bands' height ----
+
+  const rootPx = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  const clampHeight = (rem) => Math.min(HEIGHT_MAX, Math.max(HEIGHT_MIN, rem));
+  const loadHeight = () => {
+    try {
+      const rem = parseFloat(localStorage.getItem(HEIGHT_KEY) ?? '');
+      return Number.isFinite(rem) ? clampHeight(rem) : HEIGHT_DEFAULT;
+    } catch { return HEIGHT_DEFAULT; }
+  };
+  let height = HEIGHT_DEFAULT;
+  const setHeight = (rem, keep = true) => {
+    height = clampHeight(Math.round(rem * 4) / 4);
+    block?.style.setProperty('--wf-dash-h', `${height}rem`);
+    grip?.setAttribute('aria-valuenow', `${height}`);
+    if (!keep) return;
+    try {
+      if (height === HEIGHT_DEFAULT) localStorage.removeItem(HEIGHT_KEY);
+      else localStorage.setItem(HEIGHT_KEY, `${height}`);
+    } catch {}
+  };
+  let grip = null;
+  /** A bar under the bands: drag it (mouse or touch), or Up and Down on the keyboard; a double click gives the usual height. */
+  const makeGrip = () => {
+    const g = el('div', 'wf-dash-resize');
+    g.setAttribute('role', 'separator');
+    g.setAttribute('aria-orientation', 'horizontal');
+    g.setAttribute('aria-label', getLangString('MOD_WF_DASH_RESIZE_LABEL'));
+    g.setAttribute('aria-valuemin', `${HEIGHT_MIN}`);
+    g.setAttribute('aria-valuemax', `${HEIGHT_MAX}`);
+    g.tabIndex = 0;
+    g.append(el('span', 'wf-dash-resize-knob'));
+    let drag = null;
+    g.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      try { tippy.hideAll(); } catch {}
+      drag = { y: e.clientY, rem: height, px: rootPx() };
+      g.setPointerCapture(e.pointerId);
+      g.classList.add('wf-dragging');
+    });
+    g.addEventListener('pointermove', (e) => {
+      if (drag !== null) setHeight(drag.rem + (e.clientY - drag.y) / drag.px, false);
+    });
+    const end = () => {
+      if (drag === null) return;
+      drag = null;
+      g.classList.remove('wf-dragging');
+      setHeight(height);
+    };
+    g.addEventListener('pointerup', end);
+    g.addEventListener('pointercancel', end);
+    g.addEventListener('lostpointercapture', end);
+    g.addEventListener('dblclick', () => setHeight(HEIGHT_DEFAULT));
+    g.addEventListener('keydown', (e) => {
+      const step = { ArrowUp: -HEIGHT_STEP, ArrowDown: HEIGHT_STEP, Home: HEIGHT_MIN - height, End: HEIGHT_MAX - height }[e.key];
+      if (step === undefined) return;
+      e.preventDefault();
+      setHeight(height + step);
+    });
+    tips?.set(g, getLangString('MOD_WF_DASH_RESIZE_TIP'));
+    return g;
+  };
 
   /** One paragraph per sentence (scan A-28, C-07, build .112). */
   const paragraphs = (text) => text.split(/(?<=[.!?])\s+/).filter(Boolean).map((line) => el('p', 'wf-help-p', line));
@@ -139,8 +221,10 @@ export function install(ctx, { getHiring, model, milestones, bulk, tips, marquee
     payBand.dataset.wf = 'payroll';
     madeBand = el('div', 'wf-band wf-dash-band wf-dash-made');
     grid.append(workBand, payBand, madeBand);
-    content.append(head, grid);
+    grip = makeGrip();
+    content.append(head, grid, grip);
     block.append(content);
+    setHeight(loadHeight(), false);
     column.prepend(block);
     dirty = true;
   };
@@ -234,15 +318,31 @@ export function install(ctx, { getHiring, model, milestones, bulk, tips, marquee
       tips?.set(row, `${r.name}\n${r.statusText} · ${doing}`);
       list.append(row);
     }
-    workBand.replaceChildren(bandHead(getLangString('MOD_WF_DASH_WORK'), count), list, ...(v.bulk === null ? [] : [bulkButtons(v.bulk)]));
+    keepScroll(workBand, () => workBand.replaceChildren(bandHead(getLangString('MOD_WF_DASH_WORK'), count), list, bulkButtons(v.bulk)));
   };
 
   /**
    * Stop all, Restart all, Restock all, Settle all under the list (build .218): greyed when there is nothing for one to
-   * do, the tooltip saying what it does and who it would act on.
+   * do, the tooltip saying what it does and who it would act on. Last, Open shop (build .250, a player's idea: it fills
+   * the cell beside Settle all; on a row of its own it takes the whole row); with nobody hired it is the only one. It goes
+   * to another page rather than acting on the crew, so it looks apart: the game's Shop icon on a gold tint (build .251).
    */
   const bulkButtons = (b) => {
     const row = el('div', 'wf-dash-bulk');
+    const shop = () => {
+      const btn = el('button', 'btn btn-sm wf-dash-bulk-btn wf-dash-shop');
+      btn.type = 'button';
+      const media = hiring?.game?.pages?.getObjectByID('melvorD:Shop')?.media;
+      if (media) btn.append(icon(media, 'wf-dash-shop-icon'));
+      btn.append(el('span', 'wf-dash-shop-text', getLangString('MOD_WF_BUTTON_OPEN_SHOP')));
+      btn.addEventListener('click', () => hiring?.openShop?.());
+      tips?.set(btn, getLangString('MOD_WF_DASH_SHOP_TIP'));
+      return btn;
+    };
+    if (b === null) {
+      row.append(shop());
+      return row;
+    }
     const button = (kind, key, count, shown = true) => {
       if (!shown) return;
       const btn = el('button', `btn btn-sm ${kind === 'stop' ? 'btn-outline-danger' : 'btn-outline-primary'} wf-dash-bulk-btn`, getLangString(`MOD_WF_BULK_${key}`));
@@ -259,6 +359,7 @@ export function install(ctx, { getHiring, model, milestones, bulk, tips, marquee
     button('restart', 'RESTART', b.restart);
     button('restock', 'RESTOCK', b.restock, b.showRestock);
     button('settle', 'SETTLE', b.settle, b.showSettle);
+    row.append(shop());
     return row;
   };
 
@@ -268,7 +369,7 @@ export function install(ctx, { getHiring, model, milestones, bulk, tips, marquee
     const parts = [bandHead(getLangString('MOD_WF_DASH_MADE'), kinds)];
     if (v.xp.length === 0 && v.currencies.length === 0 && v.items.length === 0) {
       parts.push(note(getLangString('MOD_WF_DASH_NOTHING')));
-      madeBand.replaceChildren(...parts);
+      keepScroll(madeBand, () => madeBand.replaceChildren(...parts));
       return;
     }
     // Currencies first, then XP, all as the same chips on one row (the user, build .98).
@@ -296,7 +397,7 @@ export function install(ctx, { getHiring, model, milestones, bulk, tips, marquee
       if (v.more > 0) chips.append(note((v.more === 1 ? getLangString('MOD_WF_DASH_MORE_ONE') : templateLangString('MOD_WF_DASH_MORE', { count: `${v.more}` })), 'wf-subtle wf-dash-more'));
       parts.push(chips);
     }
-    madeBand.replaceChildren(...parts);
+    keepScroll(madeBand, () => madeBand.replaceChildren(...parts));
   };
 
   /** The Next unlock pill in the title row, naming what unlocks (scan A-08, build .112); gone once every milestone is reached. */

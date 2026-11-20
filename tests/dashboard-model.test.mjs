@@ -58,13 +58,20 @@ test('progressTo stays within 0..1', () => {
   assert.equal(progressTo(5, 10, 10), 1);
 });
 
-test('rosterOrder: strike, debt, cooldown, idle, overtime, working; slot order within', () => {
+test('rosterOrder: strike, debt, cooldown, then at work (overtime too) by skill, idle last; slot order within', () => {
   const rows = [
-    { slot: 0, status: 'working' }, { slot: 1, status: 'idle' }, { slot: 2, status: 'strike' },
-    { slot: 3, status: 'working' }, { slot: 4, status: 'debt' }, { slot: 5, status: 'overtime' }, { slot: 6, status: 'cooldown' },
+    { slot: 0, status: 'working', skillText: 'Woodcutting' }, { slot: 1, status: 'idle', skillText: 'Cooking' },
+    { slot: 2, status: 'strike', skillText: 'Mining' }, { slot: 3, status: 'working', skillText: 'Fishing' },
+    { slot: 4, status: 'debt' }, { slot: 5, status: 'overtime', skillText: 'Woodcutting' }, { slot: 6, status: 'cooldown' },
+    { slot: 7, status: 'working', skillText: 'Woodcutting' }, { slot: 8, status: 'idle' },
   ];
-  assert.deepEqual(rosterOrder(rows).map((r) => r.slot), [2, 4, 6, 1, 5, 0, 3]);
-  assert.deepEqual(rows.map((r) => r.slot), [0, 1, 2, 3, 4, 5, 6], 'the input stays as it was');
+  assert.deepEqual(rosterOrder(rows).map((r) => r.slot), [2, 4, 6, 3, 0, 5, 7, 1, 8]);
+  assert.deepEqual(rows.map((r) => r.slot), [0, 1, 2, 3, 4, 5, 6, 7, 8], 'the input stays as it was');
+});
+
+test('rosterOrder: a status it does not know sorts with idle', () => {
+  const rows = [{ slot: 0, status: 'mystery' }, { slot: 1, status: 'working', skillText: 'Mining' }, { slot: 2, status: 'idle' }];
+  assert.deepEqual(rosterOrder(rows).map((r) => r.slot), [1, 0, 2]);
 });
 
 test('every literal lang key the Overview code uses exists in en.json', () => {
