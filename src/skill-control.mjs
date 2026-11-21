@@ -155,7 +155,7 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
     });
     const options = hiring.workerOptions(skill);
     options.forEach((opt) => tile({
-      media: hiring.portrait(opt.tier),
+      media: (() => { const f = hiring.crew.byId(opt.id); return f === undefined ? hiring.portrait(opt.tier) : hiring.portraitOf(f); })(),
       title: `${opt.name} (${hiring.roleName(opt.tier)})`,
       lines: opt.lines,
       gear: (() => { const f = hiring.crew.byId(opt.id); return f === undefined ? undefined : hiring.loadout?.summary(f); })(),
@@ -205,7 +205,8 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
 
     const button = q('folk-button');
     const who = shown === undefined ? getLangString('MOD_WF_CTRL_YOU') : `${shown.name} (${hiring.roleName(shown.tier)})`;
-    const buttonKey = `${who}|${shown?.tier ?? ''}`;
+    const shownPortrait = shown === undefined ? '' : hiring.portraitOf(shown);
+    const buttonKey = `${who}|${shownPortrait}`;
     if (button.dataset.wfKey !== buttonKey) {
       button.dataset.wfKey = buttonKey;
       button.replaceChildren();
@@ -213,7 +214,7 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
         const img = document.createElement('img');
         img.className = 'wf-ctrl-portrait mr-1';
         img.alt = '';
-        img.src = hiring.portrait(shown.tier);
+        img.src = shownPortrait;
         button.append(img);
       }
       button.append(document.createTextNode(who));

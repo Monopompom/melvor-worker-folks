@@ -28,7 +28,7 @@ const placeCopy = (place) => (place === null || place === undefined ? null : Obj
 
 /**
  * A read-only view of a Folk. `hp` null means full health; `maxHp` (v3) is undefined where health isn't known;
- * `portrait` (build .124) is the URL of its rank's picture, as on its card; `traits` (v5) the ids of the traits it
+ * `portrait` (build .124) is the URL of its own picture, as on its card; `traits` (v5) the ids of the traits it
  * holds (a trait waiting for a slot does nothing, so it isn't listed); `mastery` (v10) its Hiring mastery level, 1 to
  * 99, where known. A Folk has no skill levels of its own: it works every skill at your level. `job` (v11) the id of
  * its job (the Quartermaster, or one another mod registered), null for none; a Folk holds a skill or a job.
@@ -89,7 +89,7 @@ function viewPayload(payload, view) {
 export function createApi({ getHiring, model, pricing, rules, getBackup, version = API_VERSION }) {
   const { normalizePlace, TRAVEL } = model;
   const hiring = () => getHiring();
-  const view = (folk) => folkView(folk, hiring().statusOf(folk), hiring().health?.maxHpOf(folk), hiring().portrait?.(folk.tier), hiring().masteryLevelOf?.(folk));
+  const view = (folk) => folkView(folk, hiring().statusOf(folk), hiring().health?.maxHpOf(folk), hiring().portraitOf?.(folk) ?? hiring().portrait?.(folk.tier), hiring().masteryLevelOf?.(folk));
   /** The room's calls (v10) go to room.mjs; an unknown Folk, or no room module, answers undefined. */
   const roomCall = (id, fn) => {
     const folk = record(id);

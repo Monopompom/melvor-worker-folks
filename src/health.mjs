@@ -77,9 +77,13 @@ export function install(ctx, { getHiring, rules, time, log }) {
      */
     damage(folk, amount, { skill, eat = true, cause } = {}) {
       if (!(amount > 0)) return false;
-      const result = rules.applyDamage(api.hpOf(folk), amount);
+      const before = api.hpOf(folk);
+      const result = rules.applyDamage(before, amount);
       api.setHp(folk, result.hp);
-      if (!result.dead) hiring.traits?.onHurt(folk, result.hp, api.maxHpOf(folk));
+      if (!result.dead) {
+        hiring.traits?.onHurt(folk, result.hp, api.maxHpOf(folk));
+        hiring.looks?.onHurt(folk, before, result.hp, api.maxHpOf(folk));
+      }
       log(`${folk.name} takes ${amount} damage${cause === undefined ? '' : ` (${cause})`} (${result.hp}/${api.maxHpOf(folk)})`);
       if (result.dead) {
         api.kill(folk, { skill, cause });
@@ -101,7 +105,7 @@ export function install(ctx, { getHiring, rules, time, log }) {
       // The death names its cause (hunger on the road) or the skill it died at; a Folk with neither just died.
       const vars = { name: folk.name, skill: working === undefined ? '' : hiring.skillName(working), slot: `${folk.slot + 1}` };
       const key = cause === 'hunger' ? 'MOD_WF_DIED_HUNGER' : working === undefined ? 'MOD_WF_DIED_PLAIN' : 'MOD_WF_DIED';
-      game.notifications.createErrorNotification('worker_folks:died', templateLangString(key, vars), hiring.portrait(folk.tier));
+      game.notifications.createErrorNotification('worker_folks:died', templateLangString(key, vars), hiring.portraitOf(folk));
       log(`${folk.name} died on ${working?.id ?? '-'}; slot ${folk.slot} frozen until ${new Date(until).toISOString()}`);
     },
     /** Failed pickpocket: the Folk takes the NPC's hit instead of the player. */

@@ -348,7 +348,7 @@ export function install(ctx, { getHiring, model, popupDidRender, titleName = (s)
         didRender: popupDidRender,
         title: templateLangString('MOD_WF_TRAITS_TITLE', { name: titleName(folk.name) }),
         html: root,
-        imageUrl: hiring.portrait(folk.tier),
+        imageUrl: hiring.portraitOf(folk),
         imageWidth: 64,
         imageHeight: 64,
         imageAlt: folk.name,

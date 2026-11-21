@@ -155,6 +155,37 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
       emitChange();
       return true;
     },
+    /**
+     * Gives a Folk a nickname, or its hired name back. Returns null when done, or what is wrong with it (folk.mjs
+     * nickProblem), and nothing changes then.
+     */
+    rename(id, text) {
+      const folk = this.byId(id);
+      if (folk === undefined) return 'empty';
+      const nick = model.cleanNick(text);
+      const original = folk.born ?? folk.name;
+      if (nick !== original) {
+        const problem = model.nickProblem(nick, folks.filter((f) => f !== folk).map((f) => f.name));
+        if (problem !== null) return problem;
+      }
+      if (nick === folk.name) return null;
+      if (nick === original) delete folk.born;
+      else folk.born = original;
+      folk.name = nick;
+      emitChange();
+      return null;
+    },
+    /** Keeps the face the player chose; null goes back to the one from its id. False for an unknown Folk or a bad look. */
+    setLook(id, look) {
+      const folk = this.byId(id);
+      if (folk === undefined) return false;
+      const clean = look === null ? undefined : model.normalizeLook(look);
+      if (look !== null && clean === undefined) return false;
+      if (clean === undefined) delete folk.look;
+      else folk.look = clean;
+      emitChange();
+      return true;
+    },
     /** Raises a Folk one tier; everything else (skill, mastery slot, loadout) stays. `paid`: the fee, added to its cost. */
     promote(id, toTier, { paid = 0 } = {}) {
       const folk = this.byId(id);

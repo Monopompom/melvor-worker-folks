@@ -7,7 +7,8 @@
 // `{ text, media, item, cls, parts }`: `item` (an item object or id) puts its icon before the text (the text defaults
 // to the item's name), `media` puts that icon, `cls` colours the line the game's way, and `parts` (a list of
 // `{ text, media, item }`) runs several pieces on one line ("Ran out: [icon] Bones, [icon] Ashes."). Built as DOM
-// nodes, never as HTML from strings. Buttons show theirs on press-and-hold on a phone (`touch: 'hold'`: a tap acts).
+// nodes, never as HTML from strings; the one exception is `{ gameItem }`, the game's own item tooltip for that item,
+// as its bank shows it. Buttons show theirs on press-and-hold on a phone (`touch: 'hold'`: a tap acts).
 // clear(el) removes one; sweep() destroys the tooltips of elements a redraw removed (a shown tooltip never gets its
 // mouseleave once its button is gone).
 
@@ -32,6 +33,16 @@ export function install(ctx, { log }) {
     if (media) row.append(icon(media));
     row.append(document.createTextNode(p?.text ?? item?.name ?? ''));
   };
+  const gameItem = (row, item) => {
+    try {
+      if (typeof createItemInformationTooltip === 'function') {
+        row.classList.add('wf-tip-game');
+        row.innerHTML = createItemInformationTooltip(item);
+        return;
+      }
+    } catch (e) { log?.('item tooltip failed', e); }
+    piece(row, { item });
+  };
   /** The centred box for `content` (a string or a list of lines, see above). */
   const box = (content) => {
     const div = document.createElement('div');
@@ -40,6 +51,7 @@ export function install(ctx, { log }) {
       const row = document.createElement('div');
       row.className = `wf-tip-line${typeof l === 'object' && l?.cls ? ` ${l.cls}` : ''}`;
       if (typeof l === 'string') row.textContent = l;
+      else if (l?.gameItem !== undefined) gameItem(row, l.gameItem);
       else for (const p of l?.parts ?? [l]) piece(row, p);
       div.append(row);
     }
@@ -47,7 +59,7 @@ export function install(ctx, { log }) {
   };
   const keyOf = (content) => {
     try {
-      return JSON.stringify(content, (k, v) => (k === 'item' && v !== null && typeof v === 'object' ? v.id : v));
+      return JSON.stringify(content, (k, v) => ((k === 'item' || k === 'gameItem') && v !== null && typeof v === 'object' ? v.id : v));
     } catch { return String(Math.random()); }
   };
   const empty = (content) => content == null || content === '' || (Array.isArray(content) && content.length === 0);

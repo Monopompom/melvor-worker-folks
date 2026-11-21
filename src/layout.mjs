@@ -23,6 +23,9 @@ export function install(ctx, { log, tips, model }) {
   /** The hired Folks' ids in slot order, from the last orderFolks(). */
   let live = [];
   let rerender = () => {};
+  /** Told when the card order changes (the Overview's My order follows it). */
+  let orderListener = null;
+  const orderChanged = () => { try { orderListener?.(); } catch (err) { log('order listener failed', err); } };
   const isDefaultNow = () => isDefault(layout, DEFAULT_COLS, live);
 
   const load = () => {
@@ -162,6 +165,7 @@ export function install(ctx, { log, tips, model }) {
           save();
           refresh();
           rerender(); // the cards' rows changed: their heights are measured again
+          orderChanged();
         },
       });
     } catch (err) { log('Sortable failed (cards)', err); }
@@ -230,6 +234,7 @@ export function install(ctx, { log, tips, model }) {
       save();
       apply();
       rerender(); // the cards back in slot order
+      orderChanged();
     });
     foot.append(resetButton);
     container.append(foot);
@@ -267,5 +272,15 @@ export function install(ctx, { log, tips, model }) {
     refresh();
   };
 
-  return { wire, refresh, orderFolks, dressCards };
+  /** The card order set from elsewhere (a row dragged in the Overview's At work list). */
+  const setCardOrder = (ids) => {
+    layout = { ...layout, cards: ids };
+    save();
+    refresh();
+    rerender();
+    orderChanged();
+  };
+  const onOrderChange = (fn) => { orderListener = fn; };
+
+  return { wire, refresh, orderFolks, dressCards, setCardOrder, onOrderChange };
 }

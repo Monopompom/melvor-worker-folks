@@ -49,7 +49,7 @@ export function install(ctx, { getHiring, rate, tips, log }) {
     br.hidden = false;
     span.hidden = false;
     span.innerHTML = templateLangString('MOD_WF_THIEVING_FOLK_RATE', {
-      portrait: `<img class="wf-thieving-rate-icon" src="${hiring.portrait(folk.tier)}" alt="">`,
+      portrait: `<img class="wf-thieving-rate-icon" src="${hiring.portraitOf(folk)}" alt="">`,
       name: folk.name.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])),
       value: formatPercent(value, 2),
     });

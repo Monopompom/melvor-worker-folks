@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-11-20.251';
+export const BUILD = '2026-11-21.269';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -93,6 +93,7 @@ export async function setup(ctx) {
     model: await ctx.loadModule('src/dashboard-model.mjs'),
     milestones: await ctx.loadModule('src/milestones.mjs'),
     bulk,
+    layout,
     tips,
     marquee: marqueeLine,
     popupDidRender,
@@ -304,6 +305,7 @@ export async function setup(ctx) {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     rules: loadoutRules,
     consumptionRules,
+    numbers,
     popupDidRender,
     titleName,
     tips,
@@ -401,6 +403,17 @@ export async function setup(ctx) {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     rules: healthRules,
     time,
+    log,
+  });
+
+  // 5f. Each Folk's own portrait: its face, what it wears, the marks it earned, and the window that edits them.
+  (await ctx.loadModule('src/looks.mjs')).install(ctx, {
+    getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+    model: await ctx.loadModule('src/look-model.mjs'),
+    art: await ctx.loadModule('src/look-art-model.mjs'),
+    popupDidRender,
+    titleName,
+    tips,
     log,
   });
 
@@ -537,7 +550,7 @@ export async function setup(ctx) {
       game.notifications.createSuccessNotification(
         'worker_folks:hired',
         templateLangString('MOD_WF_HIRED_NOTIFICATION', { name: folk.name, aRole: getLangString(`MOD_WF_A_ROLE_${folk.tier}`) }),
-        hiring.portrait(folk.tier),
+        hiring.portraitOf(folk),
       );
     });
     hiring.events.on('folkFired', ({ folk, reason }) => log(`folkFired: ${folk.name} (${reason})`));

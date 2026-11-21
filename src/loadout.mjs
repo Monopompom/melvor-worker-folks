@@ -14,7 +14,7 @@ const AOD_INHERIT = {
   'melvorAoD:Cartography': ['melvorAoD:Cartography_Skillcape', 'melvorAoD:Superior_Cartography_Skillcape'],
 };
 
-export function install(ctx, { getHiring, rules, consumptionRules, popupDidRender, titleName, tips, log }) {
+export function install(ctx, { getHiring, rules, consumptionRules, numbers, popupDidRender, titleName, tips, log }) {
   let hiring;
   const expansions = () => ({
     hasAoD: game.registeredNamespaces.hasNamespace('melvorAoD'),
@@ -257,7 +257,12 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
       // Every tooltip through src/tips.mjs (build .91): centred, an item's icon before its name; on a phone a tap
       // selects or opens, holding shows the tooltip.
       const tipped = [];
-      const tip = (el, content) => { tips?.set(el, content); tipped.push(el); };
+      const tip = (el, content, opts) => { tips?.set(el, content, opts); tipped.push(el); };
+      // The game's full item tooltip (a player's idea: a name alone says nothing about a bag or an Heirloom), built when
+      // it is shown: a picker can list hundreds of items. `extra()` gives the lines under it, read at that moment.
+      const itemTip = (el, item, extra) => tip(el, [{ item }], {
+        onShow: (inst) => { inst.setContent(tips.box([{ gameItem: item }, ...extra()])); },
+      });
       const clearTips = () => { tipped.splice(0).forEach((el) => tips?.clear(el)); };
 
       // The views redraw inside the open popup, so the skill-name pass (didRender) runs again after each one.
@@ -323,17 +328,23 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
           if (slot.charges !== undefined) {
             const q = document.createElement('span');
             q.className = `wf-slot-qty${slot.charges === 0 ? ' text-danger' : ''}`;
-            // The game's short form, as its bank writes a count (999K, 100M), never our own "12k".
-            q.textContent = formatNumber(slot.charges);
+            // One short line on the tile (12.3K, 2.5M); the exact count is in its tooltip.
+            q.textContent = numbers.shortNumber(slot.charges);
             b.append(q);
           } else if (slot.qty > 0) {
             const q = document.createElement('small');
             q.className = 'wf-slot-qty';
-            q.textContent = formatNumber(slot.qty);
+            q.textContent = numbers.shortNumber(slot.qty);
             b.append(q);
           }
           const e = api.entry(folk, slot.id);
-          tip(b, [e === undefined ? slot.name : { item: e.item }]);
+          if (e === undefined) tip(b, [slot.name]);
+          else {
+            itemTip(b, e.item, () => {
+              if (slot.charges !== undefined) return [{ text: templateLangString('MOD_WF_GEAR_CHARGES', { count: numberWithCommas(slot.charges) }), cls: 'font-w600' }];
+              return slot.qty > 0 ? [{ text: templateLangString('MOD_WF_GEAR_HELD', { count: numberWithCommas(slot.qty) }), cls: 'font-w600' }] : [];
+            });
+          }
           b.onclick = () => showPicker(slot.id);
           grid.append(b);
         }
@@ -433,6 +444,20 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
         let picked;
         let qtyInput;
         let allQty;
+        // Starts on the whole stack, as the game's own bank slider does (a player's idea: nobody refills tablets one at a
+        // time). A typed number stays through other picks; All, or an emptied field, goes back to the whole stack.
+        let qtyAll = true;
+        const stack = () => (picked === undefined ? 0 : game.bank.getQty(picked));
+        const markAll = () => {
+          allQty.classList.toggle('btn-info', qtyAll);
+          allQty.classList.toggle('btn-outline-info', !qtyAll);
+          allQty.setAttribute('aria-pressed', `${qtyAll}`);
+        };
+        const showQty = () => {
+          if (qtyInput === undefined) return;
+          markAll();
+          if (qtyAll) qtyInput.value = picked === undefined ? '' : `${stack()}`;
+        };
         if (slot.allowQuantity) {
           const row = document.createElement('div');
           row.className = 'd-flex align-items-center justify-content-center flex-wrap wf-picker-qty-row mb-2';
@@ -443,7 +468,8 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
           qtyInput.type = 'number';
           qtyInput.min = '1';
           qtyInput.inputMode = 'numeric';
-          qtyInput.value = '1';
+          qtyInput.value = '';
+          qtyInput.placeholder = getLangString('MOD_WF_RESERVE_QUICK_ALL');
           qtyInput.className = 'form-control wf-picker-qty';
           qtyInput.setAttribute('aria-label', getLangString('MOD_WF_PICKER_QTY'));
           allQty = document.createElement('button');
@@ -451,7 +477,8 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
           allQty.className = 'btn btn-sm btn-info';
           allQty.textContent = getLangString('MOD_WF_RESERVE_QUICK_ALL');
           allQty.disabled = true;
-          allQty.onclick = () => { if (picked !== undefined) qtyInput.value = `${game.bank.getQty(picked)}`; };
+          allQty.onclick = () => { qtyAll = true; showQty(); refreshPicked(); };
+          qtyInput.addEventListener('input', () => { qtyAll = qtyInput.value.trim() === ''; markAll(); refreshPicked(); });
           row.append(qtyLabel, qtyInput, allQty);
           root.append(row);
         }
@@ -465,7 +492,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
         equip.className = 'btn btn-success wf-picker-equip';
         equip.textContent = getLangString('MOD_WF_BUTTON_EQUIP');
         equip.onclick = () => {
-          if (picked !== undefined && api.equip(folk, slotId, picked, qtyInput === undefined ? 1 : qtyInput.value)) showGrid();
+          if (picked !== undefined && api.equip(folk, slotId, picked, qtyInput === undefined ? 1 : qtyAll ? stack() : qtyInput.value)) showGrid();
         };
         const select = (item, button) => {
           picked = item;
@@ -475,6 +502,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
             b.classList.toggle('btn-outline-info', !on);
             b.setAttribute('aria-pressed', on ? 'true' : 'false');
           });
+          showQty();
           refreshPicked();
         };
         // Your levels gate what a Folk may wear: such items stay listed (greyed, last) and say what they need,
@@ -494,12 +522,13 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
           pickedLine.classList.toggle('text-warning', missing !== null);
           pickedLine.textContent = picked === undefined ? getLangString('MOD_WF_PICKER_PICK')
             : missing !== null ? templateLangString('MOD_WF_PICKER_LOCKED', { item: picked.name, needs: missing })
-              : templateLangString('MOD_WF_PICKER_PICKED', { item: picked.name, count: numberWithCommas(game.bank.getQty(picked)) });
+              : templateLangString(qtyInput !== undefined && qtyAll ? 'MOD_WF_PICKER_PICKED_ALL' : 'MOD_WF_PICKER_PICKED', { item: picked.name, count: numberWithCommas(game.bank.getQty(picked)) });
         };
         const fill = () => {
           clearTips();
           grid.replaceChildren();
           picked = undefined;
+          showQty();
           refreshPicked();
           const narrowed = !showAll.checked && skill !== undefined;
           const all = api.candidates(folk, slotId, { showAll: showAll.checked });
@@ -522,12 +551,15 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
             const b = document.createElement('button');
             b.type = 'button';
             b.className = `btn btn-sm btn-outline-info wf-picker-item${needs(item) !== null ? ' wf-picker-locked' : ''}`;
-            b.innerHTML = `<img src="${item.media}" alt=""><small>${count}</small>`;
+            b.innerHTML = `<img src="${item.media}" alt=""><small>${numbers.shortNumber(game.bank.getQty(item))}</small>`;
             b.setAttribute('aria-label', `${item.name} ×${count}`);
             b.setAttribute('aria-pressed', 'false');
             // A greyed item says why in its tooltip, as a locked slot does (scan B-17, build .112).
             const missing = needs(item);
-            tip(b, missing === null ? [{ item }] : [{ item }, { text: templateLangString('MOD_WF_PICKER_LOCKED', { item: item.name, needs: missing }), cls: 'text-warning' }]);
+            itemTip(b, item, () => [
+              { text: templateLangString('MOD_WF_PICKER_IN_BANK', { count: numberWithCommas(game.bank.getQty(item)) }), cls: 'font-w600' },
+              ...(missing === null ? [] : [{ text: templateLangString('MOD_WF_PICKER_LOCKED', { item: item.name, needs: missing }), cls: 'text-warning' }]),
+            ]);
             b.onclick = () => select(item, b);
             grid.append(b);
           });
@@ -587,7 +619,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, popupDidRende
         title,
         html: root,
         // 64px like Fire, Promote and the offline popup (scan B-31, C-24, build .112).
-        imageUrl: hiring.portrait(folk.tier),
+        imageUrl: hiring.portraitOf(folk),
         imageWidth: 64,
         imageHeight: 64,
         imageAlt: folk.name,

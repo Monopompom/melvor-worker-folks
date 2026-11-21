@@ -45,7 +45,7 @@ export function install(ctx, { getHiring, model, log }) {
     game.notifications.createInfoNotification(
       'worker_folks:qualify',
       templateLangString('MOD_WF_QUALIFY_STOPPED', { name: folk.name, skill: hiring.skillName(skill), reason }),
-      hiring.portrait(folk.tier),
+      hiring.portraitOf(folk),
     );
   };
 

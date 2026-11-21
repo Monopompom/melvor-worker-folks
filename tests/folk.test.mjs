@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
-import { createFolk, normalizeFolk, migrateRoot, parseRoot, serializeRoot, normalizeLost, SAVE_VERSION, TIERS } from '../src/folk.mjs';
+import { NICK_MAX, cleanNick, createFolk, nickProblem, normalizeFolk, migrateRoot, parseRoot, serializeRoot, normalizeLost, SAVE_VERSION, TIERS } from '../src/folk.mjs';
 
 test('createFolk fills defaults and rejects bad input', () => {
   const f = createFolk({ id: 'a', slot: 0, tier: 'Newbie', name: 'Ada' });
@@ -240,4 +240,26 @@ test('the pick to restart on is kept only while a strike or its restart is pendi
   assert.equal(normalizeFolk({ ...base, debt: 0, restartPick: { cook: 'melvorD:Fire' } }).restartPick, null, 'nothing pending: dropped');
   assert.equal(normalizeFolk({ ...base, onStrike: true, restartPick: ['x'] }).restartPick, null);
   assert.equal(normalizeFolk({ ...base, onStrike: true }).restartPick, null);
+});
+
+test('nicknames: tidied, length, characters, taken', () => {
+  assert.equal(cleanNick("  Big   O'Bram "), 'Big O’Bram');
+  assert.equal(nickProblem('Big Bram'), null);
+  assert.equal(nickProblem('Ólafur-2.'), null);
+  assert.equal(nickProblem('李小龙'), null);
+  assert.equal(nickProblem('   '), 'empty');
+  assert.equal(nickProblem('x'.repeat(NICK_MAX)), null);
+  assert.equal(nickProblem('x'.repeat(NICK_MAX + 1)), 'long');
+  for (const bad of ['<img src=x>', 'a&b', 'a"b', 'a`b', '-dash']) assert.equal(nickProblem(bad), 'chars', bad);
+  assert.equal(nickProblem('big bram', ['Big Bram']), 'taken');
+});
+
+test('a nickname survives a save; markup in a stored name does not', () => {
+  const kept = normalizeFolk({ id: 'a', slot: 0, tier: 'Newbie', name: 'Big Bram', born: 'Bram the Chair Expert' });
+  assert.equal(kept.name, 'Big Bram');
+  assert.equal(kept.born, 'Bram the Chair Expert');
+  assert.equal(normalizeFolk({ id: 'a', slot: 0, tier: 'Newbie', name: 'Ada' }).born, undefined);
+  assert.equal(normalizeFolk({ id: 'a', slot: 0, tier: 'Newbie', name: '<b>Ada</b>' }).name, 'bAda/b');
+  assert.equal(normalizeFolk({ id: 'a', slot: 0, tier: 'Newbie', name: '<>', born: 'Ada' }).name, 'Ada');
+  assert.equal(normalizeFolk({ id: 'a', slot: 0, tier: 'Newbie', name: '<>' }).name, 'Folk');
 });

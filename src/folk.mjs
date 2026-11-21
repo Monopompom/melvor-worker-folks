@@ -10,6 +10,70 @@ export const TRAVEL = ['idle', 'with', 'walking'];
 
 const TIER_SET = new Set(TIERS);
 
+/** The longest nickname the player can give a Folk. */
+export const NICK_MAX = 24;
+const NICK_SHAPE = /^[\p{L}\p{N}][\p{L}\p{M}\p{N} .’-]*$/u;
+
+/** A typed name tidied: single spaces, trimmed, a straight apostrophe made typographic. */
+export function cleanNick(text) {
+  return String(text ?? '').normalize('NFC').replace(/'/g, '’').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * What is wrong with a nickname: 'empty', 'long', 'chars', 'taken', or null when it is fine. Letters of any language,
+ * digits, spaces, hyphens, full stops and apostrophes only, because a Folk's name goes into popup markup as it is.
+ */
+export function nickProblem(text, takenNames = []) {
+  const nick = cleanNick(text);
+  if (nick === '') return 'empty';
+  if ([...nick].length > NICK_MAX) return 'long';
+  if (!NICK_SHAPE.test(nick)) return 'chars';
+  const low = nick.toLocaleLowerCase();
+  return takenNames.some((n) => cleanNick(n).toLocaleLowerCase() === low) ? 'taken' : null;
+}
+
+/** How many of each part a Folk's face can pick from. */
+export const LOOK_PARTS = Object.freeze({ skin: 9, hair: 8, hairColor: 9, beard: 5, extra: 4 });
+export const LOOK_COLORS = 8;
+export const LOOK_MARKS = Object.freeze(['mastery', 'anchor', 'service', 'armband', 'scar', 'patch']);
+export const LOOK_GEAR = Object.freeze(['hardhat', 'apron', 'ledger', 'charter', 'whistle', 'bell']);
+
+/**
+ * A face the player chose, or undefined when the save holds none that fits. Only an edited Folk has one: the others get
+ * a lasting face from their id. `hide` lists earned marks kept off the portrait.
+ */
+export function normalizeLook(raw) {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const look = {};
+  for (const [key, size] of Object.entries(LOOK_PARTS)) {
+    if (!Number.isInteger(raw[key]) || raw[key] < 0 || raw[key] >= size) return undefined;
+    look[key] = raw[key];
+  }
+  look.color = Number.isInteger(raw.color) && raw.color >= 0 && raw.color < LOOK_COLORS ? raw.color : -1;
+  look.colorAt = raw.colorAt === 'band' ? 'band' : 'scarf';
+  const hide = Array.isArray(raw.hide) ? [...LOOK_MARKS, ...LOOK_GEAR].filter((id) => raw.hide.includes(id)) : [];
+  if (hide.length > 0) look.hide = hide;
+  return look;
+}
+
+/**
+ * The counts behind a Folk's earned marks, only those above zero: `ms` worked, `close` calls, `trips` home from travel
+ * with you, and `from`, the hex a trip under way began on. undefined when there is nothing to keep.
+ */
+export function normalizeMarks(raw) {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const out = {};
+  if (typeof raw.ms === 'number' && Number.isFinite(raw.ms) && raw.ms > 0) out.ms = raw.ms;
+  if (Number.isInteger(raw.close) && raw.close > 0) out.close = raw.close;
+  if (Number.isInteger(raw.trips) && raw.trips > 0) out.trips = raw.trips;
+  const from = normalizePlace(raw.from ?? null);
+  if (from !== null) out.from = from;
+  return Object.keys(out).length === 0 ? undefined : out;
+}
+
+/** A name from a save or a backup code, with what could break popup markup taken out. */
+const plainName = (text) => text.replace(/[<>&"`]/g, '').trim();
+
 export function isTier(tier) {
   return TIER_SET.has(tier);
 }
@@ -117,7 +181,16 @@ export function normalizeFolk(raw) {
   if (!Number.isInteger(raw.slot) || raw.slot < 0) return null;
   if (!isTier(raw.tier)) return null;
   if (typeof raw.name !== 'string' || raw.name.length === 0) return null;
-  const folk = createFolk({ id: raw.id, slot: raw.slot, tier: raw.tier, name: raw.name, hiredAt: nonNegNumber(raw.hiredAt) });
+  const born = typeof raw.born === 'string' ? plainName(raw.born) : '';
+  const name = plainName(raw.name) || born || 'Folk';
+  const folk = createFolk({ id: raw.id, slot: raw.slot, tier: raw.tier, name, hiredAt: nonNegNumber(raw.hiredAt) });
+  // Only on a renamed Folk: `born` is the name it was hired with, `name` its nickname.
+  if (born !== '' && born !== name) folk.born = born;
+  // Only on a Folk with an edited face, or with something counted toward a mark.
+  const look = normalizeLook(raw.look);
+  if (look !== undefined) folk.look = look;
+  const marks = normalizeMarks(raw.marks);
+  if (marks !== undefined) folk.marks = marks;
   folk.skillId = typeof raw.skillId === 'string' ? raw.skillId : null;
   folk.job = folk.skillId === null && typeof raw.job === 'string' && raw.job !== '' ? raw.job : null;
   folk.jobMemory = normalizeJobMemory(raw.jobMemory);

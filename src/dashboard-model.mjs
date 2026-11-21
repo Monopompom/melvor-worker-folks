@@ -63,9 +63,37 @@ export function progressTo(xp, fromXP, toXP) {
  */
 export const STATUS_RANK = { strike: 0, debt: 1, cooldown: 2, working: 3, overtime: 3, idle: 4 };
 
-export function rosterOrder(rows) {
+/** The At work list's sorts (a player's idea): the order above, by skill, by name, or the player's own card order. */
+export const ROSTER_SORTS = Object.freeze(['trouble', 'skill', 'name', 'mine']);
+export const cleanRosterSort = (sort) => (ROSTER_SORTS.includes(sort) ? sort : 'trouble');
+
+/** `sort` one of ROSTER_SORTS; `mine` the Folk ids in the player's order (My order). Slot order breaks every tie. */
+export function rosterOrder(rows, sort = 'trouble', mine = []) {
+  const bySlot = (a, b) => a.slot - b.slot;
+  const text = (v) => `${v ?? ''}`;
+  if (sort === 'skill') {
+    return [...rows].sort((a, b) => (a.assigned === false) - (b.assigned === false) || text(a.skillText).localeCompare(text(b.skillText)) || bySlot(a, b));
+  }
+  if (sort === 'name') return [...rows].sort((a, b) => text(a.first ?? a.name).localeCompare(text(b.first ?? b.name)) || bySlot(a, b));
+  if (sort === 'mine') {
+    const at = new Map(mine.map((id, i) => [id, i]));
+    const place = (r) => at.get(r.id) ?? Infinity;
+    return [...rows].sort((a, b) => (place(a) === place(b) ? bySlot(a, b) : place(a) - place(b)));
+  }
   const rank = (r) => STATUS_RANK[r.status] ?? STATUS_RANK.idle;
   const atWork = STATUS_RANK.working;
   const bySkill = (a, b) => (rank(a) === atWork ? `${a.skillText ?? ''}`.localeCompare(`${b.skillText ?? ''}`) : 0);
-  return [...rows].sort((a, b) => rank(a) - rank(b) || bySkill(a, b) || a.slot - b.slot);
+  return [...rows].sort((a, b) => rank(a) - rank(b) || bySkill(a, b) || bySlot(a, b));
+}
+
+/**
+ * The order of a list the player may be scrolling: while `hold`, what is shown keeps its place and new ids join the end,
+ * so tiles never move under the pointer; otherwise simply `next`.
+ */
+export function holdOrder(shown, next, hold) {
+  if (!hold) return [...next];
+  const wanted = new Set(next);
+  const kept = shown.filter((id) => wanted.has(id));
+  const have = new Set(kept);
+  return [...kept, ...next.filter((id) => !have.has(id))];
 }

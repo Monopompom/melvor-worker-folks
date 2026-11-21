@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { MILESTONES } from '../src/milestones.mjs';
 import {
-  TIP_COUNT, WAGE_TIPS, createTally, nextMilestone, progressTo, rosterOrder, tipNumbers, topEntries,
+  ROSTER_SORTS, TIP_COUNT, WAGE_TIPS, cleanRosterSort, createTally, holdOrder, nextMilestone, progressTo, rosterOrder, tipNumbers, topEntries,
 } from '../src/dashboard-model.mjs';
 
 const lang = JSON.parse(readFileSync(new URL('../languages/en.json', import.meta.url), 'utf8'));
@@ -72,6 +72,30 @@ test('rosterOrder: strike, debt, cooldown, then at work (overtime too) by skill,
 test('rosterOrder: a status it does not know sorts with idle', () => {
   const rows = [{ slot: 0, status: 'mystery' }, { slot: 1, status: 'working', skillText: 'Mining' }, { slot: 2, status: 'idle' }];
   assert.deepEqual(rosterOrder(rows).map((r) => r.slot), [1, 0, 2]);
+});
+
+test('rosterOrder: by skill (unassigned last), by name, and in the player\'s own order', () => {
+  const rows = [
+    { id: 'a', slot: 0, first: 'Zane', status: 'working', skillText: 'Mining', assigned: true },
+    { id: 'b', slot: 1, first: 'Ada', status: 'idle', skillText: 'Unassigned', assigned: false },
+    { id: 'c', slot: 2, first: 'Big Bram', status: 'strike', skillText: 'Cooking', assigned: true },
+  ];
+  assert.deepEqual(rosterOrder(rows, 'skill').map((r) => r.id), ['c', 'a', 'b']);
+  assert.deepEqual(rosterOrder(rows, 'name').map((r) => r.id), ['b', 'c', 'a']);
+  assert.deepEqual(rosterOrder(rows, 'mine', ['b', 'a']).map((r) => r.id), ['b', 'a', 'c'], 'a Folk not in the order comes last');
+  assert.deepEqual(rosterOrder(rows, 'trouble').map((r) => r.id), ['c', 'a', 'b']);
+});
+
+test('cleanRosterSort: a stored value it does not know is the default', () => {
+  for (const s of ROSTER_SORTS) assert.equal(cleanRosterSort(s), s);
+  assert.equal(cleanRosterSort('junk'), 'trouble');
+  assert.equal(cleanRosterSort(null), 'trouble');
+});
+
+test('holdOrder: held, tiles keep their place and new ones join the end; free, the new order', () => {
+  assert.deepEqual(holdOrder(['a', 'b', 'c'], ['c', 'd', 'a', 'b'], true), ['a', 'b', 'c', 'd']);
+  assert.deepEqual(holdOrder(['a', 'b', 'c'], ['c', 'a'], true), ['a', 'c'], 'one no longer listed goes');
+  assert.deepEqual(holdOrder(['a', 'b'], ['b', 'a'], false), ['b', 'a']);
 });
 
 test('every literal lang key the Overview code uses exists in en.json', () => {

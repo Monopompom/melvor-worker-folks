@@ -30,22 +30,27 @@
       <div class="block-content p-3 wf-card-body">
         <div class="wf-band wf-band-who">
           <div class="d-flex align-items-start">
-            <img class="wf-card-portrait mr-3" data-wf="portrait" alt="" />
+            <!-- A Townsfolk's town crest sits on the portrait's corner (Township Commissions, Trusted), beside the button
+                 and not in it, so its tooltip stays its own and the name keeps the width. -->
+            <div class="wf-look-wrap mr-3">
+              <button type="button" class="wf-look-btn" data-wf="look">
+                <img class="wf-card-portrait" data-wf="portrait" alt="" />
+                <span class="wf-look-badge" aria-hidden="true"><i class="fa fa-paint-brush"></i></span>
+              </button>
+              <img class="wf-town-badge d-none" data-wf="town-badge" alt="" />
+            </div>
             <div class="flex-fill wf-min0">
-              <div class="d-flex justify-content-between align-items-start">
-                <div class="wf-min0">
-                  <!-- The whole name, wrapping onto balanced lines (scan A-06, C-12, build .112); "· Slot N" never splits (A-11). -->
-                  <!-- A Townsfolk's town crest after the name (Township Commissions, Trusted). -->
-                  <div class="d-flex align-items-start wf-min0">
-                    <h5 class="font-w600 mb-0 wf-card-name wf-min0" data-wf="name"></h5>
-                    <img class="wf-town-badge d-none" data-wf="town-badge" alt="" />
-                  </div>
-                  <small class="wf-subtle"><span data-wf="role"></span> <span class="text-nowrap">&middot; <span data-wf="slot"></span></span></small>
-                </div>
+              <div class="justify-content-between">
+                <!-- The status comes first and floats right, so it takes width from the name's first line only. -->
                 <span class="badge wf-status wf-card-status">
                   <img class="wf-status-icon" data-wf="status-icon" alt="" />
                   <span data-wf="status-text"></span>
                 </span>
+                <div class="wf-min0 wf-card-who">
+                  <!-- The whole name, wrapping onto lines (scan A-06, C-12, build .112); "· Slot N" never splits (A-11). -->
+                  <h5 class="font-w600 mb-0 wf-card-name"><button type="button" class="btn btn-sm wf-rename" data-wf="rename"><i class="fa fa-pencil-alt" aria-hidden="true"></i></button><span data-wf="name"></span></h5>
+                  <small class="wf-subtle"><span data-wf="role"></span> <span class="text-nowrap">&middot; <span data-wf="slot"></span></span></small>
+                </div>
               </div>
               <div class="wf-card-badges">
                 <span class="badge badge-info" data-wf="rate"></span>

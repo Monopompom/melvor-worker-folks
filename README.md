@@ -199,6 +199,26 @@ of what the Folk cost you (its hire price and its promotion fees), 5% from Hirin
 nothing from Hiring 90. A Folk hired before this rule counts as having cost its tier's
 first-hire price. Fire stays disabled while you can't pay the severance.
 
+## A Folk's name and look
+
+Click a Folk's **portrait** to edit its look: skin, hair and hair colour, facial hair, an extra
+(freckles, glasses or earrings) and a personal colour, worn as a neckerchief or a hat band.
+**Randomize** rolls a new look and **Original look** brings the first one back. The **pencil**
+before a Folk's name gives it a nickname of up to 24 characters; its original name stays one
+click away.
+
+The portrait also shows the Guild Heirlooms a Folk wears and the marks it earns. Untick any of
+them in the same window to hide it on the portrait; an Heirloom stays equipped and keeps working.
+
+| Mark | Earned when a Folk |
+| --- | --- |
+| Mastery pin | reaches Mastery 99 |
+| Anchor pin | comes home from 10 trips with you (only with Voyage) |
+| Service stripes | works 100 h, one bar per 100 h, up to 3 |
+| Strike armband | has gone on strike 3 times |
+| Scar | survives a hit that leaves it under 10% HP |
+| Eye patch | survives such a hit three times |
+
 ## Traits
 
 A Folk learns **traits** from what it does and what happens to it: long hours in one skill,

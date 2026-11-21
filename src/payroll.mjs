@@ -197,7 +197,7 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
       const kind = hiring.jobs?.kind(jobId);
       if (!game._isInOnlineLoop || !(hiring.levels?.autoRestart()) || kind === undefined || !hiring.folkAvailable(folk)) return false;
       if (folk.skillId !== null || folk.job !== null || !hiring.jobs.set(folk, jobId)) return false;
-      game.notifications.createSuccessNotification('worker_folks:restart', templateLangString('MOD_WF_AUTO_RESTARTED', { name: folk.name, skill: kind.name }), hiring.portrait(folk.tier));
+      game.notifications.createSuccessNotification('worker_folks:restart', templateLangString('MOD_WF_AUTO_RESTARTED', { name: folk.name, skill: kind.name }), hiring.portraitOf(folk));
       log(`${folk.name} back on its job ${jobId} after settlement`);
       return true;
     }
@@ -212,7 +212,7 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     // popup opening on whatever page is shown (together-check, 16 Oct 2026).
     const why = hiring.workRefusal(folk, skill);
     if (why !== '') {
-      game.notifications.createInfoNotification('worker_folks:restart', templateLangString('MOD_WF_AUTO_RESTART_REFUSED', { name: folk.name, skill: hiring.skillName(skill), reason: why }), hiring.portrait(folk.tier));
+      game.notifications.createInfoNotification('worker_folks:restart', templateLangString('MOD_WF_AUTO_RESTART_REFUSED', { name: folk.name, skill: hiring.skillName(skill), reason: why }), hiring.portraitOf(folk));
       log(`${folk.name} not restarted on ${skill.id}: ${why}`);
       return false;
     }
@@ -233,7 +233,7 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     game.notifications.createSuccessNotification(
       'worker_folks:restart',
       templateLangString('MOD_WF_AUTO_RESTARTED', { name: folk.name, skill: hiring.skillName(skill) }),
-      hiring.portrait(folk.tier),
+      hiring.portraitOf(folk),
     );
     log(`${folk.name} restarted ${skill.id} after settlement`);
     return true;
@@ -305,7 +305,7 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     game.notifications.createInfoNotification(
       'worker_folks:debt',
       templateLangString(d.loyal ? 'MOD_WF_DEBT_NOTIFICATION_LOYAL' : 'MOD_WF_DEBT_NOTIFICATION', { name: folk.name, skill: hiring.skillName(skill), amount: d.amount, minutes: d.minutes }),
-      hiring.portrait(folk.tier),
+      hiring.portraitOf(folk),
     );
   };
 
@@ -350,7 +350,7 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     game.notifications.createErrorNotification(
       'worker_folks:strike',
       templateLangString('MOD_WF_STRIKE_NOTIFICATION', { name: folk.name, skill: hiring.skillName(skill) }),
-      hiring.portrait(folk.tier),
+      hiring.portraitOf(folk),
     );
     hiring.events.emit('folkStruck', { folk, skill, debt: folk.debt, offline: !game._isInOnlineLoop });
     selfSettle(folk);
@@ -374,7 +374,7 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
         'worker_folks:autosettle',
         items === '' ? templateLangString('MOD_WF_AUTO_SETTLED', { name: folk.name })
           : templateLangString('MOD_WF_AUTO_SETTLED_ITEMS', { name: folk.name, items }),
-        hiring.portrait(folk.tier),
+        hiring.portraitOf(folk),
       );
     }
     return true;
@@ -403,7 +403,7 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
         game.notifications.createErrorNotification(
           'worker_folks:strike',
           templateLangString('MOD_WF_STRIKE_NOTIFICATION', { name: folk.name, skill: hiring.skillName(skill) }),
-          hiring.portrait(folk.tier),
+          hiring.portraitOf(folk),
         );
       });
     } else if (parkedCount() > 0 && game._isInOnlineLoop) {

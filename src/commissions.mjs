@@ -775,7 +775,7 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
           marquee('small', 'wf-subtle', run !== undefined
             ? templateLangString('MOD_WF_COMM_FOLK_RUN_SHORT', { time: backIn })
             : getLangString('MOD_WF_COMM_FOLK_ON_SHORT')));
-        who.append(img(hiring.portrait(folk.tier), 'wf-comm-icon'), words);
+        who.append(img(hiring.portraitOf(folk), 'wf-comm-icon'), words);
         tips?.set(who, text);
         const back = el('button', 'btn btn-sm btn-outline-info flex-shrink-0', getLangString('MOD_WF_COMM_RECALL'));
         back.type = 'button';

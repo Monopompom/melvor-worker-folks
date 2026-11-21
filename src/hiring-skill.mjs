@@ -142,6 +142,11 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       return this.getMediaURL(`assets/worker_folk_${tier.toLowerCase()}.webp`);
     }
 
+    /** This Folk's own picture, at its rank or at `tier`; its rank's picture until the portraits are in. */
+    portraitOf(folk, tier = folk.tier) {
+      return this.looks?.urlOf(folk, tier) ?? this.portrait(tier);
+    }
+
     /**
      * On strike / owing wages right now. With wages off (No sweat) both are parked, not forgiven: the Folk works free
      * and the state comes back when a paid difficulty returns, so No sweat is no free way out of a strike (build .86).
@@ -606,6 +611,10 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         dreamSpare: daydream?.minSpare,
         roleName: (tier) => this.roleName(tier),
         portrait: (tier) => this.portrait(tier),
+        folkPortrait: (folk) => this.portraitOf(folk),
+        lookLabel: (folk) => templateLangString('MOD_WF_LOOK_LABEL', { name: folk.name }),
+        lookTip: () => getLangString('MOD_WF_LOOK_TIP'),
+        onLook: (folk) => this.looks?.openEdit(folk),
         slotText: (folk) => templateLangString('MOD_WF_CARD_SLOT', { slot: `${folk.slot + 1}` }),
         helpLabel: (topic) => getLangString(`MOD_WF_HELP_LABEL_${topic}`),
         emptyText: () => getLangString(this.hasLicence('Newbie') ? 'MOD_WF_NO_WORKERS_DESC_LICENSED' : 'MOD_WF_NO_WORKERS_DESC'),
@@ -797,6 +806,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
           return { text: s.out.length > 0 ? `${count} · ${templateLangString('MOD_WF_TILE_GEAR_OUT', { count: `${s.out.length}` })}` : count, tip, out: s.out.length > 0 };
         },
         onGear: (folk) => { if (!this.refused('gear', { folk })) this.loadout?.openLoadout(folk); },
+        renameLabel: (folk) => templateLangString('MOD_WF_RENAME_LABEL', { name: folk.name }),
+        onRename: (folk) => this.openRename(folk),
         traits: (folk) => this.traits?.cardView(folk),
         local: (folk) => this.commissions?.localView(folk) ?? null,
         onTraits: (folk) => this.traits?.openTraits(folk),
@@ -1173,7 +1184,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         // The Folk's name kept whole when it fits; the title wraps, never cut (build .109).
         title: templateLangString('MOD_WF_PROMO_TITLE', { name: titleName(folk.name), role: this.roleName(plan.nextTier) }),
         html,
-        imageUrl: this.portrait(plan.nextTier),
+        imageUrl: this.portraitOf(folk, plan.nextTier),
         imageWidth: 64,
         imageHeight: 64,
         imageAlt: folk.name,
@@ -1210,7 +1221,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         this.game.notifications.createSuccessNotification(
           'worker_folks:promoted',
           templateLangString('MOD_WF_PROMOTED', { name: folk.name, role: this.roleName(fresh.nextTier), aRole: getLangString(`MOD_WF_A_ROLE_${fresh.nextTier}`) }),
-          this.portrait(fresh.nextTier),
+          this.portraitOf(folk),
         );
       });
     }
@@ -1274,7 +1285,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         didRender: popupDidRender,
         title: templateLangString('MOD_WF_FIRE_TITLE', { name: titleName(folk.name) }),
         html: `<div class="text-center text-warning">${getLangString('MOD_WF_FIRE_TEXT')}</div>${severanceBand}${roomBand}`,
-        imageUrl: this.portrait(folk.tier),
+        imageUrl: this.portraitOf(folk),
         imageWidth: 64,
         imageHeight: 64,
         imageAlt: folk.name,
@@ -1300,6 +1311,67 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         if (due > 0) this.game.gp.remove(due);
         const lost = this.returnLoadout(folk);
         this.crew.fire(folk.id, { reason: 'fired', lost });
+      });
+    }
+
+    /** A nickname for a Folk (a player's idea), kept in the save; its hired name stays one click away. */
+    openRename(folk) {
+      const original = folk.born ?? folk.name;
+      const node = (tag, cls, text) => {
+        const e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (text !== undefined) e.textContent = text;
+        return e;
+      };
+      const body = node('div', 'text-left wf-rename-form');
+      const inputId = 'wf-rename-input';
+      const label = node('label', 'font-w600 mb-1', getLangString('MOD_WF_RENAME_FIELD'));
+      label.htmlFor = inputId;
+      const input = node('input', 'form-control');
+      input.id = inputId;
+      input.type = 'text';
+      input.autocomplete = 'off';
+      input.maxLength = Math.max(folkModel.NICK_MAX, [...original].length);
+      input.value = folk.name;
+      const foot = node('div', 'wf-rename-foot');
+      const was = node('small', 'wf-subtle', templateLangString('MOD_WF_RENAME_ORIGINAL', { name: original }));
+      const count = node('small', 'wf-subtle');
+      const showCount = () => {
+        count.textContent = templateLangString('MOD_WF_RENAME_COUNT', { count: `${[...folkModel.cleanNick(input.value)].length}`, max: `${folkModel.NICK_MAX}` });
+        Swal.resetValidationMessage?.();
+      };
+      foot.append(was, count);
+      body.append(label, input, foot);
+      if (typeof folk.born === 'string') {
+        const back = node('button', 'btn btn-sm btn-outline-info mt-2', getLangString('MOD_WF_RENAME_USE_ORIGINAL'));
+        back.type = 'button';
+        back.addEventListener('click', () => { input.value = original; showCount(); input.focus(); });
+        body.append(back);
+      }
+      input.addEventListener('input', showCount);
+      input.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        Swal.clickConfirm();
+      });
+      SwalLocale.fire({
+        didRender: popupDidRender,
+        title: templateLangString('MOD_WF_RENAME_TITLE', { name: titleName(folk.name) }),
+        html: body,
+        imageUrl: this.portraitOf(folk),
+        imageWidth: 64,
+        imageHeight: 64,
+        imageAlt: folk.name,
+        customClass: swalClass({ popup: 'wf-ui wf-pic', confirmButton: 'btn btn-success m-1' }),
+        showCancelButton: true,
+        confirmButtonText: getLangString('MOD_WF_BUTTON_SAVE'),
+        didOpen: () => { showCount(); input.focus(); input.select(); },
+        preConfirm: () => {
+          const problem = this.crew.rename(folk.id, input.value);
+          if (problem === null) return true;
+          Swal.showValidationMessage(templateLangString(`MOD_WF_RENAME_${problem.toUpperCase()}`, { max: `${folkModel.NICK_MAX}` }));
+          return false;
+        },
       });
     }
 
@@ -1411,7 +1483,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
 
     getSlotMedia(action) {
       const folk = this.crew.bySlot(action.index);
-      return this.portrait(folk !== undefined ? folk.tier : 'Newbie');
+      return folk !== undefined ? this.portraitOf(folk) : this.portrait('Newbie');
     }
 
     computeDelegableSkills() {

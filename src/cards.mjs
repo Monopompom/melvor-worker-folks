@@ -10,7 +10,7 @@ const FROZEN_TEMPLATE_ID = 'wf-frozen-slot-template';
  * fields are refreshed on every render, so hover states, tooltips and the unfolded Details
  * survive the per-action re-renders (no flicker). Cards of Folks that left are removed and
  * the order follows `folks`, then the frozen slots.
- * `view` supplies: roleName(tier), portrait(tier), status(folk), statusIcon(key),
+ * `view` supplies: roleName(tier), portrait(tier), folkPortrait(folk), status(folk), statusIcon(key),
  * statusText(key), assignmentText(folk), skillMedia(folk), rateText(folk),
  * effects(folk), detailText(folk), isWorking(folk), onStop(folk), stopText(), ...
  * Returns false when the page is not in the DOM yet.
@@ -109,23 +109,33 @@ export function effectsFragment(effects) {
 }
 
 export function equalizeCards(list, minSpare = Infinity) {
-  const cols = Array.from(list.querySelectorAll(':scope > [data-wf-folk]')).filter((col) => col.offsetParent !== null);
-  const cards = cols.map((col) => col.querySelector('.block'));
-  // Measured without their daydreams: a daydream only fills height another card in the row already gives (build .155).
   const dreamOf = (card) => card?.querySelector('[data-wf="dream"]') ?? null;
-  cards.forEach((card) => { if (card) card.style.minHeight = ''; dreamOf(card)?.classList.add('d-none'); });
   const rows = new Map();
-  cols.forEach((col, i) => {
-    const card = cards[i];
+  Array.from(list.querySelectorAll(':scope > [data-wf-folk]')).filter((col) => col.offsetParent !== null).forEach((col) => {
+    const card = col.querySelector('.block');
     if (!card) return;
-    const details = card.querySelector('[data-wf="details"]');
-    const extra = details !== null && !details.classList.contains('d-none')
-      ? details.offsetHeight + (parseFloat(getComputedStyle(details).marginTop) || 0) : 0;
     const top = Math.round(col.offsetTop);
     if (!rows.has(top)) rows.set(top, []);
-    rows.get(top).push({ card, base: card.offsetHeight - extra, extra });
+    rows.get(top).push({ col, card });
   });
   rows.forEach((row) => {
+    // A card alone in its row has nothing to match: writing to it on every redraw made phones scroll by themselves.
+    if (row.length === 1) {
+      const { card } = row[0];
+      if (card.style.minHeight !== '') card.style.minHeight = '';
+      dreamOf(card)?.classList.add('d-none');
+      return;
+    }
+    // Each column holds its height while its card is measured, so nothing below it moves and the page stays where it is.
+    row.forEach((c) => { c.col.style.height = `${c.col.getBoundingClientRect().height}px`; });
+    // Measured without their daydreams: a daydream only fills height another card in the row already gives (build .155).
+    row.forEach((c) => { c.card.style.minHeight = ''; dreamOf(c.card)?.classList.add('d-none'); });
+    row.forEach((c) => {
+      const details = c.card.querySelector('[data-wf="details"]');
+      c.extra = details !== null && !details.classList.contains('d-none')
+        ? details.getBoundingClientRect().height + (parseFloat(getComputedStyle(details).marginTop) || 0) : 0;
+      c.base = c.card.getBoundingClientRect().height - c.extra;
+    });
     const base = Math.max(...row.map((c) => c.base));
     row.forEach((c) => {
       c.card.style.minHeight = `${base + c.extra}px`;
@@ -134,6 +144,7 @@ export function equalizeCards(list, minSpare = Infinity) {
       const quiet = alert === null || alert.classList.contains('d-none');
       if (dream !== null && dream.dataset.wfReady === '1' && quiet && base - c.base >= minSpare) dream.classList.remove('d-none');
     });
+    row.forEach((c) => { c.col.style.height = ''; });
   });
 }
 
@@ -195,7 +206,12 @@ function fillCard(col, folk, view) {
   const setText = (el, text) => { if (el.textContent !== text) el.textContent = text; };
   // Attributes too are written only when they change (scan C-36: unchanged values were rewritten every second).
   const setAttr = (el, name, value) => { if (el.getAttribute(name) !== value) el.setAttribute(name, value); };
-  set('portrait', (el) => { if (el.getAttribute('src') !== view.portrait(folk.tier)) el.src = view.portrait(folk.tier); setAttr(el, 'alt', folk.name); });
+  set('portrait', (el) => { const src = view.folkPortrait(folk); if (el.getAttribute('src') !== src) el.src = src; setAttr(el, 'alt', folk.name); });
+  set('look', (el) => {
+    setAttr(el, 'aria-label', view.lookLabel(folk));
+    view.tip(el, view.lookTip());
+    el.onclick = () => view.onLook(folk);
+  });
   set('name', (el) => {
     setText(el, folk.name);
     // The card is a labelled group, so a screen reader's button list says whose Fire it is (scan C-33).
@@ -203,6 +219,12 @@ function fillCard(col, folk, view) {
     setAttr(el, 'id', id);
     const card = col.querySelector('.wf-card');
     if (card !== null) setAttr(card, 'aria-labelledby', id);
+  });
+  set('rename', (el) => {
+    const label = view.renameLabel(folk);
+    setAttr(el, 'aria-label', label);
+    view.tip(el, label);
+    el.onclick = () => view.onRename(folk);
   });
   set('town-badge', (el) => {
     const local = view.local?.(folk) ?? null;
