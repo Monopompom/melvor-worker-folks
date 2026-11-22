@@ -2,20 +2,20 @@
 // 2026). Pure: the game's own formatters are used when they are there, plain output where they are not (tests).
 
 const UNITS = [
-  { size: 1e12, fallback: 'T' },
-  { size: 1e9, fallback: 'B' },
-  { size: 1e6, fallback: 'M' },
-  { size: 1e3, fallback: 'K' },
+  { size: 1e12, key: 'NUM_T', fallback: 'T' },
+  { size: 1e9, key: 'NUM_B', fallback: 'B' },
+  { size: 1e6, key: 'NUM_M', fallback: 'M' },
+  { size: 1e3, key: 'NUM_K', fallback: 'K' },
 ];
 
 const whole = (n) => (typeof numberWithCommas === 'function' ? numberWithCommas(n) : `${n}`);
 const tenth = (n) => (typeof formatFixed === 'function' ? formatFixed(n, 1) : n.toFixed(1));
 
-/** The game's own letter for a unit (its short form of ten of them, digits stripped), so a translation carries over. */
+/** The game's own word for a unit in this language. Its leading space stays ("127 Mio.") and never breaks the line. */
 function suffix(unit) {
-  if (typeof formatNumber !== 'function') return unit.fallback;
-  const s = String(formatNumber(unit.size * 10)).replace(/^[-\d\s.,  ']+/, '');
-  return s === '' ? unit.fallback : s;
+  if (typeof getLangString !== 'function') return unit.fallback;
+  const s = String(getLangString(unit.key) ?? '');
+  return s.trim() === '' ? unit.fallback : s.replace(/^\s+/, '\u00a0');
 }
 
 /**

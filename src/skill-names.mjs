@@ -10,6 +10,8 @@ let byName;
 /** A pattern for whole-word skill names, longest first (so "Alt Magic" wins over "Magic"); null without names. Pure. */
 export function namePattern(names) {
   const list = [...names].sort((a, b) => b.length - a.length).map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  // Chinese has no spaces: its language files set a name apart with U+200B where the text means the skill, so an
+  // ordinary word or an item name holding the same characters never gets an icon.
   return list.length === 0 ? null : new RegExp(`(?<![\\p{L}\\p{N}])(${list.join('|')})(?![\\p{L}\\p{N}])`, 'gu');
 }
 
@@ -133,7 +135,7 @@ const fitTitle = (title, tries = 0) => {
       // What follows a name goes with it ("?", "'s"): the end of a no-wrap span is a place to break. Merged into the
       // name's text, so the last-word tie below sees "Breakfast?" whole.
       const next = el.nextSibling;
-      const mark = next?.nodeType === 3 ? next.nodeValue.match(/^(?:['\u2019]s|[?!.,:;])+/) : null;
+      const mark = next?.nodeType === 3 ? next.nodeValue.match(/^(?:['\u2019]s|[?!.,:;\uff1f\uff01\u3002\uff0c\uff1a\uff1b])+/) : null;
       if (mark !== null) { el.append(mark[0]); el.normalize(); next.nodeValue = next.nodeValue.slice(mark[0].length); }
       el.style.whiteSpace = 'nowrap';
       if (!fits()) el.style.whiteSpace = '';

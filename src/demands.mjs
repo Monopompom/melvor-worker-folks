@@ -65,7 +65,7 @@ export function install(ctx, { getHiring, model }) {
     /** "10 Old Boot, 200 Ash": the items a settlement would take now (for the self-settle notice). */
     itemsText(folk) {
       return model.itemsToTake(folk.demand).filter(({ id }) => item(id) !== undefined)
-        .map(({ id, qty }) => `${numberWithCommas(qty)} ${item(id).name}`).join(', ');
+        .map(({ id, qty }) => `${numberWithCommas(qty)} ${item(id).name}`).join(getLangString('MOD_WF_LIST_SEP'));
     },
     /** Takes the items the demands want from the bank; false (nothing taken) when one is short. */
     take(folk) {
@@ -95,7 +95,7 @@ export function install(ctx, { getHiring, model }) {
         // Enough of it, but locked: "Topaz (unlock it)".
         if (p.locked && p.have >= p.need) return templateLangString('MOD_WF_DEMAND_UNLOCK', { item: nameOf(d) });
         return `${numberWithCommas(p.need - p.have)} ${nameOf(d)}`;
-      }).join(', ');
+      }).join(getLangString('MOD_WF_LIST_SEP'));
     },
   };
 

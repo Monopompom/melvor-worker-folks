@@ -224,7 +224,7 @@ export function install(ctx, { getHiring, model, costs = null, time, numbers, ti
       hiring.folkTurn = turn;
     }
     order.paid = { gp: r.gp, xp: r.xp };
-    const text = templateLangString('MOD_WF_ORDER_DELIVERED', { what: askText(order), rewards: rewardParts(r, order).join(', ') });
+    const text = templateLangString('MOD_WF_ORDER_DELIVERED', { what: askText(order), rewards: rewardParts(r, order).join(getLangString('MOD_WF_LIST_SEP')) });
     if (game._isInOnlineLoop) game.notifications.createSuccessNotification('worker_folks:order', text, sizeIcon(order.size));
     hiring.events.emit('orderDelivered', { order, reward: r, text, offline: !game._isInOnlineLoop });
     log(`work order delivered: ${order.id} ${order.itemId} ×${order.qty}`, r);
@@ -311,7 +311,7 @@ export function install(ctx, { getHiring, model, costs = null, time, numbers, ti
     for (const k of [1, 2, 3]) {
       const b = el('div', 'wf-band');
       b.append(el('div', 'wf-help-head', getLangString(`MOD_WF_ORDERS_HELP_${k}_HEAD`)));
-      getLangString(`MOD_WF_ORDERS_HELP_${k}`).split(/(?<=[.!?])\s+/).filter(Boolean).forEach((line) => b.append(el('p', 'wf-help-p', line)));
+      getLangString(`MOD_WF_ORDERS_HELP_${k}`).split(/(?<=[.!?])\s+|(?<=[。！？])(?![”」』）])/).filter(Boolean).forEach((line) => b.append(el('p', 'wf-help-p', line)));
       body.append(b);
     }
     const cls = { popup: 'wf-ui', confirmButton: 'btn btn-success m-1' };

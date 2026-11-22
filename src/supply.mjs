@@ -71,7 +71,7 @@ export function install(ctx, { getHiring, model, log }) {
       .filter((r) => r.folk !== undefined);
   };
 
-  const names = (items) => items.map((i) => i.name).join(', ');
+  const names = (items) => items.map((i) => i.name).join(getLangString('MOD_WF_LIST_SEP'));
 
   /** Why this supplier can't feed this receiver now ('' = it can). */
   const refusal = (folk, receiverId) => {

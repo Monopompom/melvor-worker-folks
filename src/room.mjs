@@ -202,7 +202,7 @@ export function install(ctx, { getHiring, model, depotModel, resume, time, tips,
   };
 
   /** "2,989 Willow Logs, 1 Mastery Token" for [{ id, qty }]. */
-  const itemsText = (list) => list.map(({ id, qty }) => `${numberWithCommas(qty)} ${game.items.getObjectByID(id)?.name ?? id}`).join(', ');
+  const itemsText = (list) => list.map(({ id, qty }) => `${numberWithCommas(qty)} ${game.items.getObjectByID(id)?.name ?? id}`).join(getLangString('MOD_WF_LIST_SEP'));
   const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   /** "17 kinds of item": Welcome Back's short form for a list (the user: a full gear set ran down the modal). */
   const kindsText = (list) => (list.length === 1 ? getLangString('MOD_WF_ITEM_KINDS_ONE') : templateLangString('MOD_WF_ITEM_KINDS', { count: numberWithCommas(list.length) }));

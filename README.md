@@ -479,8 +479,9 @@ off brings back the game's own way, in case a bar or an amount from another mod 
 
 ## Languages
 
-Every text of the mod comes from its language files. Only English ships for now; the
-game's language setting picks the matching file when one exists.
+Every text of the mod comes from its language files. It ships in English, German, French,
+Simplified Chinese and Traditional Chinese. The game's language setting picks the file, and
+any other language reads in English.
 
 ## Game modes
 

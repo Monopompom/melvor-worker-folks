@@ -231,7 +231,7 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
     c.paid = { resources: added, lost: Math.max(0, Math.floor(p.resources) - added), standing: p.standing, late: p.late };
     const thanks = line(c, p.late ? 'LATE' : 'THANKS', 1 + Math.floor(Math.random() * (p.late ? model.LINES.late : model.LINES.thanks)));
     const parts = [...(added > 0 ? [resourceText(c.resourceId, added)] : []), templateLangString('MOD_WF_COMM_REWARD_STANDING', { points: n(p.standing) }), templateLangString('MOD_WF_COMM_REWARD_XP', { xp: n(xp) })];
-    notify('success', templateLangString('MOD_WF_COMM_DELIVERED', { figure: figureName(c.figure), name: folk?.name ?? '', what: askText(c), line: thanks, rewards: parts.join(', ') }), portraitOf(c.figure));
+    notify('success', templateLangString('MOD_WF_COMM_DELIVERED', { figure: figureName(c.figure), name: folk?.name ?? '', what: askText(c), line: thanks, rewards: parts.join(getLangString('MOD_WF_LIST_SEP')) }), portraitOf(c.figure));
     if (added < p.resources) notify('error', templateLangString('MOD_WF_COMM_STORAGE_FULL', { lost: resourceText(c.resourceId, p.resources - added) }));
     if (tiers.after > tiers.before) {
       const id = model.TIERS[tiers.after].id;
@@ -540,7 +540,7 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
     for (const k of [1, 2, 3, 4]) {
       const b = el('div', 'wf-band');
       b.append(el('div', 'wf-help-head', getLangString(`MOD_WF_COMM_HELP_${k}_HEAD`)));
-      getLangString(`MOD_WF_COMM_HELP_${k}`).split(/(?<=[.!?])\s+/).filter(Boolean).forEach((l) => b.append(el('p', 'wf-help-p', l)));
+      getLangString(`MOD_WF_COMM_HELP_${k}`).split(/(?<=[.!?])\s+|(?<=[。！？])(?![”」』）])/).filter(Boolean).forEach((l) => b.append(el('p', 'wf-help-p', l)));
       body.append(b);
     }
     const cls = { popup: 'wf-ui', confirmButton: 'btn btn-success m-1' };
@@ -582,7 +582,7 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
       b.append(img(media(model.storyMedia(d.id)), 'wf-history-img mr-2'));
       const words = el('div', 'wf-min0');
       words.append(el('div', 'font-w600', storyTitle(d.id)), el('small', 'd-block', getLangString(`MOD_WF_STORY_${d.id}_HISTORY`)));
-      if (d.folks.length > 0) words.append(el('small', 'wf-subtle d-block', templateLangString('MOD_WF_STORY_HISTORY_FOLKS', { names: d.folks.join(', ') })));
+      if (d.folks.length > 0) words.append(el('small', 'wf-subtle d-block', templateLangString('MOD_WF_STORY_HISTORY_FOLKS', { names: d.folks.join(getLangString('MOD_WF_LIST_SEP')) })));
       b.append(words);
       body.append(b);
     });

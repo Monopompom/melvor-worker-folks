@@ -354,7 +354,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, numbers, popu
         if (out.length > 0) {
           const warn = document.createElement('div');
           warn.className = 'text-warning font-w600 text-center mt-2';
-          warn.textContent = templateLangString('MOD_WF_GEAR_OUT', { items: out.map((t) => t.name).join(', ') });
+          warn.textContent = templateLangString('MOD_WF_GEAR_OUT', { items: out.map((t) => t.name).join(getLangString('MOD_WF_LIST_SEP')) });
           root.append(warn);
         }
         // The bonuses fold behind a toggle at the bottom (build .65, user request), closed by default; the choice
@@ -512,7 +512,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, numbers, popu
           const levels = (item.equipRequirements ?? [])
             .filter((r) => r.type === 'SkillLevel' && r.skill !== undefined && r.skill.level < r.level)
             .map((r) => `${r.skill.name} ${r.level}`); // the game's skill name: an equip level is the player's Magic, not "Alt. Magic" (B-16)
-          return levels.length > 0 ? levels.join(', ') : getLangString('MOD_WF_PICKER_LOCKED_OTHER');
+          return levels.length > 0 ? levels.join(getLangString('MOD_WF_LIST_SEP')) : getLangString('MOD_WF_PICKER_LOCKED_OTHER');
         };
         const refreshPicked = () => {
           const missing = picked === undefined ? null : needs(picked);

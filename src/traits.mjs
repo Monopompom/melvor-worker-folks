@@ -329,7 +329,7 @@ export function install(ctx, { getHiring, model, popupDidRender, titleName = (s)
           : templateLangString('MOD_WF_TRAITS_SLOT_LOCKED', { slot: `${slot + 1}`, level: `${opensAt}` })));
       }
       if (s.waiting.length > 0) {
-        root.append(text('div', 'wf-trait-waiting', templateLangString('MOD_WF_TRAITS_WAITING', { traits: s.waiting.map(nameOf).join(', ') })));
+        root.append(text('div', 'wf-trait-waiting', templateLangString('MOD_WF_TRAITS_WAITING', { traits: s.waiting.map(nameOf).join(getLangString('MOD_WF_LIST_SEP')) })));
       }
       if (forgetUnlocked() && s.traits.length > 0 && !canPay) {
         root.append(text('div', 'wf-trait-waiting text-warning', templateLangString('MOD_WF_FORGET_NEED', { amount: numberWithCommas(cost) })));

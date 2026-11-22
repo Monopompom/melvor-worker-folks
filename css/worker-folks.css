@@ -186,6 +186,7 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 /* A receiver's supply panel (round 3): a green edge as the strike band's red one; "Supplied by" with the rate step at
    the right, then each supplier's name and what it brings, item icon first. */
 .wf-supplied { padding: 8px 10px 8px 13px; border-radius: 6px; background: var(--wf-well); box-shadow: inset 3px 0 0 var(--wf-edge-supply); }
+.wf-job:not(.d-none) ~ .wf-supplied { margin-top: 8px; } /* a step of room under the Job or Supplies button */
 .wf-supplied-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .wf-supplied-rate { font-size: 0.875rem; font-weight: 600; color: var(--wf-working); white-space: nowrap; }
 .wf-supplied-rate.wf-off { color: var(--wf-subtle); font-weight: 400; }
@@ -193,8 +194,12 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 .wf-supplied-row > :first-child { min-width: 0; overflow-wrap: anywhere; }
 .wf-supplied-items { flex: none; color: var(--wf-subtle); white-space: nowrap; }
 .wf-supplied-items img { width: 16px; height: 16px; margin-right: 4px; vertical-align: -3px; }
-/* The Job button and the Restock button above it take the same width, so their edges line up. */
-.wf-restock-fill, .wf-job-pick .dropdown-toggle { min-width: 5rem; }
+/* Restock, Job, Supplies and the auto-restock line share one width, so their edges line up in every language (the user,
+   22 Nov 2026): 8rem holds the longest Restock beside its caret; a longer pick ends in an ellipsis. */
+.wf-restock, .wf-job-pick, .wf-auto-restock-at { width: 8rem; max-width: 100%; }
+.wf-restock-fill { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wf-restock .btn.wf-restock-fill { padding-left: 6px; padding-right: 6px; } /* a long word still fits beside the arrow */
+.wf-job-pick .dropdown-toggle, .wf-auto-restock-at .dropdown-toggle { width: 100%; }
 /* Health on one line: the HP text, its bar, the food (which wraps under when long). */
 .wf-band-health { display: flex; flex-wrap: wrap; align-items: center; column-gap: 10px; row-gap: 2px; }
 .wf-band-health .wf-hp-bar { flex: 1 1 60px; margin-bottom: 0; }
@@ -351,9 +356,12 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 .wf-reserve-covers { margin-top: 8px; }
 .wf-reserve-rule { margin: 14px 0; border-top: 1px solid var(--wf-line-soft); }
 .wf-reserve-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.wf-reserve-input { min-height: 40px; flex: 1 1 8rem; min-width: 8rem; width: auto; }
-.wf-reserve-presets { display: flex; gap: 6px; flex: 0 0 auto; }
+/* Beside the field the field takes the free width; wrapped to their own row the presets take it, All at the far right
+   (the user, 22 Nov 2026). */
+.wf-reserve-input { min-height: 40px; flex: 1000 1 8rem; min-width: 8rem; width: auto; }
+.wf-reserve-presets { display: flex; gap: 6px; flex: 1 0 auto; }
 .wf-reserve-presets .btn { min-height: 40px; min-width: 40px; } /* one height with the field (scan A-05, .112) */
+.wf-reserve-presets .btn:last-child { margin-left: auto; }
 .wf-reserve-deposit { width: 100%; min-height: 40px; margin-top: 14px !important; }
 /* Top row (build .79): the reserve and the Overview one height (row-deck). */
 /* Build .88 (the user): block content 16px in, blocks 12px apart both ways (the game's .block keeps 30px
@@ -403,6 +411,11 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 /* Card layout: full-width sections under the portrait row, a button row with even gaps. */
 .wf-min0 { min-width: 0; }
 .wf-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+/* All four on one row: Fire's box takes the free width, so it sits at the right. When they don't fit, Fire takes a row of
+   its own and Details, Gear and Traits fill every row above it, however many they need (the user, 22 Nov 2026). */
+.wf-card-main { display: flex; flex-wrap: wrap; gap: inherit; flex: 1 1 auto; min-width: 0; }
+.wf-card-main > .btn { flex: 1 1 auto; }
+.wf-card-fire { display: flex; justify-content: flex-end; flex: 1000 0 auto; }
 /* Gear modal: the game's popup width and padding, no extra of ours (build .68); the bonus band spans the popup. */
 .wf-gear-head { margin-bottom: 0.75rem; }
 .wf-picker-head { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
@@ -686,7 +699,10 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-dash-paymini { display: none; align-items: center; gap: 8px; font-size: 0.9rem; white-space: nowrap; }
 .wf-dash-paymini-cur .wf-line-icon { margin-right: 0; }
 #worker-folks-overview.wf-folded .wf-dash-paymini { display: flex; }
-.wf-dash-grid { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1.6fr); gap: 12px; height: var(--wf-dash-h, 34.5rem); } /* 23rem holds five two-line At work rows; the grip sets 23 to 69rem (.250) */
+/* Two columns (the user, 22 Nov 2026): At work the whole height at the left; at the right Payroll at its own height and
+   Made this session under it, taking all the height left, so dragging the grip never opens an empty band. */
+.wf-dash-grid { display: grid; grid-template-columns: minmax(17.5rem, 1fr) minmax(0, 2.4fr); grid-template-rows: minmax(0, auto) minmax(9rem, 1fr); gap: 12px; height: var(--wf-dash-h, 34.5rem); } /* 23rem holds five two-line At work rows; the grip sets 23 to 69rem (.250) */
+.wf-dash-work { grid-row: 1 / -1; }
 /* The grip under the bands (.250): a full-width strip with a short knob, dragged up or down; hidden on a phone,
    where the bands stack at their own height. */
 .wf-dash-resize { display: flex; justify-content: center; align-items: center; height: 14px; margin: 6px 0 -10px; cursor: ns-resize; touch-action: none; border-radius: 4px; outline: none; }
@@ -694,7 +710,7 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-dash-resize:hover .wf-dash-resize-knob, .wf-dash-resize.wf-dragging .wf-dash-resize-knob { opacity: 1; width: 72px; }
 .wf-dash-resize:focus-visible { box-shadow: 0 0 0 2px var(--wf-line); }
 .wf-dash-band { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
-.wf-dash-pay { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--wf-thumb) transparent; }
+.wf-dash-pay { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--wf-thumb) transparent; container-type: inline-size; container-name: wf-payroll; }
 .wf-dash-head { color: var(--wf-head); font-weight: 600; margin-bottom: 8px; gap: 6px; flex: 0 0 auto; }
 .wf-dash-head .wf-help { margin: -4px 0; }
 .wf-dash-work { overflow: visible; } /* the Sort menu opens over the list; the list scrolls in its own box */
@@ -728,7 +744,8 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 /* Stop / Restart / Restock / Settle all under the list (build .218): two to a row, never growing the band; a label
    too long for its half ends in an ellipsis, the tooltip names it whole. */
 .wf-dash-bulk { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 8px; flex: 0 0 auto; }
-.wf-dash-bulk-btn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 6px; padding-right: 6px; }
+.wf-dash-bulk-btn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wf-dash-bulk .btn.wf-dash-bulk-btn { padding-left: 6px; padding-right: 6px; } /* over the game's small-button padding */
 .wf-dash-bulk-btn.disabled { cursor: default; } /* greyed by the shared .wf-ui .btn.disabled look */
 /* Open shop (.250, its look .251): last in the grid; when it starts a row (odd place) it takes the whole row, beside
    Settle all it fills the free cell. The game's Shop icon on a GP-gold tint, brighter on hover, so it reads as the way
@@ -762,11 +779,18 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-dash-pay .wf-reserve-controls { margin-top: 10px; gap: 6px; }
 .wf-dash-pay .wf-reserve-input { min-height: 40px; flex-basis: 6rem; min-width: 6rem; }
 .wf-dash-pay .wf-reserve-deposit { min-height: 40px; margin-top: 10px !important; } /* 40px field and a normal Deposit (scan A-05, .112) */
+/* A wide Payroll keeps the field, the presets and Deposit on one line, so Made this session gets the height. */
+@container wf-payroll (min-width: 30rem) {
+  .wf-pay-cur { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; }
+  .wf-pay-cur > * { grid-column: 1 / -1; }
+  .wf-pay-cur > .wf-reserve-controls { grid-column: 1; flex-wrap: nowrap; }
+  .wf-dash-pay .wf-pay-cur > .wf-reserve-deposit { grid-column: 2; width: auto; min-width: 8rem; }
+}
 /* Made: XP as skill chips, then the item chips in their own scroll box, so many kinds never grow the block */
 .wf-dash-xp { display: flex; flex-wrap: wrap; gap: 6px; flex: 0 0 auto; }
 .wf-dash-xp-chip { display: inline-flex; align-items: center; gap: 2px; padding: 2px 8px; border-radius: 6px; background: var(--wf-well); font-size: 0.9rem; }
 /* An even grid: equal cells that stretch to fill each row, so no ragged gap at the right (the user, build .98). */
-.wf-dash-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); grid-auto-rows: min-content; align-content: start; gap: 8px; margin-top: 10px; min-height: 76px; padding-right: 4px; }
+.wf-dash-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); grid-auto-rows: min-content; align-content: start; gap: 8px; margin-top: 10px; min-height: 3rem; padding-right: 4px; }
 .wf-dash-item, .wf-item-tile { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; padding: 8px 4px 6px; border-radius: 8px; background: var(--wf-well); }
 .wf-dash-item-icon, .wf-item-tile-icon { width: 32px; height: 32px; object-fit: contain; }
 .wf-dash-item-count, .wf-item-tile-count { font-size: 0.8rem; font-weight: 600; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -780,27 +804,15 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-item-grid-sm .wf-item-tile-icon { width: 24px; height: 24px; }
 .wf-item-grid-sm .wf-item-tile-count { font-size: 0.7rem; }
 .wf-dash-more { grid-column: 1 / -1; }
-/* The bands follow the Overview's own width, not the window's (scan A-10, build .112): three across from
-   900px of block; under it At work and Payroll side by side with Made this session under them; under 600px one
-   column, Payroll first. */
+/* The bands follow the Overview's own width, not the window's (scan A-10, build .112): two columns from 600px of
+   block, At work's at least 17.5rem so its buttons keep their labels whole; under 600px one column, Payroll first. */
 #worker-folks-overview { container-type: inline-size; container-name: wf-overview; }
-/* Three across but narrow (900 to 1060px of block): At work as wide as Payroll, Made a little narrower, so At work's
-   buttons keep "Restart all" and "Restock all" whole at their normal size (under ~230px they were cut). */
-@container wf-overview (min-width: 900px) and (max-width: 1059.98px) {
-  .wf-dash-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr); }
-}
-@container wf-overview (max-width: 899.98px) {
-  .wf-dash-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); height: auto; }
-  .wf-dash-work, .wf-dash-pay { height: var(--wf-dash-h, 34.5rem); }
-  .wf-dash-made { grid-column: 1 / -1; }
-  .wf-dash-made .wf-dash-scroll { flex: 0 1 auto; }
-  .wf-dash-items { max-height: 12rem; }
-}
 @container wf-overview (max-width: 599.98px) {
-  .wf-dash-grid { grid-template-columns: minmax(0, 1fr); }
-  .wf-dash-work, .wf-dash-pay { height: auto; }
+  .wf-dash-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; height: auto; }
+  .wf-dash-work { grid-row: auto; }
   .wf-dash-pay { order: -1; overflow: visible; }
   .wf-dash-scroll { flex: 0 1 auto; }
+  .wf-dash-items { max-height: 12rem; }
   .wf-dash-roster { max-height: 14rem; }
   .wf-dash-resize { display: none; }
 }

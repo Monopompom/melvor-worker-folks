@@ -98,7 +98,7 @@ export function install(ctx, { getHiring, time, log }) {
     // A job's work (the Quartermaster): what each Folk refilled, one line a Folk, and what ran out in your bank, red.
     tracker.refills.forEach(({ folk, items }) => {
       const job = hiring.jobs?.of(folk);
-      const list = [...items.values()].map(({ item, qty }) => `${numberWithCommas(qty)} ${item.name}`).join(', ');
+      const list = [...items.values()].map(({ item, qty }) => `${numberWithCommas(qty)} ${item.name}`).join(getLangString('MOD_WF_LIST_SEP'));
       lines.push({ media: job?.media, html: fill('MOD_WF_OFFLINE_REFILLED', { name: folk.name, skill: job?.name ?? '', items: list }, { items: 'text-success' }, job?.media) });
     });
     tracker.refillOut.forEach(({ folk, item }) => {
@@ -108,7 +108,7 @@ export function install(ctx, { getHiring, time, log }) {
     // Supply lines: what each supplier sent down its line, one line a supplier and receiver.
     tracker.supplied.forEach(({ folk, receiver, items }) => {
       const skill = hiring.skillOf(folk);
-      const list = [...items.values()].map(({ item, qty }) => `${numberWithCommas(qty)} ${item.name}`).join(', ');
+      const list = [...items.values()].map(({ item, qty }) => `${numberWithCommas(qty)} ${item.name}`).join(getLangString('MOD_WF_LIST_SEP'));
       lines.push({ media: skill?.media, html: fill('MOD_WF_OFFLINE_SUPPLIED', { name: folk.name, skill: skill === undefined ? '' : hiring.skillName(skill), items: list, receiver: receiver.name }, { items: 'text-success' }, skill?.media) });
     });
     // Work Orders: a delivered one green with what it paid, one gone undelivered red; the order's size icon first.

@@ -18,6 +18,20 @@ test('shortNumber keeps small numbers whole and shortens big ones, rounded down'
   assert.equal(shortNumber(1234.9), '1234');
 });
 
+test('shortNumber takes the unit from the language, its space kept and unbreakable', () => {
+  const words = { de: { NUM_K: ' Tsd.', NUM_M: ' Mio.' }, zh: { NUM_K: '千', NUM_M: '百万' } };
+  try {
+    globalThis.getLangString = (key) => words.de[key];
+    assert.equal(shortNumber(12345), '12.3 Tsd.');
+    assert.equal(shortNumber(127_000_000), '127 Mio.');
+    globalThis.getLangString = (key) => words.zh[key];
+    assert.equal(shortNumber(12345), '12.3千');
+    assert.equal(shortNumber(2_500_000), '2.5百万');
+  } finally {
+    delete globalThis.getLangString;
+  }
+});
+
 test('shortNumber passes a value that is not a number through', () => {
   assert.equal(shortNumber(Infinity), 'Infinity');
   assert.equal(shortNumber('x'), 'x');

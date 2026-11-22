@@ -228,8 +228,9 @@ export function install(ctx, { getHiring, model, milestones, bulk, layout, tips,
     pill = el('div', 'wf-dash-pill wf-dash-next d-none');
     right.append(payMini, pill);
     head.append(help, right);
-    // Three bands at one fixed height: At work, Payroll (reserve-panel.mjs fills it; it is never redrawn from here, so
-    // the amount field keeps its focus), Made this session. On a phone they stack, Payroll first.
+    // Three bands in two columns at one fixed height: At work at the left; at the right Payroll (reserve-panel.mjs fills
+    // it; it is never redrawn from here, so the amount field keeps its focus) over Made this session. On a phone they
+    // stack, Payroll first.
     grid = el('div', 'wf-dash-grid');
     workBand = el('div', 'wf-band wf-dash-band wf-dash-work');
     const payBand = el('div', 'wf-band wf-dash-band wf-dash-pay');

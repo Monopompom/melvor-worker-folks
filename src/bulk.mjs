@@ -26,7 +26,7 @@ export function install(ctx, { getHiring, model, time, popupDidRender, tips, log
   const done = (key, folks) => (folks.length === 1
     ? templateLangString(`${key}_ONE`, { name: folks[0].name })
     : templateLangString(key, { count: `${folks.length}` }));
-  const names = (folks) => folks.map((f) => f.name).join(', ');
+  const names = (folks) => folks.map((f) => f.name).join(getLangString('MOD_WF_LIST_SEP'));
   const swalClass = (cls) => (typeof createSwalCustomClass === 'function' ? createSwalCustomClass(cls) : cls);
   const room = () => hiring.room;
 
@@ -85,7 +85,7 @@ export function install(ctx, { getHiring, model, time, popupDidRender, tips, log
     }
     if (started.length > 0) notify('success', done('MOD_WF_BULK_STARTED', started));
     if (misses.length > 0) {
-      const lines = model.byReason(misses).map(([why, list]) => templateLangString(`MOD_WF_BULK_WHY_${why}`, { names: list.join(', ') }));
+      const lines = model.byReason(misses).map(([why, list]) => templateLangString(`MOD_WF_BULK_WHY_${why}`, { names: list.join(getLangString('MOD_WF_LIST_SEP')) }));
       notify(started.length > 0 ? 'info' : 'error', lines.join(' '));
     }
     log(`restart all: ${started.length} started, ${misses.length} not`);

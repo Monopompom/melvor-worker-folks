@@ -21,6 +21,12 @@ test('skill names: no names, no pattern', () => {
   assert.deepEqual(splitNames('Anything', null), ['Anything']);
 });
 
+test('skill names: Chinese names count only where set apart by a zero-width space, never inside an item name', () => {
+  const zh = namePattern(['魔法', '生活类魔法', '伐木']);
+  assert.deepEqual(splitNames('前往\u200b伐木\u200b页面', zh), ['前往\u200b', { name: '伐木' }, '\u200b页面']);
+  assert.deepEqual(splitNames('一瓶魔法药水', zh), ['一瓶魔法药水']);
+});
+
 const N = ' ';
 
 test('title ties: coordinates, articles, the last two words', async () => {

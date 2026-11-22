@@ -35,7 +35,7 @@ export function install(ctx, { getHiring, B, folkModel, BUILD, popupDidRender, l
   const ours = (o) => o?.namespace === NS;
   const voyageLoaded = () => { try { return game.registeredNamespaces.hasNamespace('voyage'); } catch { return false; } };
   const plural = (n, one, many) => t(n === 1 ? one : many, { n: num(n) });
-  const names = (list) => list.map((f) => f.name).join(', ');
+  const names = (list) => list.map((f) => f.name).join(getLangString('MOD_WF_LIST_SEP'));
   const bold = (x) => `<strong>${esc(x)}</strong>`;
 
   // ---- the popups' look: the help bands, a heading each, amber-edged where something is lost ----------------------
@@ -312,9 +312,9 @@ export function install(ctx, { getHiring, B, folkModel, BUILD, popupDidRender, l
       bank.push({ rows: itemRows(plan.add) });
       if (plan.add.length > SHOWN) bank.push(t('MOD_WF_RESTORE_ITEMS_MORE', { more: num(plan.add.length - SHOWN) }));
     }
-    if (plan.buys.length > 0) bank.push(t('MOD_WF_RESTORE_BUYS', { buys: plan.buys.map(([id]) => nameOf(game.shop.purchases, id)).join(', ') }));
-    if (plan.buildings.length > 0) bank.push(t('MOD_WF_RESTORE_BUILDINGS', { buildings: [...new Set(plan.buildings.map((x) => nameOf(game.township.buildings, x.id)))].join(', ') }));
-    if (plan.pets.length > 0) bank.push(t('MOD_WF_RESTORE_PETS', { pets: plan.pets.map((id) => nameOf(game.pets, id)).join(', ') }));
+    if (plan.buys.length > 0) bank.push(t('MOD_WF_RESTORE_BUYS', { buys: plan.buys.map(([id]) => nameOf(game.shop.purchases, id)).join(getLangString('MOD_WF_LIST_SEP')) }));
+    if (plan.buildings.length > 0) bank.push(t('MOD_WF_RESTORE_BUILDINGS', { buildings: [...new Set(plan.buildings.map((x) => nameOf(game.township.buildings, x.id)))].join(getLangString('MOD_WF_LIST_SEP')) }));
+    if (plan.pets.length > 0) bank.push(t('MOD_WF_RESTORE_PETS', { pets: plan.pets.map((id) => nameOf(game.pets, id)).join(getLangString('MOD_WF_LIST_SEP')) }));
     if (bank.length === 0) bank.push(t('MOD_WF_RESTORE_BANK_NONE'));
     sections.push({ head: t('MOD_WF_RESTORE_BANK_HEAD'), body: bank });
     // Voyage: Folks first, then Voyage's own backup; walkers stand still without it.

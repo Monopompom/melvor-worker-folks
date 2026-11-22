@@ -1243,7 +1243,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
           default: return b;
         }
       });
-      return [templateLangString('MOD_WF_PROMO_BLOCKED', { name: folk.name }), templateLangString('MOD_WF_PROMO_STILL_NEEDED', { needs: needs.join(', ') })];
+      return [templateLangString('MOD_WF_PROMO_BLOCKED', { name: folk.name }), templateLangString('MOD_WF_PROMO_STILL_NEEDED', { needs: needs.join(getLangString('MOD_WF_LIST_SEP')) })];
     }
 
     /** The Folk's gear back to the bank as far as it has space; returns what was lost, [{ id, qty }]. */
@@ -1394,7 +1394,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         if (!paid && wageOnly.has(key)) return;
         // A Newbie has no tier below; with Qualification switched off the perk is moot.
         if (key === 'qualify' && (folk.tier === 'Newbie' || this.qualification?.enabled() !== true)) return;
-        lines.push({ met: level >= at, text: `${at}: ${getLangString(`MOD_WF_PERK_${key}`)}` });
+        lines.push({ met: level >= at, text: templateLangString('MOD_WF_PERK_LINE', { at: String(at), text: getLangString(`MOD_WF_PERK_${key}`) }) });
       });
       return lines;
     }
