@@ -1,6 +1,6 @@
 {
   "name": "Worker Folks: Hiring",
-  "version": "1.11.4",
+  "version": "1.11.5",
   "namespace": "worker_folks",
   "setup": "setup.mjs",
   "icon": "assets/icon.svg"
