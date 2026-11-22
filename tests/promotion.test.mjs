@@ -7,10 +7,9 @@ test('promotion cost is 60% of the next hire price, rounded up', () => {
   assert.equal(promotionCost(1), 1);
 });
 
-test('diplomas by target tier, Expert depends on TotH', () => {
+test('diplomas by target tier', () => {
   assert.equal(diplomaFor('Junior'), 'melvorD:Amulet_of_Torture');
   assert.equal(diplomaFor('Expert'), 'melvorF:Elder_Crown');
-  assert.equal(diplomaFor('Expert', { hasTotH: true }), 'melvorTotH:FrostSpark_Amulet');
   assert.equal(diplomaFor('Newbie'), null);
 });
 

@@ -52,13 +52,14 @@ while you fight, raid or train something else.
 
 **Produce Rate** below 100 is the chance an action succeeds; a failed action gives nothing
 (crafting inputs are still used). Above 100, the excess is the chance of a second full
-batch. Folks never stun or hurt you in Thieving. Folks use everything you have earned
+batch. Folks never stun or hurt you in Thieving, and they steal in any realm whatever
+weapon you hold. Folks use everything you have earned
 (pets, shop upgrades, potions, Agility, Astrology, Township, mastery tokens) but **not**
 the equipment you wear.
 
 Higher Licences need the previous Licence, a Hiring level (20 / 40 / 60 / 80) and items
-from harder content. The Foreman Licence asks for different items depending on the
-expansions you own.
+from harder content. The Foreman Licence asks for an Ultima Godsword and two Elder Crowns,
+plus a Mystic Pure Crystal Staff and 100 Imbued Elder Dragonhide with Atlas of Discovery.
 
 ## Qualification
 
@@ -190,7 +191,7 @@ Abyssal NPCs hit Folks at a tenth of their listed damage.
 A Folk's card has **Promote** and **Fire** buttons. Promotion raises the Folk one tier and
 needs the target tier's Licence, the Folk's mastery (20 / 40 / 60 / 80 for Apprentice /
 Journeyman / Master / Foreman), a diploma item (Amulet of Torture, Amulet of Fury,
-Infernal Core, Elder Crown or FrostSpark Amulet with Throne of the Herald) and a fee of
+Infernal Core or Elder Crown) and a fee of
 60% of that tier's next hire price. The Folk keeps its skill, mastery and anything it
 carries, and keeps working if you still qualify it for its skill (the popup warns when the
 new tier needs more of your level). Firing asks for confirmation (listing what goes back to your

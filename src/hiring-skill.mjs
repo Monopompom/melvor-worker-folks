@@ -1130,7 +1130,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
     // ---- promotion and firing ---------------------------------------------------
 
     diplomaItem(targetTier) {
-      const id = promotion.diplomaFor(targetTier, { hasTotH: this.game.registeredNamespaces.hasNamespace('melvorTotH') });
+      const id = promotion.diplomaFor(targetTier);
       return id === null ? undefined : this.game.items.getObjectByID(id);
     }
 

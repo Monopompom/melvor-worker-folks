@@ -3,13 +3,13 @@
 export const NEXT_TIER = { Newbie: 'Junior', Junior: 'Middle', Middle: 'Senior', Senior: 'Expert', Expert: null };
 export const MASTERY_GATE = { Junior: 20, Middle: 40, Senior: 60, Expert: 80 };
 export const PROMOTION_COST_RATE = 0.6;
-/** Diploma item by target tier; Expert differs with Throne of the Herald. */
-export function diplomaFor(targetTier, { hasTotH = false } = {}) {
+/** Diploma item by target tier, the same with any expansion mix. */
+export function diplomaFor(targetTier) {
   switch (targetTier) {
     case 'Junior': return 'melvorD:Amulet_of_Torture';
     case 'Middle': return 'melvorD:Amulet_of_Fury';
     case 'Senior': return 'melvorF:Infernal_Core';
-    case 'Expert': return hasTotH ? 'melvorTotH:FrostSpark_Amulet' : 'melvorF:Elder_Crown';
+    case 'Expert': return 'melvorF:Elder_Crown';
     default: return null;
   }
 }

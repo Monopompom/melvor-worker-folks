@@ -37,26 +37,24 @@ export const LICENCE_DUNGEON = {
 
 /**
  * Items per licence. Within one licence no two items are of the same kind (one amulet, one bar, one weapon of each
- * sort...) in any expansion mix (decided 15 Oct 2026); the Expert expansion extras come from less played skills:
- * AoD Runecrafting 90 (Mystic Pure Crystal Staff) and Crafting 99 (Imbued Elder Dragonhide), ItA abyssal Crafting 51
- * (Obzurian Unnatural Vitality Ring) and abyssal Harvesting 55 (Voidfire Quartz, the Voidfire vein's 80% product).
+ * sort...) in any expansion mix (decided 15 Oct 2026). The Foreman list asks for no level above 99, so owning Throne
+ * of the Herald or Into the Abyss never puts the licence further away (22 Nov 2026, from a player's report). Atlas of
+ * Discovery adds two products of less played skills: Runecrafting 90 (Mystic Pure Crystal Staff) and Crafting 99
+ * (Imbued Elder Dragonhide).
  */
-export function licenceItems(tier, { hasTotH = false, hasAoD = false, hasItA = false } = {}) {
+export function licenceItems(tier, { hasAoD = false } = {}) {
   switch (tier) {
     case 'Newbie':
       return [item('melvorD:Amulet_of_Looting', 1), item('melvorD:Mithril_Platebody', 25), item('melvorD:Adamant_Arrows', 2000)];
     case 'Junior':
       return [item('melvorD:Amulet_of_Torture', 3), item('melvorD:Rune_Platebody', 25), item('melvorD:Magic_Logs', 5000)];
     case 'Middle':
-      return [item('melvorD:Amulet_of_Fury', 1), item('melvorD:Dragon_Platebody', 10), item('melvorD:Redwood_Longbow', 25), item('melvorD:Whale', 500)];
+      return [item('melvorD:Amulet_of_Fury', 10), item('melvorD:Dragon_Platebody', 10), item('melvorD:Redwood_Longbow', 25), item('melvorD:Whale', 500)];
     case 'Senior':
       return [item('melvorD:Fury_of_the_Elemental_Zodiac', 1), item('melvorF:Infernal_Core', 2), item('melvorF:Fire_Imbued_Wand', 5), item('melvorF:Summoning_Familiar_Dragon', 1000)];
     case 'Expert': {
-      const items = hasTotH
-        ? [item('melvorTotH:FrostSpark_Amulet', 1), item('melvorTotH:Divine_Platebody', 5), item('melvorTotH:Ethereal_Arrows', 5000)]
-        : [item('melvorF:Ultima_Godsword', 1), item('melvorF:Elder_Crown', 1)];
+      const items = [item('melvorF:Ultima_Godsword', 1), item('melvorF:Elder_Crown', 2)];
       if (hasAoD) items.push(item('melvorAoD:Mystic_Pure_Crystal_Staff', 1), item('melvorAoD:Imbued_Elder_Dragonhide', 100));
-      if (hasItA) items.push(item('melvorItA:Obzurian_Unnatural_Vitality_Ring', 1), item('melvorItA:Voidfire_Quartz', 100));
       return items;
     }
     default:

@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-11-21.269';
+export const BUILD = '2026-11-22.271';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -429,6 +429,7 @@ export async function setup(ctx) {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     rate: produceRate,
     createTablePool,
+    isDisabled: () => state.disabled,
     log,
   });
 

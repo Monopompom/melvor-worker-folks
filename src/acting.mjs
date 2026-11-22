@@ -3,7 +3,7 @@
 // roll (fail / ok / bonus) and tier flavour (no pets, interval, preservation,
 // crew bonus). Game-facing.
 
-export function install(ctx, { getHiring, rate, createTablePool, log }) {
+export function install(ctx, { getHiring, rate, createTablePool, isDisabled = () => false, log }) {
   let hiring;
   /** folk.id → { table, dirty, key, skillId, memo } */
   const tables = new Map();
@@ -261,16 +261,30 @@ export function install(ctx, { getHiring, rate, createTablePool, log }) {
 
   // 6. Thieving: the NPC's success rate still applies, but a Folk is never
   //    stunned and the player never takes damage.
+  //    The NPC's damage-type rule is about the weapon the player holds, so it never binds a Folk: not at the start
+  //    (asked inside startThieving, after its stop, so the Folk taking this start is the current one) and not on
+  //    each action below. A player stealing in person keeps the game's rule.
   if (typeof Thieving !== 'undefined') {
+    let starting;
+    ctx.patch(Thieving, 'startThieving').replace(function (original, area, npc) {
+      const outer = starting;
+      starting = this;
+      try {
+        return original(area, npc);
+      } finally {
+        starting = outer;
+      }
+    });
+    if (typeof ThievingNPC !== 'undefined') {
+      ctx.patch(ThievingNPC, 'canUseWithDamageType').replace(function (original, damageType) {
+        if (starting !== undefined && !isDisabled() && hiring?.actorFor(starting) !== undefined) return true;
+        return original(damageType);
+      });
+    }
     ctx.patch(Thieving, 'preAction').replace(function (original) {
       const acting = hiring?.acting;
       if (acting === undefined || acting.skill !== this) return original();
       if (this.currentNPC === undefined) return original();
-      if (!this.currentNPC.canUseWithDamageType(this.game.combat.player.damageType) && this.isActive) {
-        this.notifyIncorrectDamageType(this.currentNPC);
-        this.stop();
-        return undefined;
-      }
       if (acting.outcome !== 'fail' && !rollPercentage(this.getNPCSuccessRate(this.currentNPC))) {
         acting.outcome = 'fail';
         hiring.lastOutcome = 'fail';
