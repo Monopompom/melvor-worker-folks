@@ -103,18 +103,23 @@ export function reserveLow(hoursCovered, reserve, threshold = RESERVE_WARN_HOURS
   return reserve > 0 && hoursCovered < threshold;
 }
 
-export function severance(nextHirePrice) {
-  return Math.ceil(nextHirePrice * SEVERANCE_RATE);
+/** Severance on settling a strike: a share (`rate`, 0–1) of the next hire's price. */
+export function severance(nextHirePrice, rate = SEVERANCE_RATE) {
+  return Math.ceil(nextHirePrice * Math.max(0, rate));
 }
 
-/** Settlement = owed wages + severance; apology adds 2 more severances (×3 in total) and skips the cooldown. */
-export function settlement(debt, nextHirePrice, { apology = false } = {}) {
-  const sev = severance(nextHirePrice);
-  return { debt, severance: sev, total: debt + (apology ? sev * APOLOGY_MULTIPLIER : sev) };
+/**
+ * Settlement = owed wages + severance; an apology pays the severance `apologyMultiplier` times in all (×3 by default)
+ * and skips the cooldown.
+ */
+export function settlement(debt, nextHirePrice, { apology = false, rate = SEVERANCE_RATE, apologyMultiplier = APOLOGY_MULTIPLIER } = {}) {
+  const sev = severance(nextHirePrice, rate);
+  return { debt, severance: sev, total: debt + (apology ? sev * apologyMultiplier : sev) };
 }
 
-export function cooldownAfterSettlement(tier, { apology = false } = {}) {
-  return apology ? 0 : COOLDOWN_TICKS[tier];
+/** Cooldown ticks after a settled strike: the tier's, times `factor` (the cooldown setting); none after an apology. */
+export function cooldownAfterSettlement(tier, { apology = false, factor = 1 } = {}) {
+  return apology ? 0 : Math.round(COOLDOWN_TICKS[tier] * Math.max(0, factor));
 }
 
 export function tickCooldown(cooldownTicks, ticks) {

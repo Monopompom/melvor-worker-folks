@@ -172,12 +172,52 @@ export function install(ctx, { getHiring, model, rate, log }) {
     })));
   };
 
+  /** The recipe, tree or NPC open on the page when the player can't do it yet (level, abyssal level, mastery), or null. */
+  const lockedAction = (skill) => {
+    try {
+      const action = skill.masteryAction;
+      if (action === undefined || action === null || typeof skill.isMasteryActionUnlocked !== 'function') return null;
+      return skill.isMasteryActionUnlocked(action) ? null : action;
+    } catch {
+      return null; // nothing selected: the getter throws in some skills
+    }
+  };
+
+  /**
+   * A skill this file can estimate (it says nothing for the others). The game's classes are top-level declarations,
+   * not window properties, so each is named here as in readRecipe.
+   */
+  const knows = (skill) => (typeof Thieving !== 'undefined' && skill instanceof Thieving)
+    || (typeof Woodcutting !== 'undefined' && skill instanceof Woodcutting)
+    || (typeof Fishing !== 'undefined' && skill instanceof Fishing)
+    || (typeof Mining !== 'undefined' && skill instanceof Mining)
+    || (typeof Cooking !== 'undefined' && skill instanceof Cooking)
+    || (typeof AltMagic !== 'undefined' && skill instanceof AltMagic)
+    || (typeof Firemaking !== 'undefined' && skill instanceof Firemaking)
+    || typeof skill.getCurrentRecipeCosts === 'function';
+
+  /**
+   * Why the Worker popup shows no net line on its tiles ('' when it does, or the skill has no estimate at all): the
+   * page has nothing picked, or what it has is still locked for the player, and so for every Folk.
+   */
+  const profitWhy = (skill) => {
+    if (skill === undefined || !knows(skill)) return '';
+    const locked = lockedAction(skill);
+    if (locked !== null) return templateLangString('MOD_WF_NET_LOCKED', { action: String(locked.name ?? '') });
+    let read;
+    try { read = readRecipe(skill); } catch { read = null; }
+    return read === null || read === undefined ? getLangString('MOD_WF_NET_NONE') : '';
+  };
+
   /**
    * The estimate for `folk` on the recipe open on `skill`'s page:
    * { actionsPerHour, makes, spends, wage, courier, net, wageCounted } per hour in GP, or null when there is none.
    */
   const profitOf = (folk, skill) => {
     if (folk === undefined || skill === undefined || typeof hiring?.asFolk !== 'function') return null;
+    // A Folk works with your levels: what you can't start yet, it can't either (round 2: a net showed for an NPC
+    // above your Thieving level).
+    if (lockedAction(skill) !== null) return null;
     let read;
     try {
       read = hiring.asFolk(folk, skill, () => readRecipe(skill));
@@ -209,5 +249,6 @@ export function install(ctx, { getHiring, model, rate, log }) {
   ctx.onModsLoaded(() => {
     hiring = getHiring();
     hiring.profitOf = profitOf;
+    hiring.profitWhy = profitWhy;
   });
 }

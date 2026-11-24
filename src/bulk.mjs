@@ -82,10 +82,23 @@ export function install(ctx, { swalClass, getHiring, model, time, popupDidRender
       if (why === '') started.push(r.folk);
       else misses.push({ why, name: r.folk.name });
     }
-    if (started.length > 0) notify('success', done('MOD_WF_BULK_STARTED', started));
-    if (misses.length > 0) {
-      const lines = model.byReason(misses).map(([why, list]) => templateLangString(`MOD_WF_BULK_WHY_${why}`, { names: list.join(getLangString('MOD_WF_LIST_SEP')) }));
-      notify(started.length > 0 ? 'info' : 'error', lines.join(' '));
+    const lines = model.byReason(misses).map(([why, list]) => templateLangString(`MOD_WF_BULK_WHY_${why}`, { names: list.join(getLangString('MOD_WF_LIST_SEP')) }));
+    if (lines.length === 0) {
+      if (started.length > 0) notify('success', done('MOD_WF_BULK_STARTED', started));
+    } else {
+      // Some stayed idle: who and why in a popup, one line per reason, never a toast that goes by unread (round 2).
+      const body = el('div', 'text-center wf-help-body wf-bulk');
+      if (started.length > 0) body.append(line(done('MOD_WF_BULK_STARTED', started), 'font-w600 text-success'));
+      // Each reason its own paragraph, set apart as Settle all's groups are: a list of names runs over several lines.
+      lines.forEach((text, i) => body.append(line(text, i > 0 || started.length > 0 ? 'wf-bulk-head' : '')));
+      SwalLocale.fire({
+        didRender: popupDidRender,
+        title: getLangString('MOD_WF_BULK_RESTART'),
+        width: '32rem',
+        html: body,
+        confirmButtonText: getLangString('MOD_WF_BUTTON_CLOSE'),
+        customClass: swalClass(),
+      });
     }
     log(`restart all: ${started.length} started, ${misses.length} not`);
   };

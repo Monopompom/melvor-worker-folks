@@ -62,7 +62,9 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
             picks.set(value, resume.selectionOf(value));
             hiring.renderQueue.folks = true;
             log(`delegated: ${value.id}`);
-            hiring.events.emit('folkStarted', { skill: value, folk: folkFor(value) });
+            const started = folkFor(value);
+            if (started !== undefined) hiring.stopNotes.delete(started.id);
+            hiring.events.emit('folkStarted', { skill: value, folk: started });
             return; // main slot untouched
           }
           if (value === undefined && hiring.stopping !== undefined) {
@@ -228,7 +230,7 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
           // A Folk's error never stops the game loop (it escaped Game.tick and repeated on every reload, build .136):
           // the skill is stopped and released, the error logged.
           log(`${skill.id}: a delegated tick failed, the Folk stops`, err);
-          try { hiring.forceStop(skill); } catch (e) { log('stop after the failed tick failed', e); }
+          try { hiring.forceStop(skill, getLangString('MOD_WF_STOP_ERROR')); } catch (e) { log('stop after the failed tick failed', e); }
           hiring.release(skill);
         }
       }

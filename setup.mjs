@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-11-24.309';
+export const BUILD = '2026-11-24.313';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -73,7 +73,7 @@ export async function setup(ctx) {
   const time = await ctx.loadModule('src/time-format.mjs');
   // A big number in a short form ("2.5M") where the full one is too long to read at a glance.
   const numbers = await ctx.loadModule('src/number-format.mjs');
-  const wages = await ctx.loadModule('src/wages.mjs');
+  const wagesRules = await ctx.loadModule('src/wages.mjs');
   const perks = await ctx.loadModule('src/mastery-perks.mjs');
   const promotion = await ctx.loadModule('src/promotion.mjs');
   const loadoutRules = await ctx.loadModule('src/loadout-model.mjs');
@@ -113,7 +113,13 @@ export async function setup(ctx) {
   const resume = await ctx.loadModule('src/resume.mjs');
   const payroll = await ctx.loadModule('src/payroll.mjs');
   const dev = DEV ? await ctx.loadModule('src/dev.mjs') : null;
-  const pricing = await ctx.loadModule('src/pricing.mjs');
+  const pricingRules = await ctx.loadModule('src/pricing.mjs');
+  // Tuning settings (polish round, 24 Nov 2026): every module prices hires and settles strikes through these, so the
+  // Mod Settings knobs reach the Shop, payroll, promotions and Forget alike. At the defaults they are the plain rules.
+  const tuningRules = await ctx.loadModule('src/tuning-model.mjs');
+  const tuning = (await ctx.loadModule('src/tuning.mjs')).create(ctx, { model: tuningRules, log });
+  const pricing = tuningRules.tunedPricing(pricingRules, tuning.value);
+  const wages = tuningRules.tunedWages(wagesRules, tuning.value);
   const shop = await ctx.loadModule('src/shop.mjs');
   const hiringModule = await ctx.loadModule('src/hiring-skill.mjs');
   const delegationRules = await ctx.loadModule('src/delegation-model.mjs');
@@ -180,7 +186,7 @@ export async function setup(ctx) {
   let backupApi;
   ctx.api(apiModule.createApi({ getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'), model: folkModel, pricing, getBackup: () => (state.disabled ? undefined : backupApi),
     rules: { promotion: { level: milestones.PROMOTION_LEVEL, mastery: promotion.MASTERY_GATE, costRate: promotion.PROMOTION_COST_RATE }, slotCaps: pricing.SHIFT_SLOT_CAP,
-      tiers: { hireBase: pricing.HIRE_BASE_PRICE, wages: wages.WAGE_PER_HOUR, produceRates: produceRate.RATE_BY_TIER,
+      tiers: { get hireBase() { return pricing.hireBasePrice(); }, wages: wages.WAGE_PER_HOUR, produceRates: produceRate.RATE_BY_TIER,
         hiringXPPerHour: milestones.HIRING_XP_PER_HOUR, qualification: qualificationRules.QUALIFICATION_LEVELS },
       levels: { workOrders: workOrderRules.BOARD_LEVEL, marks: milestones.MARKS_LEVEL, marksShare: milestones.folkMarkShare(milestones.MARKS_LEVEL),
         crewBonus: { per: produceRate.CREW_BONUS_PER_EXPERT, max: produceRate.CREW_BONUS_MAX, topLevel: milestones.CREW_CAP_LEVEL, topMax: milestones.crewBonusMax(milestones.CREW_CAP_LEVEL) },
@@ -532,6 +538,9 @@ export async function setup(ctx) {
     popupDidRender,
     log,
   });
+
+  // 11b. Tuning settings: added last, so they come after the older settings in Hiring and Wages.
+  tuning.register({ getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'), shop: shopData });
 
   // 12. Backups (the user, 5 Nov 2026): Back up and Restore at the Hiring page's foot, by hand only. A failure: no buttons.
   let backup;

@@ -190,7 +190,8 @@ export function install(ctx, { swalClass, getHiring, model, milestones, bulk, la
     };
     if ((hiring?.crew?.size ?? 0) === 0) band(getLangString('MOD_WF_TIP_START_HEAD'), ...paragraphs(getLangString('MOD_WF_TIP_START')));
     for (const t of model.tipNumbers(hiring?.payroll?.enabled !== false)) {
-      band(getLangString(`MOD_WF_TIP_${t}_HEAD`), ...paragraphs(getLangString(`MOD_WF_TIP_${t}`)), ...(t === 12 ? [capacityTable()] : []));
+      // A tip may quote a setting (the strike tip: severance and apology as they are set now).
+      band(getLangString(`MOD_WF_TIP_${t}_HEAD`), ...paragraphs(templateLangString(`MOD_WF_TIP_${t}`, hiring?.tuning?.tipVars?.() ?? {})), ...(t === 12 ? [capacityTable()] : []));
     }
     const cls = { popup: 'wf-ui', confirmButton: 'btn btn-success m-1' };
     SwalLocale.fire({
@@ -258,7 +259,9 @@ export function install(ctx, { swalClass, getHiring, model, milestones, bulk, la
       // Its skill, or its job (named and drawn as a skill; a job has no action line).
       const skill = hiring.workOf(folk);
       const action = skill?.isJob === true ? null : hiring.currentAction(skill);
-      const skillText = skill === undefined ? getLangString('MOD_WF_UNASSIGNED') : hiring.skillName(skill);
+      // A Folk walking alone (Voyage) is on the road, not "Unassigned" (round 2 finding): the card says so too.
+      const skillText = skill !== undefined ? hiring.skillName(skill)
+        : getLangString(folk.travel === 'walking' ? 'MOD_WF_ATWORK_WALKING' : 'MOD_WF_UNASSIGNED');
       return {
         id: folk.id,
         slot: folk.slot,

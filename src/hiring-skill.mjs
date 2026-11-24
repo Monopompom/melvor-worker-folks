@@ -71,6 +71,11 @@ export function createHiringClass({ swalClass, popupDidRender, titleName = (s) =
        * starts; null means the player takes the skill over at its next start.
        */
       this.pending = new Map();
+      /**
+       * folk id → { skillId, text }: why the mod last stopped this Folk on that skill (not saved). An Idle tile and the
+       * skill page's Worker box say it until the Folk starts again, leaves the skill or the game reloads.
+       */
+      this.stopNotes = new Map();
       /** Testing aid: extra Shift Slots granted by the dev console (not saved). */
       this.devExtraShiftSlots = 0;
       /** { folk, skill, table, outcome } while a delegated skill resolves (acting.mjs). */
@@ -267,8 +272,9 @@ export function createHiringClass({ swalClass, popupDidRender, titleName = (s) =
      * cleared first (the engine does the same in its own stopOnDeath). When the
      * engine still refuses (Golbin Raid) the skill is dropped from the roster.
      */
-    forceStop(skill) {
+    forceStop(skill, why) {
       if (skill === undefined || !this.delegated.has(skill)) return; // never touches the player's own run
+      if (typeof why === 'string' && why !== '') this.noteStop(this.crew.bySkill(skill.id), skill, why);
       if (skill.stunTimer !== undefined && 'stunState' in skill) {
         skill.stunState = 0;
         skill.stunTimer.stop();
@@ -285,6 +291,31 @@ export function createHiringClass({ swalClass, popupDidRender, titleName = (s) =
       // (acting.mjs clears it); outside one, nothing should keep ticking.
       if (!skill.isActive && skill.actionTimer?.isActive && this.acting?.skill !== skill) skill.actionTimer.stop();
       skill.renderQueue.progressBar = true;
+    }
+
+    /**
+     * Keeps why the mod stopped this Folk on `skill`, for its Idle line; `still` (optional) says whether the cause
+     * lasts, so the line goes once it is gone (the room emptied).
+     */
+    noteStop(folk, skill, text, still) {
+      if (folk === undefined || skill === undefined || typeof text !== 'string' || text === '') return;
+      this.stopNotes.set(folk.id, { skillId: skill.id, text, still });
+      this.renderQueue.folks = true;
+    }
+
+    /**
+     * Why an idle Folk on a skill isn't working, '' when there is nothing to say: no free Shift Slot for its start, or
+     * why the mod last stopped it there. Strikes, cooldowns and refusals where it stands have their own lines.
+     */
+    idleWhy(folk) {
+      if (folk === undefined || folk.skillId === null || folk.job !== null || this.statusOf(folk) !== 'idle') return '';
+      if (this.slotsUsed >= this.shiftSlots) return getLangString('MOD_WF_IDLE_NO_SLOT');
+      const note = this.stopNotes.get(folk.id);
+      if (note === undefined || note.skillId !== folk.skillId) return '';
+      try {
+        if (typeof note.still === 'function' && !note.still()) return '';
+      } catch { return ''; }
+      return note.text;
     }
 
     /** What a delegated skill is doing right now (tree, recipe, NPC...) as `{ name, media }`, or null. */
@@ -327,12 +358,15 @@ export function createHiringClass({ swalClass, popupDidRender, titleName = (s) =
       if (p === null || p === undefined) return null;
       const gp = this.game.currencies.getObjectByID('melvorD:GP');
       const currency = gp?.name ?? 'GP';
-      // Rounded before the sign, so a net of -0.4 reads "+0", never "-0".
-      const signed = (n) => { const r = Math.round(n); return `${r < 0 ? '-' : '+'}${numbers.shortNumber(Math.abs(r))}`; };
-      const tip = [getLangString('MOD_WF_CTRL_NET_TIP'), templateLangString('MOD_WF_CTRL_NET_MAKES', { amount: signed(p.makes), currency })];
-      if (p.spends > 0) tip.push(templateLangString('MOD_WF_CTRL_NET_INPUTS', { amount: signed(-p.spends), currency }));
-      if (p.wageCounted && p.wage > 0) tip.push(templateLangString('MOD_WF_CTRL_NET_WAGE', { amount: signed(-p.wage), currency }));
-      if (p.courier > 0) tip.push(templateLangString('MOD_WF_CTRL_NET_COURIER', { amount: signed(-p.courier), currency }));
+      // Rounded before the sign, so a net of -0.4 reads "+0", never "-0". The tile's line is short (412K); its tooltip
+      // gives every sum in full, all in one format (round 2: "+9818" beside "-32.7K").
+      const signed = (n, form = numbers.shortNumber) => { const r = Math.round(n); return `${r < 0 ? '-' : '+'}${form(Math.abs(r))}`; };
+      const full = (n) => signed(n, numberWithCommas);
+      const tip = [getLangString('MOD_WF_CTRL_NET_TIP'), templateLangString('MOD_WF_CTRL_NET_MAKES', { amount: full(p.makes), currency })];
+      if (p.spends > 0) tip.push(templateLangString('MOD_WF_CTRL_NET_INPUTS', { amount: full(-p.spends), currency }));
+      if (p.wageCounted && p.wage > 0) tip.push(templateLangString('MOD_WF_CTRL_NET_WAGE', { amount: full(-p.wage), currency }));
+      if (p.courier > 0) tip.push(templateLangString('MOD_WF_CTRL_NET_COURIER', { amount: full(-p.courier), currency }));
+      tip.push({ text: templateLangString('MOD_WF_CTRL_NET', { amount: full(p.net), currency }), cls: 'font-w600' });
       tip.push({ text: getLangString('MOD_WF_CTRL_NET_LEFT_OUT'), cls: 'text-muted' });
       return {
         segments: [{ icon: gp?.media, text: templateLangString('MOD_WF_CTRL_NET', { amount: signed(p.net), currency }) }],
@@ -395,6 +429,10 @@ export function createHiringClass({ swalClass, popupDidRender, titleName = (s) =
       const skill = this.skillOf(folk);
       const cls = `wf-text-${status} font-w700`;
       lines.push({ icon: this.getMediaURL(`assets/status_${status}.webp`), text: getLangString(`MOD_WF_STATUS_${status}`), cls });
+      // Idle for a reason (no free Shift Slot, stopped by the mod): one short amber line. A tile that can't be picked
+      // gives its reason on hover and in a toast instead, never on the tile.
+      const idle = this.pickRefusal(folk, pageSkill) === '' ? this.idleWhy(folk) : '';
+      if (idle !== '') lines.push({ text: idle, cls: 'text-warning' });
       const where = this.whereText(folk);
       if (where !== '') lines.push({ text: where, cls: 'wf-subtle' });
       // On a job: its icon and name, as a skill's line.
@@ -1519,7 +1557,8 @@ export function createHiringClass({ swalClass, popupDidRender, titleName = (s) =
 
     tierEffects(tier) {
       const mods = produceRate.tierModifiers(tier, { preservationDisabled: !!this.game.currentGamemode.disablePreservation });
-      const pct = (n) => `${n > 0 ? '+' : n < 0 ? '-' : ''}${Math.abs(n)}%`;
+      // The game's percent, so German and French get their space before "%" as in the badges beside these lines.
+      const pct = (n) => `${n > 0 ? '+' : n < 0 ? '-' : ''}${formatPercent(Math.abs(n), Number.isInteger(n) ? 0 : 1)}`;
       const piece = (key, value, tone, extra = {}) => {
         const [before, after = ''] = templateLangString(key, { ...extra, value: '\u0001' }).split('\u0001');
         return { before, value, after, tone };

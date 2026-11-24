@@ -193,6 +193,15 @@ export function install(ctx, { swalClass, fireQuick, getHiring, isDisabled = () 
     const n = root.childElementCount;
     root.style.setProperty('--wf-cols3', `${Math.max(1, Math.min(n, 3))}`);
     root.style.setProperty('--wf-cols2', `${Math.max(1, Math.min(n, 2))}`);
+    // No net GP/h on the tiles: said once, over them, not on every tile (round 2 finding).
+    let netWhy = '';
+    try { netWhy = options.length > 0 ? hiring.profitWhy?.(skill) ?? '' : ''; } catch (err) { log('net hint failed', err); }
+    if (netWhy !== '') {
+      const hint = document.createElement('p');
+      hint.className = 'wf-worker-hint';
+      hint.textContent = netWhy;
+      root.prepend(hint);
+    }
     fireQuick({
       didRender: popupDidRender,
       title: templateLangString('MOD_WF_CTRL_PICK_TITLE', { skill: hiring.skillName(skill) }),
@@ -271,6 +280,11 @@ export function install(ctx, { swalClass, fireQuick, getHiring, isDisabled = () 
       // Not qualified yet, or refused where it stands (Voyage): idle with the reason, in amber, never "start any action".
       status = templateLangString('MOD_WF_CTRL_REFUSED', { name: holder.name, reason: hiring.workRefusal(holder, skill) });
       tone = 'text-warning font-w600';
+    } else if (!working && hiring.idleWhy(holder) !== '') {
+      // Every Shift Slot taken, or stopped by the mod (haul full): the start would be refused, so not "start any
+      // action" but why, in amber, beside the skill's own start button (round 2 finding: only a toast said so).
+      status = templateLangString('MOD_WF_CTRL_REFUSED', { name: holder.name, reason: hiring.idleWhy(holder) });
+      tone = 'text-warning font-w600';
     } else if (!working) {
       // Ready to work is news, not a footnote: normal text, not muted (build .55); "idle" like the card (B-38).
       status = templateLangString('MOD_WF_CTRL_READY', { name: holder.name });
@@ -346,14 +360,15 @@ export function install(ctx, { swalClass, fireQuick, getHiring, isDisabled = () 
       });
     });
     hiring.events.on('folkStruck', renderAll);
-    // A cooling-down Folk's time left counts down in the box (build .112): its open page redraws once a second, and
-    // only the line that changed is written.
+    // A cooling-down Folk's time left counts down in the box (build .112), an idle one's reason follows the Shift Slots:
+    // its open page redraws once a second, and only the line that changed is written.
     setInterval(() => {
       if (heldOffline && game._isInOnlineLoop) renderAll();
       const open = game.openPage;
       controls.forEach((root, skill) => {
         const holder = hiring.crew.bySkill(skill.id);
-        if (holder === undefined || !(holder.cooldownTicks > 0)) return;
+        // An idle Folk's line follows the Shift Slots too (one bought in the Shop, a Folk stopped on another page).
+        if (holder === undefined || (!(holder.cooldownTicks > 0) && hiring.delegated.has(skill))) return;
         if (open !== undefined && !(open.action === skill || open.skills?.includes?.(skill))) return;
         renderOne(skill, root);
       });

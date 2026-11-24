@@ -186,6 +186,7 @@ export function install(ctx, { getHiring, model, depotModel, resume, time, tips,
       // No space for this action's work: its items are kept all the same, and the Folk stops after it (acting.mjs
       // stops the timer the action would restart).
       acting.roomOver = true;
+      hiring.noteStop(folk, acting.skill, getLangString(haul ? 'MOD_WF_STOP_HAUL_FULL' : 'MOD_WF_STOP_ROOM_FULL'), () => isFull(folk));
       if (acting.skill.isActive) acting.skill.stop();
       if (!blocked.has(folk.id)) {
         blocked.add(folk.id);
@@ -935,6 +936,7 @@ export function install(ctx, { getHiring, model, depotModel, resume, time, tips,
     stopFull(folk) {
       const skill = hiring.skillOf(folk);
       if (skill === undefined || !hiring.delegated.has(skill)) return false;
+      hiring.noteStop(folk, skill, getLangString('MOD_WF_STOP_HAUL_FULL'), () => isFull(folk));
       hiring.forceStop(skill);
       if (!blocked.has(folk.id)) {
         blocked.add(folk.id);

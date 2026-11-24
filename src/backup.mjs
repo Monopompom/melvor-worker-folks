@@ -15,7 +15,10 @@
 const SWAL = { popup: 'wf-ui', confirmButton: 'btn btn-success m-1', cancelButton: 'btn btn-outline-info m-1' };
 const SWAL_WARN = { ...SWAL, confirmButton: 'btn btn-warning m-1' };
 /** Settings by section, as the slices register them (the names are the saved keys). */
-const SETTINGS = { Hiring: ['hiringXPRate', 'quietFolkPopups', 'qualification', 'fastMasteryDisplays'], Wages: ['wageDifficulty', 'abyssalWagesInAP'] };
+const SETTINGS = {
+  Hiring: ['hiringXPRate', 'quietFolkPopups', 'qualification', 'fastMasteryDisplays', 'hirePriceGrowth', 'slotPriceGrowth', 'slotBasePrice', 'priceMultiplier', 'altMagicForFolks'],
+  Wages: ['wageDifficulty', 'abyssalWagesInAP', 'severanceRate', 'apologyMultiplier', 'strikeCooldown'],
+};
 /** Why a pasted code was refused (backup-model decode's reasons), as literal keys. */
 const WHY = {
   empty: 'MOD_WF_RESTORE_WHY_EMPTY', notCode: 'MOD_WF_RESTORE_WHY_NOTCODE', voyage: 'MOD_WF_RESTORE_WHY_VOYAGE',

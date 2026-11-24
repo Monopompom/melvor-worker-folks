@@ -71,9 +71,9 @@ const FALLBACK = {
   MOD_WF_SHOP_LICENCE_DESC: 'Allows hiring and promoting ${roles} (Produce Rate ${rate}).',
   MOD_WF_SHOP_LICENCE_SLOT: 'Grants 1 Shift Slot (Folks working at the same time).',
   MOD_WF_SHOP_HIRE_NAME: 'Hire ${aRole}',
-  MOD_WF_SHOP_HIRE_DESC: 'Adds one unassigned ${role} (Produce Rate ${rate}) to your crew. The price rises by 20% for every ${role} you own. Your crew can never exceed the number of skills Folks can hold.',
+  MOD_WF_SHOP_HIRE_DESC: 'Adds one unassigned ${role} (Produce Rate ${rate}) to your crew. The price rises by ${growth} for every ${role} you own. Your crew can never exceed the number of skills Folks can hold.',
   MOD_WF_SHOP_SLOT_NAME: 'Shift Slot',
-  MOD_WF_SHOP_SLOT_DESC: 'One more Folk may work at the same time. The price rises by 40% per slot. Your highest Licence caps the slots: Trainee 2, Apprentice 4, Journeyman 7, Master 10, Foreman one per skill Folks can hold.',
+  MOD_WF_SHOP_SLOT_DESC: 'One more Folk may work at the same time. The price rises by ${growth} per slot. Your highest Licence caps the slots: Trainee 2, Apprentice 4, Journeyman 7, Master 10, Foreman one per skill Folks can hold.',
 };
 export const fallbackText = (key, vars = {}) => (FALLBACK[key] ?? key).replace(/\$\{(\w+)\}/g, (_, k) => `${vars[k] ?? ''}`);
 
@@ -98,7 +98,10 @@ export function licencePurchase(tier, expansions, t = fallbackText) {
   };
 }
 
-export function hirePurchase(tier, t = fallbackText) {
+/** How much each next hire or Shift Slot costs more, as the descriptions say it (the Mod Settings can change both). */
+export const DEFAULT_GROWTH_TEXT = { hire: '20%', slot: '40%' };
+
+export function hirePurchase(tier, t = fallbackText, growth = DEFAULT_GROWTH_TEXT.hire) {
   const role = t(`MOD_WF_ROLE_${tier}`);
   return {
     ...base,
@@ -109,11 +112,11 @@ export function hirePurchase(tier, t = fallbackText) {
     purchaseRequirements: [{ type: 'ShopPurchase', purchaseID: `worker_folks:Licence_${tier}`, count: 1 }],
     defaultBuyLimit: 0,
     customName: t('MOD_WF_SHOP_HIRE_NAME', { role, aRole: t(`MOD_WF_A_ROLE_${tier}`) }),
-    customDescription: t('MOD_WF_SHOP_HIRE_DESC', { role, rate: `${RATE[tier]}%` }),
+    customDescription: t('MOD_WF_SHOP_HIRE_DESC', { role, rate: `${RATE[tier]}%`, growth }),
   };
 }
 
-export function shiftSlotPurchase(t = fallbackText) {
+export function shiftSlotPurchase(t = fallbackText, growth = DEFAULT_GROWTH_TEXT.slot) {
   return {
     ...base,
     id: 'Shift_Slot',
@@ -123,7 +126,7 @@ export function shiftSlotPurchase(t = fallbackText) {
     purchaseRequirements: [{ type: 'ShopPurchase', purchaseID: 'worker_folks:Licence_Newbie', count: 1 }],
     defaultBuyLimit: 0,
     customName: t('MOD_WF_SHOP_SLOT_NAME'),
-    customDescription: t('MOD_WF_SHOP_SLOT_DESC'),
+    customDescription: t('MOD_WF_SHOP_SLOT_DESC', { growth }),
   };
 }
 

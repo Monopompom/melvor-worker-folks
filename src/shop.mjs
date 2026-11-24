@@ -8,6 +8,8 @@ export function install(ctx, { getHiring, pricing, licencePurchase, hirePurchase
   /** cost object (as the shop passes it to getCurrencyCost) → tier */
   const hireCostTier = new WeakMap();
   const shiftSlotCost = new WeakSet();
+  /** A Licence's currency costs: the price multiplier setting scales them (its items stay as they are). */
+  const licenceCost = new WeakSet();
   const hireTier = new Map();
   const licenceTier = new Map();
   let shiftSlot;
@@ -51,7 +53,9 @@ export function install(ctx, { getHiring, pricing, licencePurchase, hirePurchase
     }
     for (const [tier, localId] of Object.entries(licencePurchase)) {
       const purchase = hiring.purchase(localId);
-      if (purchase !== undefined) licenceTier.set(purchase, tier);
+      if (purchase === undefined) continue;
+      licenceTier.set(purchase, tier);
+      [purchase._defaultCosts, ...purchase._costs.values()].forEach((costs) => costs?.currencies.forEach((c) => licenceCost.add(c)));
     }
     shiftSlot = hiring.purchase(shiftSlotPurchase);
     if (shiftSlot !== undefined) {
@@ -108,9 +112,11 @@ export function install(ctx, { getHiring, pricing, licencePurchase, hirePurchase
     game.shop.renderQueue.requirements = true;
   };
 
-  // 1. Prices: hires = base × 1.2^(owned of that tier); Shift Slot = 3M × 1.4^(n−1).
+  // 1. Prices: hires = base × 1.2^(owned of that tier); Shift Slot = 3M × 1.4^(n−1); Licences as the data says. The
+  //    tuning settings change the growths, the slot base and a multiplier on all three (pricing passed in is tuned).
   ctx.patch(Shop, 'getCurrencyCost').replace(function (original, cost, buyQuantity, boughtQuantity) {
     if (hiring === undefined) return original(cost, buyQuantity, boughtQuantity);
+    if (licenceCost.has(cost)) return Math.round(original(cost, buyQuantity, boughtQuantity) * (pricing.priceMultiplier?.() ?? 1));
     if (shiftSlotCost.has(cost)) {
       let total = 0;
       for (let i = 0; i < buyQuantity; i += 1) total += shiftSlotPrice(boughtQuantity + i);

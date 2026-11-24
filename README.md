@@ -483,6 +483,15 @@ mastery bars and mastery pool bars are updated without searching the whole page 
 and the GP shown after a wage and the Completion Log's progress are redrawn at most a few times a second;
 off brings back the game's own way, in case a bar or an amount from another mod stops updating).
 
+Prices and strikes can be tuned either way from the defaults. In the Hiring section: **Hire price growth**
+(each hire costs ×1.2 the last one of its rank; ×1.05 to ×2), **Shift Slot price growth** (×1.4; ×1.1 to ×2.5),
+**Shift Slot base price** (3,000,000 GP; 300,000 to 30,000,000), a **Price multiplier** for the GP prices of
+Licences, hires and Shift Slots, and with them severance, promotions and Forget (×1; ×0.1 to ×5; the items a
+Licence asks for stay as they are), and whether **Folks may work Alt. Magic** (on by default; off stops any Folk on
+it). In the Wages section: **Severance** (5% of the next hire price; 0 to 25), the **Apology** (×3 the severance;
+×1 to ×10) and the **Strike cooldown** (×1 of 30 min for a Trainee to 8 h for a Foreman; ×0.25 to ×4). A value
+outside the limits is refused with the limits.
+
 ## Languages
 
 Every text of the mod comes from its language files. It ships in English, German, French,

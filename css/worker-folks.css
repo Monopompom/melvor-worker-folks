@@ -329,6 +329,9 @@ html.wf-popup-steady { scrollbar-gutter: stable; }
 .wf-worker-grid { display: grid; grid-template-columns: repeat(var(--wf-cols3, 3), 19.5rem); gap: 8px; justify-content: center; text-align: left; }
 @media (max-width: 1199.98px) { .wf-worker-grid { grid-template-columns: repeat(var(--wf-cols2, 2), 19.5rem); } }
 @media (max-width: 767.98px) { .wf-worker-popup { width: 96vw !important; } .wf-worker-grid { grid-template-columns: 1fr; } }
+/* Why the tiles show no net GP/h (nothing picked on the page, or it is locked): one line over the whole grid, wrapped
+   to the columns' width so it never widens the popup. */
+.wf-worker-hint { grid-column: 1 / -1; margin: 0; font-size: .9rem; line-height: 1.3; text-align: center; color: var(--wf-subtle); }
 .wf-worker-tile { display: flex; align-items: flex-start; gap: 8px; padding: 8px; border: 1px solid var(--wf-line); border-radius: 6px; background: var(--wf-tile); color: inherit; text-align: left; font-size: 1rem; }
 @media (hover: hover) { .wf-worker-tile:hover:not([aria-disabled="true"]) { border-color: #329389; background: rgba(50,147,137,0.12); } }
 /* An unavailable Folk (strike, cooldown, away): focusable with aria-disabled so its reason is reachable; only the
@@ -527,6 +530,15 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .mm__container:has([id^="worker_folks:"]) label > small, .mm__container:has([id^="worker_folks:"]) small.d-block { font-size: .9rem !important; line-height: 1.45; white-space: pre-line; }
 .mm__container:has([id^="worker_folks:"]) .dropdown-toggle, .mm__container:has([id^="worker_folks:"]) .dropdown-menu, .mm__container:has([id^="worker_folks:"]) .btn { font-size: 1rem !important; }
 .mm__container:has([id^="worker_folks:"]) .content-heading { font-size: 1.25rem; }
+/* Each setting's name stands out from its hint (the user, 24 Nov 2026): the game writes both in one weight and colour
+   (the label is font-weight-normal, !important), so the name is semibold and the hint the readable secondary ink. */
+.mm__container:has([id^="worker_folks:"]) label { font-weight: 600 !important; }
+.mm__container:has([id^="worker_folks:"]) label > small { font-weight: 400 !important; color: var(--wf-subtle); margin-top: .15rem; }
+/* A long choice wraps instead of running past the edge (German at 375px: "Standard · voller Lohn (Voreinstellung)"):
+   the game's toggle and menu items never wrap, so the caret left the button and the menu touched the window. */
+.mm__container:has([id^="worker_folks:"]) .dropdown-toggle { white-space: normal; max-width: 100%; }
+.mm__container:has([id^="worker_folks:"]) .dropdown-menu { max-width: 100%; }
+.mm__container:has([id^="worker_folks:"]) .dropdown-item { white-space: normal; }
 
 /* Popups (the user 16 Oct 2026: "8px -> 20px is much better"): grey bands inside a popup get 20px
    padding; on the Hiring page and the cards they stay 8px. */
