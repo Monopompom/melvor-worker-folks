@@ -1,7 +1,8 @@
 // Worker Folks backups at the Hiring page's foot (the user, 5 Nov 2026: the same as Voyage's): Back up shows a code to
 // copy or download; Restore takes a pasted code or a file, shows what it holds and what it replaces and, once
-// confirmed, writes it back, saves and reloads the game, as the game itself does after changing a save. Nothing runs
-// by itself. The shape, the code and the restore's arithmetic are src/backup-model.mjs.
+// confirmed, writes it back, saves and reloads the game, as the game itself does after changing a save. These two run
+// only when pressed; the automatic safety copies are src/safety.mjs, using `safety` below. The shape, the code and the
+// restore's arithmetic are src/backup-model.mjs.
 //
 // The same backup through the API (v8, `api` below) for Voyage's one backup of both mods: the code to carry, what a
 // restore would do as the confirm's bands, and the restore itself without the save and the reload, which the caller
@@ -22,13 +23,14 @@ const WHY = {
   newer: 'MOD_WF_RESTORE_WHY_NEWER', record: 'MOD_WF_RESTORE_WHY_RECORD', cantUnzip: 'MOD_WF_RESTORE_WHY_CANTUNZIP',
 };
 const WIDTH = '38rem';
+/** Far above any real backup code (a few KB to some tens of KB). */
+const FILE_MAX = 2 * 1024 * 1024;
 const SHOWN = 6;
 
-export function install(ctx, { getHiring, B, folkModel, BUILD, popupDidRender, log }) {
+export function install(ctx, { swalClass, getHiring, B, folkModel, BUILD, popupDidRender, log }) {
   const NS = B.NS;
   const t = (key, vars) => (vars === undefined ? getLangString(key) : templateLangString(key, vars));
   const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const swalClass = (c) => (typeof createSwalCustomClass === 'function' ? createSwalCustomClass(c) : c);
   const num = (n) => { try { return numberWithCommas(Math.floor(n)); } catch { return `${Math.floor(n)}`; } };
   const level = (xp) => { try { return exp.xpToLevel(xp); } catch { return 1; } };
   const when = (at) => { try { return new Date(at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }); } catch { return new Date(at).toISOString(); } };
@@ -214,6 +216,7 @@ export function install(ctx, { getHiring, B, folkModel, BUILD, popupDidRender, l
     const plan = B.restorePlan(b, have());
     // A crew that lived on keeps its Work Orders and commissions: nothing finished since is paid twice.
     const live = B.livedOn(h._xp, b.xp);
+    const coinTaken = live ? B.currencyTakes(nowRecord, b.record, (id) => game.currencies.getObjectByID(id)?.amount ?? 0) : [];
     const boardNow = h.crew.board;
     const commissionsNow = h.crew.commissions;
     // The crew, as the save's own load does it (older records migrate); walking Folks stand still without Voyage.
@@ -252,6 +255,7 @@ export function install(ctx, { getHiring, B, folkModel, BUILD, popupDidRender, l
     for (const [id, n] of taken) {
       try { const it = game.items.getObjectByID(id); if (it !== undefined) game.bank.removeItemQuantity(it, n, false); } catch (e) { log(`backup: ${id} not taken`, e); }
     }
+    for (const [id, n] of coinTaken) { try { game.currencies.getObjectByID(id)?.remove(n); } catch (e) { log(`backup: ${id} not taken`, e); } }
     for (const [id, n] of back.items) { try { game.bank.addItemByID(id, n, false, false, true); } catch (e) { log(`backup: ${id} not handed back`, e); } }
     for (const [id, n] of back.currencies) { try { game.currencies.getObjectByID(id)?.add(n); } catch (e) { log(`backup: ${id} not handed back`, e); } }
     for (const [id, n] of plan.add) { try { game.bank.addItemByID(id, n, false, false, true); } catch (e) { log(`backup: ${id} not added`, e); } }
@@ -350,8 +354,8 @@ export function install(ctx, { getHiring, B, folkModel, BUILD, popupDidRender, l
   const restore = () => {
     if (getHiring() === undefined) return;
     const html = body([{ head: t('MOD_WF_BACKUP_CODE_HEAD'), body: [t('MOD_WF_RESTORE_PASTE'), { html: `${codeBox('id="wf-restore-code"')}></textarea>`
-      + `<span class="wf-backup-acts"><label class="btn btn-outline-info mb-0">${esc(t('MOD_WF_RESTORE_FILE'))}`
-      + '<input type="file" accept=".txt,text/plain" class="d-none" data-wf-backup="file"></label></span>'
+      + `<span class="wf-backup-acts"><button type="button" class="btn btn-outline-info" data-wf-backup="pick">${esc(t('MOD_WF_RESTORE_FILE'))}</button>`
+      + '<input type="file" accept=".txt,text/plain" class="d-none" data-wf-backup="file"></span>'
       + '<span class="wf-backup-note text-success" data-wf-backup="loaded" aria-live="polite"></span>' }] }]);
     SwalLocale.fire({
       customClass: swalClass(SWAL),
@@ -366,6 +370,7 @@ export function install(ctx, { getHiring, B, folkModel, BUILD, popupDidRender, l
         const input = el?.querySelector?.('[data-wf-backup="file"]');
         if (input == null || input.dataset.wfBound === '1') return;
         input.dataset.wfBound = '1';
+        el.querySelector('[data-wf-backup="pick"]')?.addEventListener('click', () => input.click());
         // A new code or file clears the last refusal under the field: it was about the code before.
         const fresh = () => { try { Swal.resetValidationMessage(); } catch {} };
         el.querySelector('#wf-restore-code')?.addEventListener('input', fresh);
@@ -374,12 +379,20 @@ export function install(ctx, { getHiring, B, folkModel, BUILD, popupDidRender, l
           if (f === undefined) return;
           fresh();
           const loaded = el.querySelector('[data-wf-backup="loaded"]');
+          const say = (text, cls) => { if (loaded !== null) { loaded.textContent = text; loaded.className = `wf-backup-note ${cls}`; } };
+          // Cleared at once, so picking the same file again (after fixing it) reads it again.
+          input.value = '';
+          if (f.size > FILE_MAX) { say(t('MOD_WF_RESTORE_FILE_BIG'), 'text-warning'); return; }
           try {
-            document.getElementById('wf-restore-code').value = await f.text();
-            if (loaded !== null) { loaded.textContent = t('MOD_WF_RESTORE_LOADED', { file: f.name }); loaded.className = 'wf-backup-note text-success'; }
+            const text = await f.text();
+            // Only a real backup reaches the box: a picture or a zip gets its reason here, not a green "Loaded".
+            const r = await B.decode(text, folkModel.SAVE_VERSION);
+            if (r.backup === undefined) { say(t(WHY[r.why] ?? WHY.broken), 'text-warning'); return; }
+            document.getElementById('wf-restore-code').value = text;
+            say(t('MOD_WF_RESTORE_LOADED', { file: f.name }), 'text-success');
           } catch (e) {
             log('backup: file read failed', e);
-            if (loaded !== null) { loaded.textContent = t('MOD_WF_RESTORE_LOAD_FAILED'); loaded.className = 'wf-backup-note text-warning'; }
+            say(t('MOD_WF_RESTORE_LOAD_FAILED'), 'text-warning');
           }
         });
       },
@@ -397,10 +410,10 @@ export function install(ctx, { getHiring, B, folkModel, BUILD, popupDidRender, l
   const mount = (tips) => {
     const foot = document.querySelector('#worker-folks-container [data-wf="backup-foot"]');
     if (foot === null || foot.firstChild !== null) return;
-    foot.innerHTML = `<button type="button" class="btn btn-sm btn-outline-secondary" data-wf-backup="out">${esc(t('MOD_WF_BACKUP_BUTTON'))}</button>`
-      + `<button type="button" class="btn btn-sm btn-outline-secondary" data-wf-backup="in">${esc(t('MOD_WF_RESTORE_BUTTON'))}</button>`;
+    foot.innerHTML = `<button type="button" class="btn btn-sm btn-outline-info" data-wf-backup="out">${esc(t('MOD_WF_BACKUP_BUTTON'))}</button>`
+      + `<button type="button" class="btn btn-sm btn-outline-info" data-wf-backup="in">${esc(t('MOD_WF_RESTORE_BUTTON'))}</button>`;
     const [out, inn] = foot.querySelectorAll('button');
-    const tip = (el, key) => { if (tips?.set !== undefined) tips.set(el, t(key)); else el.title = t(key); };
+    const tip = (el, key) => { tips?.set?.(el, t(key)); };
     tip(out, 'MOD_WF_BACKUP_HINT');
     tip(inn, 'MOD_WF_RESTORE_HINT');
     out.onclick = () => { backUp().catch((e) => log('backup failed', e)); };
@@ -465,5 +478,24 @@ export function install(ctx, { getHiring, B, folkModel, BUILD, popupDidRender, l
     },
   };
 
-  return { mount, backUp, restore, api };
+  // ---- the automatic safety copies (src/safety.mjs) ------------------------------------------------------------------
+  const safety = {
+    take: () => { const h = getHiring(); return h === undefined ? undefined : take(h); },
+    encode: (b) => B.encode(b),
+    decode: (code) => B.decode(code, folkModel.SAVE_VERSION),
+    writeBack: (b) => {
+      applyBackup(b);
+      // With Voyage's own save intact (it restores nothing), a Folk walking in this copy on a road it no longer holds
+      // stops where it stands, or it would wait for that walk for good.
+      const v = game.skills.getObjectByID('voyage:Voyage');
+      if (v?.saveBlockRead !== true) return;
+      // A courier walks by its route, which Voyage keeps apart from the roads.
+      const roads = v.record?.walks ?? {};
+      const routes = v.record?.couriers ?? {};
+      getHiring().crew.all.forEach((f) => { if (f.travel === 'walking' && roads[f.id] === undefined && routes[f.id] === undefined) f.travel = 'idle'; });
+    },
+    notify: ({ xp, at }) => tell(t('MOD_WF_SAFETY_TITLE'), t('MOD_WF_SAFETY_BACK', { level: num(level(xp)), when: when(at) }), 'success'),
+  };
+
+  return { mount, backUp, restore, api, safety };
 }

@@ -34,13 +34,18 @@ export function install(ctx, { getHiring, log }) {
     /**
      * Registers a job. `def`: { id, name, media (strings or functions), everyMs(folk) → ms between looks,
      * work(folk, ms, { offline }) → '' or why it waits, unlocked() → boolean, lockText() → the lock's reason,
-     * refusal(folk) → '' or why this Folk can't take it, describe(folk) → lines for the card's tooltip, travels: true
+     * refusal(folk) → '' or why this Folk can't take it, describe(folk) → lines for the card's tooltip, working(folk) →
+     * the card's line while it works and doesn't wait, travels: true
      * when the job works wherever the Folk is (along with the player too; another mod's 'work' guard says where it
-     * waits), else the Folk stays put for it }. A second registration of an id replaces the first.
+     * waits), else the Folk stays put for it, shared: true when several Folks may hold it at once, roomScale: a number
+     * from 1 up, the Folk's room that many times its size while on the job. A job with a roomScale is a carrier: its
+     * room is a load, so its stock stays aboard when it is collected }. A second registration of an id replaces the
+     * first.
      */
     register(def) {
       if (def === null || typeof def !== 'object' || typeof def.id !== 'string' || def.id === '') throw new Error('registerJob: an id is required');
       if (typeof def.work !== 'function' || typeof def.everyMs !== 'function') throw new Error(`registerJob ${def.id}: work and everyMs are required`);
+      if (def.roomScale !== undefined && !(Number.isFinite(def.roomScale) && def.roomScale >= 1)) throw new Error(`registerJob ${def.id}: roomScale must be a number from 1 up`);
       kinds.set(def.id, makeKind(def));
       if (hiring !== undefined) hiring.renderQueue.folks = true;
       return kinds.get(def.id);
@@ -65,12 +70,28 @@ export function install(ctx, { getHiring, log }) {
     isRunning(folk) {
       return running.has(folk.id);
     },
+    /** How many times its size the Folk's room is on this job: 1 with none, or a job whose mod is gone. */
+    roomScale(folk) {
+      return (folk.job === null ? undefined : kinds.get(folk.job)?.def.roomScale) ?? 1;
+    },
+    /** Whether the Folk's room is a carrier's load now. */
+    isCarrier(folk) {
+      return folk.job !== null && kinds.get(folk.job)?.def.roomScale !== undefined;
+    },
+    /** Whether a settled strike will put this Folk back on a carrier's job: what it carries waits for that. */
+    isReturningCarrier(folk) {
+      return folk.restartWhenReady === true && kinds.get(folk.restartPick?.job)?.def.roomScale !== undefined;
+    },
     get runningCount() {
       return running.size;
     },
     /** Why another mod holds the Folk's job off ('' when nothing does): it then takes no Shift Slot and no wage. */
     heldText(folk) {
       return held.get(folk.id) ?? '';
+    },
+    /** The job's own line for its card while it works ('' when it has none: the card's general line stands). */
+    workingText(folk) {
+      try { return String(api.of(folk)?.def.working?.(folk) ?? ''); } catch { return ''; }
     },
     /** Why the Folk's job waits right now ('' when it works or has no job). */
     waitText(folk) {
@@ -106,7 +127,8 @@ export function install(ctx, { getHiring, log }) {
         const skill = hiring.skillOf(folk);
         if (skill !== undefined) hiring.forceStop(skill);
       }
-      hiring.crew.assignJob(folk.id, jobId, { travels: kinds.get(jobId)?.def.travels === true });
+      const def = kinds.get(jobId)?.def;
+      hiring.crew.assignJob(folk.id, jobId, { travels: def?.travels === true, shared: def?.shared === true });
       log(`${folk.name} job → ${jobId}`);
       return true;
     },
@@ -156,7 +178,7 @@ export function install(ctx, { getHiring, log }) {
       carry.set(folk.id, 0);
       let wait = '';
       try { wait = String(kind.def.work(folk, ms, { offline }) ?? ''); } catch (err) { console.error(`[Worker Folks] job ${kind.id} failed`, err); }
-      if (wait !== (waiting.get(folk.id) ?? '')) hiring.renderQueue.folks = true;
+      if (wait !== (waiting.get(folk.id) ?? '')) hiring.markCard(folk);
       waiting.set(folk.id, wait);
       // Time worked, waiting included (a wait keeps the wage running, as a skill's Folk standing by for its stock).
       hiring.addFolkMastery(folk, ms);

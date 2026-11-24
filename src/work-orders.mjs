@@ -13,7 +13,7 @@ const CONTAINER_ID = 'worker-folks-container';
 export const BLOCK_ID = 'worker-folks-orders';
 const GP_ID = 'melvorD:GP';
 
-export function install(ctx, { getHiring, model, costs = null, time, numbers, tips, popupDidRender, log }) {
+export function install(ctx, { swalClass, getHiring, model, costs = null, time, numbers, tips, popupDidRender, log }) {
   let hiring;
   let board = null;
   let seenLevel = -1;
@@ -42,6 +42,8 @@ export function install(ctx, { getHiring, model, costs = null, time, numbers, ti
   const n = (v) => numbers.shortNumber(Math.floor(v));
   const full = (v) => numberWithCommas(Math.floor(v));
   const isShort = (v) => n(v) !== full(v);
+  // A multiplier in the player's decimal form, as the heirloom bonus writes it: ×1.75, or ×1,75 in French and German.
+  const rateText = (v) => { const raw = Math.round(v * 100) / 100; return formatFixed(raw, Number.isInteger(raw) ? 0 : Number.isInteger(raw * 10) ? 1 : 2); };
   const markDirty = () => { dirty = true; };
 
   // ---- what can be asked for ------------------------------------------------------------------------------------
@@ -321,7 +323,7 @@ export function install(ctx, { getHiring, model, costs = null, time, numbers, ti
       width: '38rem',
       html: body,
       confirmButtonText: getLangString('MOD_WF_BUTTON_GOT_IT'),
-      customClass: typeof createSwalCustomClass === 'function' ? createSwalCustomClass(cls) : cls,
+      customClass: swalClass(cls),
     });
   };
 
@@ -332,7 +334,7 @@ export function install(ctx, { getHiring, model, costs = null, time, numbers, ti
     const fee = `<img class="skill-icon-xs mr-1" src="${game.gp.media}" alt="GP"><span class="font-w600 ${short ? 'text-danger' : 'text-warning'}">${full(model.REROLL_COST)}</span>`;
     const band = `<div class="wf-band text-left mt-2"><span class="${short ? 'text-danger' : 'text-success'}">${short ? '✗' : '✓'}</span> ${templateLangString('MOD_WF_ORDERS_REROLL_COST', { cost: fee })}</div>`;
     const why = none ? getLangString('MOD_WF_ORDERS_REROLL_NONE') : short ? templateLangString('MOD_WF_ORDERS_REROLL_SHORT', { cost: full(model.REROLL_COST) }) : '';
-    const cls = { popup: 'wf-ui', confirmButton: 'btn btn-warning m-1' };
+    const cls = { popup: 'wf-ui wf-pic', confirmButton: 'btn btn-warning m-1' };
     SwalLocale.fire({
       didRender: popupDidRender,
       title: getLangString('MOD_WF_ORDERS_REROLL_TITLE'),
@@ -342,9 +344,10 @@ export function install(ctx, { getHiring, model, costs = null, time, numbers, ti
       imageHeight: 64,
       imageAlt: '',
       showCancelButton: true,
+      cancelButtonText: getLangString('MOD_WF_BUTTON_CANCEL'),
       focusCancel: why !== '',
       confirmButtonText: getLangString('MOD_WF_ORDERS_REROLL'),
-      customClass: typeof createSwalCustomClass === 'function' ? createSwalCustomClass(cls) : cls,
+      customClass: swalClass(cls),
       didOpen: () => { if (why !== '') { const b = Swal.getConfirmButton(); if (b) b.disabled = true; } },
     }).then((result) => {
       if (!result.isConfirmed || board === null) return;
@@ -437,8 +440,8 @@ export function install(ctx, { getHiring, model, costs = null, time, numbers, ti
       if (exact !== undefined && exact !== text) tips?.set(row, exact);
       list.append(row);
     };
-    if (done && order.paid !== null) line(game.gp.media, templateLangString('MOD_WF_ORDER_GP_PAID', { rate: numberWithCommas(order.gpRate), gp: numbers.shortNumber(order.paid.gp) }));
-    else if (wagesOn()) line(game.gp.media, templateLangString('MOD_WF_ORDER_GP', { rate: numberWithCommas(order.gpRate), gp: numbers.shortNumber(order.wages * order.gpRate) }));
+    if (done && order.paid !== null) line(game.gp.media, templateLangString('MOD_WF_ORDER_GP_PAID', { rate: rateText(order.gpRate), gp: numbers.shortNumber(order.paid.gp) }));
+    else if (wagesOn()) line(game.gp.media, templateLangString('MOD_WF_ORDER_GP', { rate: rateText(order.gpRate), gp: numbers.shortNumber(order.wages * order.gpRate) }));
     line(hiring.media, templateLangString('MOD_WF_ORDER_REWARD_XP', { xp: n(r.xp) }), templateLangString('MOD_WF_ORDER_REWARD_XP', { xp: full(r.xp) }));
     const token = hiring.masteryTokens?.get(game.defaultRealm)?.[0];
     if (r.tokens > 0) line(token?.media, r.tokens === 1 ? getLangString('MOD_WF_ORDER_REWARD_TOKEN') : templateLangString('MOD_WF_ORDER_REWARD_TOKENS', { count: full(r.tokens) }));

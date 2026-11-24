@@ -32,6 +32,21 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
     });
   };
 
+  /**
+   * Whether a start of this action is the Folks' to answer: a Folk holds the skill or waits to move onto it, and you
+   * are not taking it back. Another mod's start check, wrapped around this one in some load orders, lets such a start
+   * through. Reads only.
+   */
+  const startGoesToFolk = (action) => {
+    if (hiring === undefined || game.isGolbinRaid || isDisabled()) return false;
+    const skill = skillFor(action);
+    if (skill === undefined) return false;
+    const pending = hiring.pending.get(skill);
+    if (pending === null) return false;
+    if (pending !== undefined && hiring.crew.byId(pending) !== undefined) return true;
+    return folkFor(skill) !== undefined;
+  };
+
   const installAccessor = () => {
     let main = game.activeAction;
     Object.defineProperty(game, 'activeAction', {
@@ -65,6 +80,7 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
   ctx.onModsLoaded(() => {
     hiring = getHiring();
     hiring.decideStart = decide;
+    hiring.startGoesToFolk = startGoesToFolk;
     // What a Folk-held skill last started on, kept through its stop: Restart all starts it on that again.
     hiring.lastPick = (skill) => picks.get(skill) ?? null;
     installAccessor();
@@ -74,6 +90,7 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
   //    Shift Slot the start is refused (idleChecker returning true aborts start()).
   ctx.patch(Game, 'idleChecker').replace(function (original, action) {
     if (hiring === undefined || this.isGolbinRaid) return original(action);
+    const folksStart = startGoesToFolk(action);
     // You picked: the Folk leaves the skill only when your start is accepted. Another mod may refuse it where you
     // stand (Voyage: no trees on your hex), and then the Folk keeps its job.
     if (skillFor(action) !== undefined && hiring.pendingFor(action) === null) {
@@ -117,6 +134,11 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
         );
         return true;
       default:
+        // Another mod let this through as a Folk's start, so the game must not run it as yours: that would end a voyage.
+        if (folksStart) {
+          log(`${action.id}: a Folk's start found no Folk, refused`);
+          return true;
+        }
         return original(action);
     }
   });

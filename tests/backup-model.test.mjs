@@ -145,6 +145,23 @@ test('keepCommissions: runs only for Folks in the crew; stray commission stacks 
   assert.deepEqual(B.keepCommissions(null, folks), { commissions: null, home: [] });
 });
 
+test('currencyTakes: a purse collected since the backup comes out once, never below zero', () => {
+  const room = (gp) => ({ haul: {}, stock: {}, town: {}, purse: gp > 0 ? { 'melvorD:GP': gp } : {} });
+  const then = { folks: [folk('a', 0, { room: room(500) })] };
+  const now = { folks: [folk('a', 0, { room: room(200) })] };
+  assert.deepEqual(B.currencyTakes(now, then, () => 1000), [['melvorD:GP', 300]]);
+  assert.deepEqual(B.currencyTakes(now, then, () => 120), [['melvorD:GP', 120]]);
+  assert.deepEqual(B.currencyTakes(now, then, () => 0), []);
+  assert.deepEqual(B.currencyTakes(then, now, () => 1000), []);
+});
+
+test('keepCommissions: a courier keeps the town goods it carries for another Folk', () => {
+  const now = { commissions: [{ id: 'c1', folkId: 'a' }], runs: {} };
+  const town = { haul: {}, stock: {}, town: { 'melvorD:Oak_Logs': { qty: 5, ms: 0 } } };
+  const folks = [folk('a', 0), folk('courier', 1, { job: 'voyage:Courier', room: town }), folk('stray', 2, { room: town })];
+  assert.deepEqual(B.keepCommissions(now, folks).home, ['stray']);
+});
+
 test('restorePlan tops up, never doubles, never takes away', () => {
   const b = sample();
   const first = B.restorePlan(b, {});

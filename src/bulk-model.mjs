@@ -1,10 +1,15 @@
 // Stop all, Restart all, Restock all and Settle all on the Overview (build .218, joint order round 2): the rules that
 // need no game. Pure: no DOM, no game globals (tests/bulk-model.test.mjs).
 
+/** A Folk a Restock can fill: on its stock, with a skill that takes inputs. A Folk on the road has no skill. */
+export function restockable(r) {
+  return r.ownStock === true && r.hasSkill === true && r.noInputs !== true;
+}
+
 /**
  * What each button has to work on, from one plain row per Folk:
- * { working, hasSkill, available, onStrike, ownStock, onHaul }.
- * stop: Folks at work; restart: idle Folks with a skill that may work; restock: Folks on their own stock away from the
+ * { working, hasSkill, available, onStrike, ownStock, onHaul, noInputs }.
+ * stop: Folks at work; restart: idle Folks with a skill that may work; restock: Folks a Restock can fill, away from the
  * haul (the haul has no bank); settle: Folks on strike.
  */
 export function counts(rows) {
@@ -12,7 +17,7 @@ export function counts(rows) {
   for (const r of rows) {
     if (r.working) c.stop += 1;
     else if (r.hasSkill && r.available) c.restart += 1;
-    if (r.ownStock && !r.onHaul) c.restock += 1;
+    if (restockable(r) && !r.onHaul) c.restock += 1;
     if (r.onStrike) c.settle += 1;
   }
   return c;

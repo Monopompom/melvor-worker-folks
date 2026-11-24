@@ -3,7 +3,7 @@
 // Pure: the Hiring skill and the Folk model are injected (mod modules cannot import their siblings).
 
 /** Bumped when something here changes in a way a caller must know about. Voyage refuses an older one. */
-export const API_VERSION = 11;
+export const API_VERSION = 12;
 /** The least of the hire price an outside hire pays (v7): a bargain, never a free Folk. */
 export const HIRE_SHARE_MIN = 0.25;
 
@@ -34,6 +34,8 @@ const placeCopy = (place) => (place === null || place === undefined ? null : Obj
  * its job (the Quartermaster, or one another mod registered), null for none; a Folk holds a skill or a job.
  */
 export function folkView(folk, status, maxHp, portrait, mastery) {
+  // A URL, or a function that finds it: mods read views every tick and seldom show the picture.
+  let picture = portrait;
   return Object.freeze({
     id: folk.id,
     name: folk.name,
@@ -47,7 +49,10 @@ export function folkView(folk, status, maxHp, portrait, mastery) {
     travel: folk.travel,
     hp: folk.hp,
     maxHp,
-    portrait,
+    get portrait() {
+      if (typeof picture === 'function') picture = picture();
+      return picture;
+    },
     traits: Object.freeze((folk.traitState?.traits ?? []).map((t) => t.id)),
     mastery,
   });
@@ -89,7 +94,7 @@ function viewPayload(payload, view) {
 export function createApi({ getHiring, model, pricing, rules, getBackup, version = API_VERSION }) {
   const { normalizePlace, TRAVEL } = model;
   const hiring = () => getHiring();
-  const view = (folk) => folkView(folk, hiring().statusOf(folk), hiring().health?.maxHpOf(folk), hiring().portraitOf?.(folk) ?? hiring().portrait?.(folk.tier), hiring().masteryLevelOf?.(folk));
+  const view = (folk) => folkView(folk, hiring().statusOf(folk), hiring().health?.maxHpOf(folk), () => hiring().portraitOf?.(folk) ?? hiring().portrait?.(folk.tier), hiring().masteryLevelOf?.(folk));
   /** The room's calls (v10) go to room.mjs; an unknown Folk, or no room module, answers undefined. */
   const roomCall = (id, fn) => {
     const folk = record(id);
@@ -219,18 +224,28 @@ export function createApi({ getHiring, model, pricing, rules, getBackup, version
      * badge(folkView) → the card's blue pill (how often it looks, say), effects(folkView) → the line under it (strings,
      * or { before, value, after }) }. A 'work' guard refusing { folk, jobId } holds the job off: no slot, no wage. The
      * job takes a Shift Slot and its Folk's tier wage for its time; the Folk earns Hiring XP and mastery as on a skill.
-     * Its card lists it in the Job picker. Returns the function that removes it.
+     * Its card lists it in the Job picker. Since v12: `working(folkView)` is the card's line while it works and doesn't
+     * wait (without it, the Quartermaster's general line); `shared: true` lets several Folks hold it; `roomScale` (a number
+     * from 1 up) makes the Folk's room that many times its size while on the job and the Folk a carrier, whose stock
+     * stays aboard when it is collected and who moves goods with the carry calls. Register it before the first game
+     * tick of a load: a Folk whose job is not registered then sends its stock home. Returns the function that removes it.
      */
     registerJob: (def) => {
       if (def === null || typeof def !== 'object' || typeof def.id !== 'string' || !/^[A-Za-z0-9_]+:[A-Za-z0-9_]+$/.test(def.id)) throw new Error('job id must be namespace:Name');
       const jobs = hiring().jobs;
       if (jobs === undefined) throw new Error('jobs are not loaded');
       const wrap = (fn) => (typeof fn === 'function' ? (folk, ...rest) => fn(view(folk), ...rest) : undefined);
-      jobs.register({ ...def, everyMs: wrap(def.everyMs), work: wrap(def.work), refusal: wrap(def.refusal), describe: wrap(def.describe), badge: wrap(def.badge), effects: wrap(def.effects) });
+      jobs.register({ ...def, everyMs: wrap(def.everyMs), work: wrap(def.work), refusal: wrap(def.refusal), describe: wrap(def.describe), working: wrap(def.working), badge: wrap(def.badge), effects: wrap(def.effects) });
       return () => jobs.unregister(def.id);
     },
-    /** Every job, with the Folk on it: [{ id, name, holder }] (`holder` a Folk id or null) (v11). */
-    jobs: () => Object.freeze((hiring().jobs?.all ?? []).map((k) => Object.freeze({ id: k.id, name: k.name, holder: hiring().crew.byJob(k.id)?.id ?? null }))),
+    /**
+     * Every job, with the Folks on it: [{ id, name, holder, holders }] (v11; `holders`, every Folk id on it, since v12;
+     * `holder` the first, or null).
+     */
+    jobs: () => Object.freeze((hiring().jobs?.all ?? []).map((k) => {
+      const holders = hiring().crew.holdersOf(k.id).map((f) => f.id);
+      return Object.freeze({ id: k.id, name: k.name, holder: holders[0] ?? null, holders: Object.freeze(holders) });
+    })),
     /** Supply lines (v11): [{ supplierId, receiverId }] for every Folk that supplies another. */
     supplyLinks: () => Object.freeze(hiring().crew.links.map((l) => Object.freeze({ ...l }))),
     /**
@@ -268,6 +283,12 @@ export function createApi({ getHiring, model, pricing, rules, getBackup, version
       const folk = skill === undefined ? undefined : hiring().actorFor(skill);
       return folk === undefined ? undefined : Object.freeze({ id: folk.id, place: placeCopy(folk.place), travel: folk.travel });
     },
+    /**
+     * True when a start of this action is the Folks' to answer, so a mod's own start check should pass it on (v12): a
+     * Folk holds the skill or waits to move onto it, and the player is not taking it back. Such a start never reaches
+     * the game as the player's. Reads only.
+     */
+    startGoesToFolk: (action) => hiring().startGoesToFolk?.(action) === true,
     /** fn(folkView) returns the card's and the Worker box's line for where the Folk is ('' for none) (v2). */
     registerLocationText: (fn) => {
       if (typeof fn !== 'function') throw new Error('location text must be a function');
@@ -467,6 +488,81 @@ export function createApi({ getHiring, model, pricing, rules, getBackup, version
     restockDepot: (id) => hiring().depots?.restock(id),
     /** Everything in the depot to the bank, the depot staying up. { items, left, purse }. */
     emptyDepot: (id) => hiring().depots?.empty(id),
+    /**
+     * Carriers (v12): a Folk on a job with a roomScale moves goods in its own room. Each call is one whole move and
+     * answers undefined for an unknown Folk or place, or a Folk not on such a job. A place is { folk: id } or
+     * { depot: id }. carryTake takes what the place made, up to the carrier's free room and `maxMs`: `only` (item ids)
+     * limits it. A Folk's commission goods come first, on the carrier's town side, unless the Folk is on its own run.
+     * `forReceiver` (a Folk id) then puts that Folk's recipe items on the stock side; a carried line's goods for any other
+     * receiver stay with their supplier. A Folk's purse comes too, unless `only` is given. { items: [{ itemId, qty, ms,
+     * side }], purse: [{ currencyId, amount }], ms, freeMs }.
+     */
+    carryTake: (id, from, opts) => hiring().carry?.take(id, from, opts),
+    /**
+     * Hands the commission goods aboard to the town (v12), at a bank stop, before carryToBank: open commissions with a
+     * Folk on them, soonest deadline first, paid and named as a delivery by this carrier, a story's credit staying with
+     * the Folk who made them. What none wants moves to its haul side. { delivered: [{ commissionId, figure, itemId, qty,
+     * done }], home: [{ itemId, qty }] }.
+     */
+    carryToTown: (id) => hiring().carry?.toTown(id),
+    /** The carrier's haul and purse to your bank; its stock stays aboard. { items, left, purse } as collect (v12). */
+    carryToBank: (id) => hiring().carry?.toBank(id),
+    /**
+     * What to load at the bank for these stops, [{ folk | depot }], nothing moved yet (v12). A short load or bank gives
+     * every Folk the same hours. { stops: [{ folk | depot, actions, items: [{ itemId, qty }] }], take: [{ itemId, qty,
+     * ms }], spare: [itemId] (aboard, no stop uses it), ms, short: 'load' | 'bank' | null }.
+     */
+    carryInputsPlan: (id, stops) => hiring().carry?.inputsPlan(id, stops),
+    /**
+     * Carries out that plan (v12): `spare` to the bank, `take` from the bank to the carrier's stock, each line cut to
+     * what the bank and the load hold now. { items: [{ itemId, qty, ms }], home: [{ itemId, qty }], left: [{ itemId, qty }] }.
+     */
+    carryLoadInputs: (id, plan) => hiring().carry?.loadInputs(id, plan),
+    /**
+     * Hands a place the inputs aboard that its recipe uses, up to its free room and `maxMs`, weighed by that recipe; a
+     * Folk stopped for want of them starts again; the rest rides on (v12). { items: [{ itemId, qty }], ms }.
+     */
+    carryGive: (id, to, opts) => hiring().carry?.give(id, to, opts),
+    /**
+     * How a supply line's goods travel (v12): fn(supplierView, receiverView) answers 'direct' (they reach the receiver
+     * at once) or 'carried' (they wait in the supplier's room for a courier, up to its free room, the rest to your bank;
+     * the +20 Produce Rate holds only while the receiver's stock has an action of them). Anything else reads 'direct', as
+     * does no hook. One hook at a time. Kept per line and asked again on folkMoved, a load and refreshLinks(). Register
+     * and settle it before offline progress. Returns the function that removes it.
+     */
+    registerLinkReach: (fn) => {
+      if (typeof fn !== 'function') throw new Error('link reach must be a function');
+      const h = hiring();
+      const hook = (supplier, receiver) => fn(view(supplier), view(receiver));
+      h.linkReachHook = hook;
+      h.supply?.refreshLinks();
+      return () => {
+        if (h.linkReachHook !== hook) return;
+        h.linkReachHook = undefined;
+        h.supply?.refreshLinks();
+      };
+    },
+    /** Asks the link-reach hook again for one Folk's lines (by id) or every line (v12). */
+    refreshLinks: (id) => {
+      const supply = hiring().supply;
+      if (supply === undefined) return;
+      if (id === undefined) supply.refreshLinks();
+      else if (record(id) !== undefined) supply.refreshLinks(record(id));
+    },
+    /**
+     * Which couriers call at a Folk (v12): fn(folkView) answers [{ courierId, share, faresPerHour }] or null. A Folk with
+     * a courier whose job runs is served: it makes no Township run of its own and waits for that courier. List a depot's
+     * members too. `share` (0 to 1) is this Folk's part of that courier; `faresPerHour` is the courier's whole fares in
+     * GP. The Folk's net GP/h then counts `share` of the courier's wage and fares. One hook at a time. Returns the
+     * function that removes it.
+     */
+    registerRouteShare: (fn) => {
+      if (typeof fn !== 'function') throw new Error('route share must be a function');
+      const h = hiring();
+      const hook = (folk) => fn(view(folk));
+      h.routeShareHook = hook;
+      return () => { if (h.routeShareHook === hook) h.routeShareHook = undefined; };
+    },
     /** Asks for the guarded buttons and the Shop's lines to be drawn again (call after the player moves). */
     refresh: () => hiring().refreshGuarded(),
   });

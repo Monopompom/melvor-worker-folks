@@ -126,6 +126,21 @@ test('a job that travels leaves the Folk where it is, along with the player incl
   assert.equal(crew.byId(a.id).job, 'worker_folks:Quartermaster');
 });
 
+test('a shared job keeps every holder; a plain job still has one', () => {
+  const { crew } = make();
+  const a = crew.hire('Junior');
+  const b = crew.hire('Junior');
+  crew.assignJob(a.id, 'voyage:Courier', { travels: true, shared: true });
+  crew.assignJob(b.id, 'voyage:Courier', { travels: true, shared: true });
+  assert.deepEqual(crew.holdersOf('voyage:Courier').map((f) => f.id), [a.id, b.id]);
+  assert.equal(crew.byJob('voyage:Courier').id, a.id, 'the first holder');
+  crew.assignJob(a.id, null);
+  assert.deepEqual(crew.holdersOf('voyage:Courier').map((f) => f.id), [b.id]);
+  crew.assignJob(a.id, 'worker_folks:Quartermaster');
+  crew.assignJob(b.id, 'worker_folks:Quartermaster');
+  assert.deepEqual(crew.holdersOf('worker_folks:Quartermaster').map((f) => f.id), [b.id]);
+});
+
 test('load migrates a pre-version root', () => {
   const { crew } = make(4);
   const report = crew.load({ folks: [{ id: 'old', slot: 1, tier: 'Junior', name: 'Old' }] });
@@ -265,4 +280,24 @@ test('load replaces the depots whole: a backup\'s or none', () => {
   const before = older.serialize();
   crew.load(before);
   assert.deepEqual(crew.depots, {}, 'a record from before depots');
+});
+
+test('going back to a hired name another Folk has taken is refused', () => {
+  const { crew } = make();
+  const a = crew.hire('Newbie');
+  const b = crew.hire('Newbie');
+  const hired = a.name;
+  assert.equal(crew.rename(a.id, 'Boss'), null);
+  assert.equal(crew.rename(b.id, hired), null);
+  assert.equal(crew.rename(a.id, hired), 'taken');
+  assert.equal(a.name, 'Boss');
+});
+
+test('a reserved word is refused as a new name, and a Folk keeps its own', () => {
+  const { crew } = make();
+  const a = crew.hire('Newbie');
+  const was = a.name;
+  assert.equal(crew.rename(a.id, 'You', { reserved: ['You'] }), 'reserved');
+  assert.equal(a.name, was);
+  assert.equal(crew.rename(a.id, was, { reserved: [was] }), null);
 });

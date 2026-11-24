@@ -106,6 +106,18 @@ export function reconcileLoadout(loadout, { allowedSlots, itemExists, allowedIte
   return { kept, returned, dropped };
 }
 
+/**
+ * What the gear amount field holds: { kind: 'all' } when empty, { kind: 'qty', qty } for a whole number of 1 or more
+ * (full-width digits count), { kind: 'bad' } for anything else, so unreadable text never means the whole stack.
+ */
+export function equipAmount(raw) {
+  const text = String(raw ?? '').normalize('NFKC').trim();
+  if (text === '') return { kind: 'all' };
+  if (!/^[0-9]+$/.test(text)) return { kind: 'bad' };
+  const qty = Number(text);
+  return Number.isSafeInteger(qty) && qty >= 1 ? { kind: 'qty', qty } : { kind: 'bad' };
+}
+
 /** Quantity actually equipped: 1 unless the slot allows a stack. */
 export function equipQuantity(requested, { allowQuantity, available }) {
   if (!allowQuantity) return available > 0 ? 1 : 0;

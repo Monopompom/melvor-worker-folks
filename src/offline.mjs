@@ -141,7 +141,8 @@ export function install(ctx, { getHiring, time, log }) {
     });
     // What a Folk's room holds on your return, its skill's icon first: kept there while the bank had no free slot.
     if (hiring.room !== undefined) hiring.crew.all.forEach((folk) => {
-      if (stoppedFull.has(folk.id)) return;
+      // A carrier's load is on its way: its own mod reports the trips.
+      if (stoppedFull.has(folk.id) || hiring.room.isCarrier(folk)) return;
       const held = hiring.room.heldList(folk);
       if (held.length === 0) return;
       const skill = hiring.skillOf(folk);
@@ -189,8 +190,8 @@ export function install(ctx, { getHiring, time, log }) {
     header.innerHTML = `<img class="skill-icon-xs mr-1" src="${hiring.media}" alt=""><span>${esc(getLangString('MOD_WF_OFFLINE_HEADER'))}</span>`;
     const row = (className, html) => { createElement('h5', { className, parent: container }).innerHTML = html; };
     lines.forEach((line) => {
-      row('font-w600 mb-1', line.html);
-      if (line.fix) row('font-w400 mb-2', esc(line.fix));
+      row('font-w600 mb-1 wf-offline-line', line.html);
+      if (line.fix) row('font-w400 mb-2 wf-offline-line', esc(line.fix));
     });
     log(`offline: ${ticks} ticks, ${tracker.actions.size} delegated skill(s) acted`);
   });

@@ -3,7 +3,7 @@
 // in bold. Done on the rendered DOM, so every string (en.json, templates, game names) follows without markup.
 // Buttons, links, inputs and names already wrapped are left alone; `data-no-skill-names` opts a subtree out.
 
-const SKIP = 'button, a, input, textarea, select, option, script, style, .wf-skill-name, [data-no-skill-names]';
+const SKIP = 'button, a, input, textarea, select, option, script, style, .wf-skill-name, .wf-title-name, [data-no-skill-names]';
 let pattern;
 let byName;
 

@@ -26,7 +26,10 @@ const SORT_KEY = 'worker_folks:overview-sort';
 /** After a scroll, how long Made this session keeps its tiles where they are (touch has no pointer to watch). */
 const MADE_SCROLL_HOLD_MS = 1500;
 
-export function install(ctx, { getHiring, model, milestones, bulk, layout, tips, marquee, popupDidRender, log }) {
+/** Each bulk action looks like the same action on a card: Stop red, Restock blue, Restart and Settle green. */
+const BULK_LOOK = { stop: 'btn-outline-danger', restock: 'btn-outline-info' };
+
+export function install(ctx, { swalClass, getHiring, model, milestones, bulk, layout, tips, marquee, popupDidRender, log }) {
   let hiring;
   const tally = model.createTally();
   let dirty = true;
@@ -196,7 +199,7 @@ export function install(ctx, { getHiring, model, milestones, bulk, layout, tips,
       width: '38rem',
       html: body,
       confirmButtonText: getLangString('MOD_WF_BUTTON_GOT_IT'),
-      customClass: typeof createSwalCustomClass === 'function' ? createSwalCustomClass(cls) : cls,
+      customClass: swalClass(cls),
     });
   };
 
@@ -468,7 +471,7 @@ export function install(ctx, { getHiring, model, milestones, bulk, layout, tips,
     }
     const button = (kind, key, count, shown = true) => {
       if (!shown) return;
-      const btn = el('button', `btn btn-sm ${kind === 'stop' ? 'btn-outline-danger' : 'btn-outline-primary'} wf-dash-bulk-btn`, getLangString(`MOD_WF_BULK_${key}`));
+      const btn = el('button', `btn btn-sm ${BULK_LOOK[kind] ?? 'btn-outline-success'} wf-dash-bulk-btn`, getLangString(`MOD_WF_BULK_${key}`));
       btn.type = 'button';
       const off = count === 0;
       btn.classList.toggle('disabled', off);
@@ -538,7 +541,7 @@ export function install(ctx, { getHiring, model, milestones, bulk, layout, tips,
 
   /** XP as skill chips, currencies on one line, then the item chips in their own scroll box. */
   const drawMade = (v) => {
-    const kinds = v.kinds > 0 ? el('span', 'ml-auto wf-subtle', (v.kinds === 1 ? getLangString('MOD_WF_DASH_KINDS_ONE') : templateLangString('MOD_WF_DASH_KINDS', { count: `${v.kinds}` }))) : undefined;
+    const kinds = v.kinds > 0 ? el('span', 'ml-auto wf-subtle text-nowrap flex-shrink-0', (v.kinds === 1 ? getLangString('MOD_WF_DASH_KINDS_ONE') : templateLangString('MOD_WF_DASH_KINDS', { count: `${v.kinds}` }))) : undefined;
     const parts = [bandHead(getLangString('MOD_WF_DASH_MADE'), kinds)];
     if (v.xp.length === 0 && v.currencies.length === 0 && v.items.length === 0) {
       parts.push(note(getLangString('MOD_WF_DASH_NOTHING')));

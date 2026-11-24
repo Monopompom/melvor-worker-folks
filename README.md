@@ -155,6 +155,12 @@ bank has none left of a slot's item it tells you and leaves that slot. Like you,
 your equipment in a dungeon or stronghold (unless the game allows it there), nor in the Golbin
 Raid. With Voyage it travels with you.
 
+**Courier (with Voyage 1.9.0 or later).** With Voyage's Courier's Licence a Folk can take the
+Courier job. It takes a Shift Slot and its rank's wage. You set its route in Voyage: up to 12 stops
+among your Folks, tent depots and bank places, at least one of them a bank stop. The courier walks
+them in order, takes what your Folks hold and brings it to your bank, carries Township commission
+goods, and earns travel traits, Hiring XP and mastery. Without Voyage the job is not offered.
+
 ## Supply lines
 
 From Hiring 60, **Supplies** on a Folk's card sends what it makes straight to another Folk whose
@@ -504,6 +510,11 @@ Other mods' custom skills get a Worker box where their skill follows the game's 
 classes. Mods that only add items, modifiers or UI are unaffected.
 
 ## Backups
+
+**Safety copies.** Worker Folks keeps a few automatic copies of its progress in this browser, outside the game's save, about
+every 10 minutes and when you leave the tab. If the game ever saves without the mod, the next load with the mod brings
+the highest copy back for the same character, saves and reloads. They stay on this device, so a backup code is still the
+way to move or keep your progress for good.
 
 At the foot of the Hiring page, **Back up Worker Folks** makes a code to copy or download: your
 Hiring level, XP, mastery and relics, every Folk with its gear, room, place, wages, job and supply

@@ -15,6 +15,8 @@ const FROZEN_TEMPLATE_ID = 'wf-frozen-slot-template';
  * effects(folk), detailText(folk), isWorking(folk), onStop(folk), stopText(), ...
  * Returns false when the page is not in the DOM yet.
  */
+let restockPanels = 0;
+
 export function renderFolkCards(folks, view) {
   const list = document.getElementById(LIST_ID);
   const template = document.getElementById(CARD_TEMPLATE_ID);
@@ -85,6 +87,18 @@ export function renderFolkCards(folks, view) {
   return true;
 }
 
+/** Redraws these Folks' cards alone, in place. False when one has no card yet: that takes a full draw. */
+export function refreshFolkCards(folks, view) {
+  const list = document.getElementById(LIST_ID);
+  if (list === null) return false;
+  const cols = new Map();
+  list.querySelectorAll(':scope > [data-wf-folk]').forEach((el) => cols.set(el.dataset.wfFolk, el));
+  if (folks.some((folk) => !cols.has(folk.id))) return false;
+  for (const folk of folks) fillCard(cols.get(folk.id), folk, view);
+  scheduleEqualize(list);
+  return true;
+}
+
 /**
  * Closed cards in one row share one height, so their action bands line up; an open Details grows only its own card
  * (user, build .61: "while details are expanded - do not pull other blocks"). The list no longer stretches its
@@ -118,24 +132,33 @@ export function equalizeCards(list, minSpare = Infinity) {
     if (!rows.has(top)) rows.set(top, []);
     rows.get(top).push({ col, card });
   });
+  const shared = [];
   rows.forEach((row) => {
     // A card alone in its row has nothing to match: writing to it on every redraw made phones scroll by themselves.
     if (row.length === 1) {
       const { card } = row[0];
       if (card.style.minHeight !== '') card.style.minHeight = '';
       dreamOf(card)?.classList.add('d-none');
-      return;
-    }
-    // Each column holds its height while its card is measured, so nothing below it moves and the page stays where it is.
-    row.forEach((c) => { c.col.style.height = `${c.col.getBoundingClientRect().height}px`; });
-    // Measured without their daydreams: a daydream only fills height another card in the row already gives (build .155).
-    row.forEach((c) => { c.card.style.minHeight = ''; dreamOf(c.card)?.classList.add('d-none'); });
-    row.forEach((c) => {
-      const details = c.card.querySelector('[data-wf="details"]');
-      c.extra = details !== null && !details.classList.contains('d-none')
-        ? details.getBoundingClientRect().height + (parseFloat(getComputedStyle(details).marginTop) || 0) : 0;
-      c.base = c.card.getBoundingClientRect().height - c.extra;
-    });
+    } else shared.push(row);
+  });
+  const all = shared.flat();
+  if (all.length === 0) return;
+  // All reads, then all writes: reading between writes makes the browser lay the whole page out again each time.
+  const heights = all.map((c) => c.col.getBoundingClientRect().height);
+  // Each column holds its height while its card is measured, so nothing below it moves and the page stays where it is.
+  // Measured without their daydreams: a daydream only fills height another card in the row already gives (build .155).
+  all.forEach((c, i) => {
+    c.col.style.height = `${heights[i]}px`;
+    c.card.style.minHeight = '';
+    dreamOf(c.card)?.classList.add('d-none');
+  });
+  all.forEach((c) => {
+    const details = c.card.querySelector('[data-wf="details"]');
+    c.extra = details !== null && !details.classList.contains('d-none')
+      ? details.getBoundingClientRect().height + (parseFloat(getComputedStyle(details).marginTop) || 0) : 0;
+    c.base = c.card.getBoundingClientRect().height - c.extra;
+  });
+  shared.forEach((row) => {
     const base = Math.max(...row.map((c) => c.base));
     row.forEach((c) => {
       c.card.style.minHeight = `${base + c.extra}px`;
@@ -144,22 +167,38 @@ export function equalizeCards(list, minSpare = Infinity) {
       const quiet = alert === null || alert.classList.contains('d-none');
       if (dream !== null && dream.dataset.wfReady === '1' && quiet && base - c.base >= minSpare) dream.classList.remove('d-none');
     });
-    row.forEach((c) => { c.col.style.height = ''; });
   });
+  all.forEach((c) => { c.col.style.height = ''; });
 }
 
 let pending = false;
 let dreamSpare = Infinity; // the spare height a daydream needs, from the view (no daydreams without one)
-/** Once per frame at most; again whenever the list's width changes (a resize, the page shown, the menu opened). */
+let cardsChanged = true; // something that can change a card's height happened since they were last measured
+let cardWatch = null;
+/** A mastery bar's numbers change on every action and never the card's height. */
+const inMastery = (node) => (node.nodeType === 1 ? node : node.parentElement)?.closest('mastery-display') != null;
+/**
+ * Once per frame at most, and only after a change that can move a card's height: its text, its classes, a picture
+ * loaded, or the list's width (a resize, the page shown, the menu opened). A redraw that changed nothing measures nothing.
+ */
 function scheduleEqualize(list) {
   if (!list.dataset.wfEqualize && typeof ResizeObserver === 'function') {
     list.dataset.wfEqualize = '1';
     let width = -1;
-    new ResizeObserver(() => { if (list.clientWidth !== width) { width = list.clientWidth; scheduleEqualize(list); } }).observe(list);
+    const changed = () => { cardsChanged = true; scheduleEqualize(list); };
+    new ResizeObserver(() => { if (list.clientWidth !== width) { width = list.clientWidth; changed(); } }).observe(list);
+    cardWatch = new MutationObserver((records) => { if (records.some((r) => !inMastery(r.target))) changed(); });
+    cardWatch.observe(list, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class'] });
+    list.addEventListener('load', changed, true);
   }
-  if (pending) return;
+  if (pending || !cardsChanged) return;
   pending = true;
-  requestAnimationFrame(() => { pending = false; try { equalizeCards(list, dreamSpare); } catch {} });
+  requestAnimationFrame(() => {
+    pending = false;
+    cardsChanged = false;
+    try { equalizeCards(list, dreamSpare); } catch {}
+    cardWatch?.takeRecords(); // the measuring's own writes are not a change
+  });
 }
 
 /** A one-line text that slides to its end and back while it is longer than its box (build .154). */
@@ -199,8 +238,14 @@ export function marqueeLine(tag, cls, value) {
 }
 
 function fillCard(col, folk, view) {
+  // Each part is looked up once per card: a redraw asks for about sixty of them.
+  const parts = col.wfParts ?? (col.wfParts = new Map());
   const set = (key, fn) => {
-    const el = col.querySelector(`[data-wf="${key}"]`);
+    let el = parts.get(key);
+    if (el === undefined || (el !== null && col.isConnected && !el.isConnected)) {
+      el = col.querySelector(`[data-wf="${key}"]`);
+      parts.set(key, el);
+    }
     if (el !== null) fn(el);
   };
   const setText = (el, text) => { if (el.textContent !== text) el.textContent = text; };
@@ -327,7 +372,8 @@ function fillCard(col, folk, view) {
     const bar = el.querySelector('[data-wf="hp-bar"]');
     if (bar !== null) {
       bar.style.width = `${hp.percent}%`;
-      bar.className = `progress-bar ${hp.percent > 50 ? 'bg-success' : hp.percent > 25 ? 'bg-warning' : 'bg-danger'}`;
+      const className = `progress-bar ${hp.percent > 50 ? 'bg-success' : hp.percent > 25 ? 'bg-warning' : 'bg-danger'}`;
+      if (bar.className !== className) bar.className = className;
     }
     const text = el.querySelector('[data-wf="hp-text"]');
     if (text !== null) setText(text, hp.text);
@@ -372,6 +418,8 @@ function fillCard(col, folk, view) {
     fill.onclick = () => view.onRestock(folk);
     setAttr(more, 'aria-label', view.text('MOD_WF_RESTOCK_AMOUNT'));
     setAttr(more, 'aria-expanded', `${open}`);
+    if (panel.id === '') { restockPanels += 1; panel.id = `wf-restock-panel-${restockPanels}`; }
+    setAttr(more, 'aria-controls', panel.id);
     if (!canPick) return;
     panel.wfRestock = rv;
     const range = panel.querySelector('.wf-restock-range');
@@ -385,7 +433,7 @@ function fillCard(col, folk, view) {
       const full = n >= v.space;
       const put = (sel, text) => { const e = panel.querySelector(sel); if (e !== null) setText(e, text); };
       put('.wf-restock-up-to', view.text('MOD_WF_RESTOCK_UP_TO'));
-      put('.wf-restock-value', `${v.hoursAt(n)}\u00a0h`);
+      put('.wf-restock-value', view.text('MOD_WF_HOURS_SHORT', { hours: `${v.hoursAt(n)}` }));
       put('.wf-restock-now', view.text('MOD_WF_RESTOCK_NOW', { hours: v.nowText }));
       put('.wf-restock-full', view.text('MOD_WF_RESTOCK_FULL', { hours: v.fullText }));
       put('.wf-restock-cost-label', v.costLabel(n));
@@ -517,7 +565,7 @@ function fillCard(col, folk, view) {
       const current = auto.lines.find((l) => l.value === auto.at);
       if (button !== null) {
         button.disabled = auto.disabled === true;
-        setText(button, current?.text ?? '');
+        setText(button.querySelector('.wf-pick-text') ?? button, current?.text ?? '');
         setAttr(button, 'aria-label', `${auto.pickLabel}: ${current?.text ?? ''}`);
       }
       // Rebuilt only when the lines or the pick change, so an open menu survives the card's redraws (the menu element
@@ -563,7 +611,7 @@ function fillCard(col, folk, view) {
       b.className = `dropdown-item${o.id === pick.current ? ' active' : ''}${off ? ' wf-job-off' : ''}`;
       if (off) {
         b.setAttribute('aria-disabled', 'true');
-        b.title = o.why;
+        view.tip(b, o.why);
       }
       if (o.media) {
         const img = document.createElement('img');
@@ -587,7 +635,7 @@ function fillCard(col, folk, view) {
     const rate = el.querySelector('[data-wf="supplied-rate"]');
     setText(rate, v.rate);
     rate.classList.toggle('wf-off', !v.on);
-    rate.title = v.rateTip;
+    view.tip(rate, v.rateTip);
     const rows = el.querySelector('[data-wf="supplied-rows"]');
     const key = JSON.stringify(v.rows);
     if (rows.dataset.key === key) return;
@@ -632,8 +680,12 @@ function fillCard(col, folk, view) {
     if (el.dataset.wfMasterySlot !== slot.id) {
       el.setMastery(view.skill, slot);
       el.dataset.wfMasterySlot = slot.id;
+      el.wfDrawn = '';
     }
-    el.updateValues(view.masteryProgress(folk));
+    // Drawn only when it moved: the game's draw writes full numbers and this card's short ones over them, every time.
+    const progress = view.masteryProgress(folk);
+    const drawn = `${progress.level}|${progress.xp}|${progress.nextLevelXP}|${progress.percent}`;
+    if (el.wfDrawn !== drawn) { el.wfDrawn = drawn; el.updateValues(progress); }
   });
   const expanded = view.isExpanded(folk);
   // ▸ closed, ▾ open, before the word, as the gear bonuses and the game's folds (scan A-32); the glyph
@@ -802,7 +854,7 @@ function fillCard(col, folk, view) {
         // Grey but still hoverable (aria-disabled, not disabled), so its tooltip can say what is missing.
         settle.classList.toggle('disabled', !info.canSettle);
         setAttr(settle, 'aria-disabled', `${!info.canSettle}`);
-        view.tip(settle, info.settleWhy ?? '');
+        view.tip(settle, info.settleTip ?? info.settleWhy ?? '');
         settle.onclick = () => { if (info.canSettle) info.onSettle(); };
       }
     }

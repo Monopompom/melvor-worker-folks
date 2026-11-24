@@ -19,12 +19,20 @@ const CHECK_TICKS = 20;
 /** How often the board looks whether the town still owes the charter (every 10 s). */
 const CHARTER_CHECK_TICKS = 200;
 
-export function install(ctx, { getHiring, model, stories = [], resume, time, numbers, tips, marquee, popupDidRender, log }) {
+export function install(ctx, { swalClass, getHiring, model, stories = [], resume, time, numbers, tips, marquee, popupDidRender, log }) {
   let hiring;
   let state = null;
   let ticks = 0;
   /** Folks whose run starts at the next tick (decided after an action, started outside it). */
   const due = new Set();
+  /** Folks a courier serves whose room filled up: they stop at the next tick, until a courier takes the load. */
+  const fullDue = new Set();
+  /** Folk id → { tick, value }: whether a courier serves it, looked up at most once a second. */
+  const servedKept = new Map();
+  /** Commission id → { tick, qty }: its items aboard carriers, counted at most once a second. */
+  const aboardKept = new Map();
+  /** The tick of the last load: the jobs' first tick is still to come just after it. */
+  let loadedAt = 0;
   /** What a Folk was working on when it set off, to start it again on its return (not saved). */
   const picks = new Map();
   let nextId = 0;
@@ -217,7 +225,7 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
   const resourceText = (id, amount) => templateLangString('MOD_WF_COMM_REWARD_RESOURCE', { qty: n(amount), resource: resourceOf(id)?.name ?? id });
 
   /** Pays a delivered commission: resources, Standing, Hiring XP; shown even with Folks' gain popups hidden. */
-  const payDelivered = (c, folk) => {
+  const payDelivered = (c, folk, credit = folk) => {
     const p = model.payout(c);
     const added = addResources(c.resourceId, p.resources);
     const tiers = model.gainStanding(state.standing, p.standing);
@@ -239,11 +247,11 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
       const gives = id === 'Trusted' ? ` ${getLangString('MOD_WF_COMM_TIER_GIVES_Trusted')}` : '';
       notify('success', `${templateLangString('MOD_WF_COMM_TIER_UP', { tier: getLangString(`MOD_WF_STANDING_${id}`) })}${gives}`, township()?.media);
     }
-    hiring.events.emit('commissionDelivered', { commission: c, folk, reward: { ...p, resources: added, xp }, offline: !online() });
+    hiring.events.emit('commissionDelivered', { commission: c, folk: credit ?? folk, carriedBy: credit === folk ? null : folk?.id ?? null, reward: { ...p, resources: added, xp }, offline: !online() });
     log(`commission delivered: ${c.id} ${c.figure} ${c.itemId} ×${c.qty}`, p);
     if (c.story !== undefined) {
       // The next step takes the card's place; the last one finishes the story and the town hands over its deed.
-      const r = model.advanceStory(state, c, rollOpts(), folk?.name ?? null, Date.now());
+      const r = model.advanceStory(state, c, rollOpts(), (credit ?? folk)?.name ?? null, Date.now());
       if (r.finished !== null) {
         notify('success', templateLangString('MOD_WF_STORY_FINISHED', { story: storyTitle(r.finished.id), line: getLangString(`MOD_WF_STORY_${r.finished.id}_DONE`) }), media(model.storyMedia(r.finished.id)));
         log(`story finished: ${r.finished.id}`);
@@ -276,11 +284,31 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
 
   // ---- sending a Folk, runs ----------------------------------------------------------------------------------------
 
+  /** Whether a courier on its job calls at this Folk: it then makes no run of its own. */
+  const served = (folk) => {
+    const kept = servedKept.get(folk.id);
+    if (kept !== undefined && ticks - kept.tick < CHECK_TICKS) return kept.value;
+    const value = (hiring.carry?.servedBy(folk, { running: ticks - loadedAt >= CHECK_TICKS * 2 }).length ?? 0) > 0;
+    servedKept.set(folk.id, { tick: ticks, value });
+    return value;
+  };
+  /** How many of this commission's items ride with carriers. */
+  const aboardFor = (c) => {
+    const kept = aboardKept.get(c.id);
+    if (kept !== undefined && ticks - kept.tick < CHECK_TICKS) return kept.qty;
+    const qty = hiring.crew.all.filter((f) => hiring.room?.isCarrier(f) === true).reduce((sum, f) => sum + hiring.room.townQty(f, c.itemIds), 0);
+    aboardKept.set(c.id, { tick: ticks, qty });
+    return qty;
+  };
+  const claimsMore = (folk, c) => model.claimsMore({ townQty: hiring.room?.townQty(folk, c.itemIds) ?? 0, aboard: aboardFor(c), remaining: model.remaining(c) });
+
   /** The commission this Folk's action fills with `item`, or undefined (room.mjs diverts the item when there is one). */
   const claim = (folk, item) => {
     if (state === null || folk === undefined || item === undefined || state.runs[folk.id] !== undefined) return undefined;
     const c = model.commissionOf(state, folk.id);
-    return c !== undefined && c.itemIds.includes(item.id) ? c : undefined;
+    if (c === undefined || !c.itemIds.includes(item.id)) return undefined;
+    // A served Folk has no run to size its load: it stops claiming once enough is on its way.
+    return served(folk) && !claimsMore(folk, c) ? undefined : c;
   };
 
   const send = (c) => {
@@ -326,7 +354,6 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
   };
   /** Standing points as a card shows them: a whole number, or one decimal under 10 (a quarter of 8 h is 2). */
   const standingText = (points) => numberWithCommas(points >= 10 ? Math.round(points) : Math.round(points * 10) / 10);
-  const swalClass = (c) => (typeof createSwalCustomClass === 'function' ? createSwalCustomClass(c) : c);
   const openDecline = (c) => {
     if (state === null || !model.canDecline(c)) return;
     const price = model.declinePrice(state, c);
@@ -341,7 +368,7 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
       imageHeight: 64,
       imageAlt: '',
       // Standing goes for good: red confirm, blue-outline cancel, like Forget.
-      customClass: swalClass({ popup: 'wf-ui', confirmButton: 'btn btn-danger m-1', cancelButton: 'btn btn-outline-info m-1' }),
+      customClass: swalClass({ popup: 'wf-ui wf-pic', confirmButton: 'btn btn-danger m-1' }),
       showCancelButton: true,
       confirmButtonText: getLangString('MOD_WF_COMM_DECLINE'),
       cancelButtonText: getLangString('MOD_WF_BUTTON_CANCEL'),
@@ -387,23 +414,80 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
     const c = model.commissionOf(state, folk.id);
     if (c === undefined || hiring.room === undefined) return;
     const townQty = hiring.room.townQty(folk, c.itemIds);
-    if (model.runDue({ townQty, remaining: model.remaining(c), usedMs: hiring.room.usedMs(folk), capMs: hiring.room.capMs(folk), nextMs: nextMs(folk, intervalMs) })) due.add(folk.id);
+    const usedMs = hiring.room.usedMs(folk);
+    const capMs = hiring.room.capMs(folk);
+    if (served(folk)) {
+      if (townQty > 0 && claimsMore(folk, c) && usedMs + Math.max(0, nextMs(folk, intervalMs)) > capMs) fullDue.add(folk.id);
+      return;
+    }
+    if (model.runDue({ townQty, remaining: model.remaining(c), usedMs, capMs, nextMs: nextMs(folk, intervalMs) })) due.add(folk.id);
   };
 
-  const startRun = (folkId) => {
+  /**
+   * Once a second. A Folk with town goods and no courier now sets off by itself when its room is full or holds the rest
+   * (one stopped full starts again after the run). Town goods nothing will hand in go over to the haul side.
+   */
+  const townCheck = () => {
+    for (const folk of hiring.crew.all) {
+      if (folk.room === undefined || Object.keys(folk.room.town ?? {}).length === 0) continue;
+      const c = model.commissionOf(state, folk.id);
+      const onRun = state.runs[folk.id] !== undefined;
+      if (c === undefined) {
+        if (model.townStray({ hasCommission: false, onRun, onStrike: folk.onStrike === true, carrier: hiring.room?.isCarrier(folk) === true || hiring.jobs?.isReturningCarrier(folk) === true })) hiring.room?.townHome(folk);
+        continue;
+      }
+      if (onRun || due.has(folk.id) || !hiring.folkAvailable(folk) || served(folk)) continue;
+      const townQty = hiring.room.townQty(folk, c.itemIds);
+      const wasFull = hiring.room.isFull(folk);
+      if (townQty > 0 && (wasFull || model.runDue({ townQty, remaining: model.remaining(c), usedMs: hiring.room.usedMs(folk), capMs: hiring.room.capMs(folk), nextMs: nextMs(folk, 0) }))) startRun(folk.id, { wasFull });
+    }
+  };
+
+  /**
+   * A carrier hands in what it holds for the town: each open commission, soonest deadline first. The notice names the
+   * carrier; a story's credit stays with the Folk on the commission. What none wants goes to the carrier's haul side.
+   */
+  const handIn = (courier) => {
+    const delivered = [];
+    if (state !== null) {
+      for (const c of model.handInOrder(state.commissions)) {
+        const taken = hiring.room.takeTown(courier, c.itemIds, model.remaining(c));
+        if (taken <= 0) continue;
+        // Read first: a finished commission lets go of its Folk.
+        const maker = byId(c.folkId);
+        const { added, done } = model.deliver(c, taken);
+        delivered.push({ commissionId: c.id, figure: c.figure, itemId: c.itemId, qty: added, done });
+        if (done) {
+          payDelivered(c, courier, maker);
+          if (maker !== undefined && state.runs[maker.id] === undefined) hiring.room.townHome(maker);
+        } else if (added > 0) {
+          notify('success', templateLangString('MOD_WF_COMM_RUN_DONE', { name: courier.name, figure: figureName(c.figure), qty: n(added), left: n(model.remaining(c)) }), portraitOf(c.figure));
+        }
+      }
+    }
+    const home = (hiring.room.roomOf(courier)?.town ?? []).map(({ itemId, qty }) => ({ itemId, qty }));
+    hiring.room.townHome(courier);
+    aboardKept.clear();
+    hiring.renderQueue.folks = true;
+    markDirty();
+    return { delivered, home };
+  };
+
+  const startRun = (folkId, { wasFull = false } = {}) => {
     const folk = byId(folkId);
     const c = folk === undefined ? undefined : model.commissionOf(state, folkId);
     if (c === undefined || state.runs[folkId] !== undefined) return;
     const skill = hiring.skillOf(folk);
     const working = skill !== undefined && hiring.delegated.has(skill);
-    const pick = working ? resume.selectionOf(skill) : null;
+    // A Folk stopped full has lost its pick in some skills: what it last worked on is what it goes back to.
+    const pick = working ? resume.selectionOf(skill) : wasFull ? hiring.lastPick?.(skill) ?? null : null;
     if (working) {
       picks.set(folkId, pick);
       hiring.forceStop(skill);
     }
     // The pick goes into the save as ids too, so the Folk starts on the same thing after a reload.
     // A Local Folk knows the way: half the time.
-    state.runs[folkId] = { ticks: model.runTicksFor(folk.townsfolk === true), commissionId: c.id, restart: working, pick: resume.toSaved(pick) };
+    state.runs[folkId] = { ticks: model.runTicksFor(folk.townsfolk === true), commissionId: c.id, restart: working || wasFull, pick: resume.toSaved(pick) };
     const carried = hiring.room?.townQty(folk, c.itemIds) ?? 0;
     notify('success', templateLangString('MOD_WF_COMM_RUN_START', { name: folk.name, figure: figureName(c.figure), qty: n(carried), item: itemOf(c.itemId)?.name ?? c.itemId }), portraitOf(c.figure));
     hiring.events.emit('commissionRun', { commission: c, folk, qty: carried, offline: !online() });
@@ -445,7 +529,11 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
       hiring.room?.townHome(folk);
     }
     if (skill !== undefined) hiring.payroll?.chargeTime?.(folk, skill, model.runTicksFor(folk.townsfolk === true) * TICK_INTERVAL);
-    if (run.restart) restart(folk, run.pick);
+    if (run.restart) {
+      // A Folk stopped full: its room has space again.
+      hiring.room?.roomMoved(folk);
+      restart(folk, run.pick);
+    }
     hiring.renderQueue.folks = true;
     markDirty();
   };
@@ -473,8 +561,17 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
     if (due.size > 0) {
       const ids = [...due];
       due.clear();
-      ids.forEach(startRun);
+      ids.forEach((id) => startRun(id));
     }
+    if (fullDue.size > 0) {
+      const ids = [...fullDue];
+      fullDue.clear();
+      ids.forEach((id) => {
+        const folk = byId(id);
+        if (folk !== undefined && served(folk)) hiring.room?.stopFull(folk);
+      });
+    }
+    if (ticks % CHECK_TICKS === 0) townCheck();
     if (ticks % CHECK_TICKS === 0 && state.commissions.length < slots()) fillNow();
     if (ticks % CHARTER_CHECK_TICKS === 0) {
       grantCharter();
@@ -510,11 +607,12 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
     const left = model.deadlineLeft(c);
     const when = left > 0 ? templateLangString('MOD_WF_COMM_DUE', { time: time.shortTime(left * TICK_INTERVAL) }) : getLangString('MOD_WF_COMM_LATE_SHORT');
     const makes = makesItem(folk, c);
+    const way = served(folk) ? getLangString('MOD_WF_COMM_SERVED') : templateLangString(runs === 1 ? 'MOD_WF_COMM_RUNS_ONE' : 'MOD_WF_COMM_RUNS', { count: full(runs) });
     return {
       icon: portraitOf(c.figure),
-      text: templateLangString('MOD_WF_COMM_CARD', { figure, done: n(c.delivered + (hiring.room?.townQty(folk, c.itemIds) ?? 0)), qty: n(c.qty), item: itemOf(c.itemId)?.name ?? c.itemId }),
+      text: templateLangString('MOD_WF_COMM_CARD', { figure, done: n(Math.min(c.qty, c.delivered + (hiring.room?.townQty(folk, c.itemIds) ?? 0) + aboardFor(c))), qty: n(c.qty), item: itemOf(c.itemId)?.name ?? c.itemId }),
       sub: makes === false ? templateLangString('MOD_WF_COMM_CARD_WRONG', { skill: hiring.skillName(c.skillId), item: itemOf(c.itemId)?.name ?? c.itemId })
-        : `${templateLangString(runs === 1 ? 'MOD_WF_COMM_RUNS_ONE' : 'MOD_WF_COMM_RUNS', { count: full(runs) })} · ${when}`,
+        : `${way} · ${when}`,
       warn: makes === false || left <= 0,
       tip: [templateLangString('MOD_WF_COMM_ASK', { qty: full(c.qty), item: itemOf(c.itemId)?.name ?? c.itemId }), templateLangString('MOD_WF_COMM_CARD_TIP', { figure })],
     };
@@ -537,10 +635,23 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
 
   const openHelp = () => {
     const body = el('div', 'text-center wf-help-body');
-    for (const k of [1, 2, 3, 4]) {
+    const helpLines = (text) => text.split(/(?<=[.!?])\s+|(?<=[。！？])(?![”」』）])/).filter(Boolean);
+    for (const k of [1, 2, 3, 'RANKS', 4, 5]) {
       const b = el('div', 'wf-band');
       b.append(el('div', 'wf-help-head', getLangString(`MOD_WF_COMM_HELP_${k}_HEAD`)));
-      getLangString(`MOD_WF_COMM_HELP_${k}`).split(/(?<=[.!?])\s+|(?<=[。！？])(?![”」』）])/).filter(Boolean).forEach((l) => b.append(el('p', 'wf-help-p', l)));
+      if (k === 'RANKS') {
+        // What each Standing brings, its name over its text: two columns squeeze the text to a word a line on a phone.
+        const ranks = el('div', 'wf-help-ranks');
+        for (const n of [1, 2, 3]) {
+          const rank = el('div', 'wf-help-rank');
+          rank.append(el('div', 'font-w600', getLangString(`MOD_WF_COMM_HELP_RANK_${n}`)), el('div', '', getLangString(`MOD_WF_COMM_HELP_GIVES_${n}`)));
+          ranks.append(rank);
+        }
+        b.append(ranks);
+        helpLines(getLangString('MOD_WF_COMM_HELP_RANKS_NOTE')).forEach((l) => b.append(el('p', 'wf-help-p', l)));
+      } else {
+        helpLines(getLangString(`MOD_WF_COMM_HELP_${k}`)).forEach((l) => b.append(el('p', 'wf-help-p', l)));
+      }
       body.append(b);
     }
     const cls = { popup: 'wf-ui', confirmButton: 'btn btn-success m-1' };
@@ -550,7 +661,7 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
       width: '38rem',
       html: body,
       confirmButtonText: getLangString('MOD_WF_BUTTON_GOT_IT'),
-      customClass: typeof createSwalCustomClass === 'function' ? createSwalCustomClass(cls) : cls,
+      customClass: swalClass(cls),
     });
   };
 
@@ -594,10 +705,10 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
     SwalLocale.fire({
       didRender: popupDidRender,
       title: getLangString('MOD_WF_STORY_HISTORY_TITLE'),
-      width: '34rem',
+      width: '38rem',
       html: body,
       confirmButtonText: getLangString('MOD_WF_BUTTON_GOT_IT'),
-      customClass: typeof createSwalCustomClass === 'function' ? createSwalCustomClass(cls) : cls,
+      customClass: swalClass(cls),
     });
   };
   let historyButton = null;
@@ -702,7 +813,7 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
     card.append(skillLine);
 
     const folk = byId(c.folkId);
-    const held = folk === undefined ? 0 : (hiring.room?.townQty(folk, c.itemIds) ?? 0);
+    const held = folk === undefined ? 0 : (hiring.room?.townQty(folk, c.itemIds) ?? 0) + aboardFor(c);
     const bar = el('div', 'progress wf-order-bar mt-2');
     const fillBar = el('div', `progress-bar ${done ? 'bg-success' : 'bg-info'}`);
     fillBar.setAttribute('role', 'progressbar');
@@ -799,7 +910,9 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
         } else if (busy !== undefined) {
           pair.append(marquee('small', 'wf-subtle wf-min0 flex-fill', templateLangString('MOD_WF_COMM_BUSY', { name: holder.name, figure: figureName(busy.figure) })));
         } else {
-          const go = el('button', 'btn btn-sm btn-info text-truncate wf-min0 ml-auto', templateLangString('MOD_WF_COMM_SEND', { name: holder.name }));
+          // The button keeps its whole verb in every language; the Folk's name goes on the line above it and wraps.
+          foot.append(el('small', 'wf-subtle wf-comm-who', holder.name));
+          const go = el('button', 'btn btn-sm btn-success flex-shrink-0 ml-auto', getLangString('MOD_WF_COMM_SEND'));
           go.type = 'button';
           go.addEventListener('click', () => send(c));
           tips?.set(go, templateLangString('MOD_WF_COMM_SEND_TIP', { name: holder.name, figure: figureName(c.figure) }));
@@ -822,9 +935,9 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
     lv: level(),
     tier: tier(),
     points: Math.floor(state?.standing.points ?? 0),
-    crew: hiring.crew.all.map((f) => [f.id, f.skillId]),
+    crew: hiring.crew.all.map((f) => [f.id, f.skillId, f.name]),
     c: state?.commissions.map((c) => [c.id, c.story?.step ?? 0, c.delivered, c.state, c.late, c.folkId, Math.floor(model.deadlineLeft(c) / 72000),
-      c.folkId === null ? 0 : (hiring.room?.townQty(byId(c.folkId), c.itemIds) ?? 0)]) ?? null,
+      c.folkId === null ? 0 : (hiring.room?.townQty(byId(c.folkId), c.itemIds) ?? 0) + aboardFor(c)]) ?? null,
     runs: state === null ? null : Object.entries(state.runs).map(([id, r]) => [id, Math.floor(r.ticks / 1200)]),
     room: state?.commissions.some((c) => c.state === 'open' && storageFree() < Math.floor(model.payout(c).resources)) ?? false,
   });
@@ -938,9 +1051,10 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
         tips?.set(i, x.item?.name ?? x.id);
         row.append(i);
       });
-      const mult = Math.round(hl.multiplier() * 100) / 100;
+      const raw = Math.round(hl.multiplier() * 100) / 100;
+      const mult = formatFixed(raw, Number.isInteger(raw) ? 0 : Number.isInteger(raw * 10) ? 1 : 2);
       tile(row, 'MOD_WF_GUILD_HEIRLOOMS', count(heldCount, list.length),
-        [heldCount >= list.length ? [getLangString('MOD_WF_GUILD_HEIRLOOMS_ALL'), 'text-success'] : [templateLangString('MOD_WF_GUILD_HEIRLOOMS_FIND', { mult: `${mult}` }), 'wf-subtle']]);
+        [heldCount >= list.length ? [getLangString('MOD_WF_GUILD_HEIRLOOMS_ALL'), 'text-success'] : [templateLangString('MOD_WF_GUILD_HEIRLOOMS_FIND', { mult }), 'wf-subtle']]);
     }
     if (tiles.length === 0) return null;
     const box = el('div', 'wf-guild');
@@ -989,6 +1103,9 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
   const api = {
     get state() { return state; },
     claim,
+    handIn,
+    /** Whether this Folk is on its own run to town now. */
+    onRun(folk) { return state?.runs[folk?.id] !== undefined; },
     cardView,
     wire,
     render,
@@ -1076,6 +1193,10 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
       if (c.folkId !== null && (folk === undefined || folk.skillId !== c.skillId)) c.folkId = null;
     });
     due.clear();
+    fullDue.clear();
+    servedKept.clear();
+    aboardKept.clear();
+    loadedAt = ticks;
     picks.clear();
     try { resizeOld(); } catch (err) { log('old commissions not resized', err); }
     fillNow();
@@ -1085,6 +1206,7 @@ export function install(ctx, { getHiring, model, stories = [], resume, time, num
       if (state === null) return;
       delete state.runs[folk.id];
       due.delete(folk.id);
+      fullDue.delete(folk.id);
       state.commissions.forEach((c) => { if (c.folkId === folk.id) c.folkId = null; });
       markDirty();
     });

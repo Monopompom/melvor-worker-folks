@@ -44,6 +44,10 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
     byJob(jobId) {
       return folks.find((f) => f.job === jobId);
     },
+    /** Every Folk on this job, in crew order: a shared job has several. */
+    holdersOf(jobId) {
+      return folks.filter((f) => f.job === jobId);
+    },
     /** Supply lines (round 3): [{ supplierId, receiverId }] for every Folk that supplies another in the crew. */
     get links() {
       return folks.filter((f) => f.supplies !== null && folks.some((r) => r.id === f.supplies)).map((f) => ({ supplierId: f.id, receiverId: f.supplies }));
@@ -133,7 +137,7 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
         id: makeId(),
         slot,
         tier,
-        name: name ?? pickName(folks.map((f) => f.name), rng),
+        name: name ?? pickName(folks.flatMap((f) => (f.born === undefined ? [f.name] : [f.name, f.born])), rng),
         hiredAt: now(),
         paid,
       });
@@ -159,16 +163,18 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
      * Gives a Folk a nickname, or its hired name back. Returns null when done, or what is wrong with it (folk.mjs
      * nickProblem), and nothing changes then.
      */
-    rename(id, text) {
+    rename(id, text, { reserved = [] } = {}) {
       const folk = this.byId(id);
       if (folk === undefined) return 'empty';
       const nick = model.cleanNick(text);
-      const original = folk.born ?? folk.name;
-      if (nick !== original) {
-        const problem = model.nickProblem(nick, folks.filter((f) => f !== folk).map((f) => f.name));
-        if (problem !== null) return problem;
-      }
       if (nick === folk.name) return null;
+      const original = folk.born ?? folk.name;
+      const others = folks.filter((f) => f !== folk).map((f) => f.name);
+      // A hired name may be outside the nickname rules, but two Folks still never share one.
+      const problem = nick === original
+        ? (model.nickProblem(nick, others) === 'taken' ? 'taken' : null)
+        : model.nickProblem(nick, others, reserved);
+      if (problem !== null) return problem;
       if (nick === original) delete folk.born;
       else folk.born = original;
       folk.name = nick;
@@ -223,11 +229,12 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
      * leaves its skill and stays put, unless the job `travels` (it works wherever the Folk is, along with the player
      * included). A new job starts with an empty memory.
      */
-    assignJob(id, jobId, { travels = false } = {}) {
+    assignJob(id, jobId, { travels = false, shared = false } = {}) {
       const folk = this.byId(id);
       if (folk === undefined) return false;
       if (jobId !== null) {
-        const holder = this.byJob(jobId);
+        // One Folk per job, unless the job is shared.
+        const holder = shared ? undefined : this.byJob(jobId);
         if (holder !== undefined && holder !== folk) this.assignJob(holder.id, null);
         if (folk.skillId !== null) this.assign(folk.id, null);
         // A job makes nothing: its supply line ends.

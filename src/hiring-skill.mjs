@@ -11,16 +11,9 @@ export const HIRE_PURCHASE = { Newbie: 'Hire_Newbie', Junior: 'Hire_Junior', Mid
 export const SHIFT_SLOT_PURCHASE = 'Shift_Slot';
 /** Marks the start of mod data inside the skill's save region ("WOLK"). */
 export const SAVE_MAGIC = 0x574f4c4b;
-/**
- * Popup buttons (build .55): confirm green, cancel blue outline (the game's default cancel is red and grey
- * means disabled). Promote is an upgrade and stays the game's primary blue; Fire loses the Folk, so its confirm is red.
- */
-const swalClass = (extra = {}) => {
-  const cls = { popup: 'wf-ui', confirmButton: 'btn btn-success m-1', cancelButton: 'btn btn-outline-info m-1', ...extra };
-  return typeof createSwalCustomClass === 'function' ? createSwalCustomClass(cls) : cls;
-};
 
-export function createHiringClass({ popupDidRender, titleName = (s) => s, time, numbers, selectDelegable, log, createCrew, createEventBus, createGuards, folkView, folkModel, pickName, renderFolkCards, cardListId, renderReservePanel, produceRate, rules, perks, promotion, pricing, tips, layout, dashboard, daydream }) {
+
+export function createHiringClass({ swalClass, popupDidRender, titleName = (s) => s, time, numbers, selectDelegable, log, createCrew, createEventBus, createGuards, folkView, folkModel, pickName, renderFolkCards, refreshFolkCards, cardDraw, cardListId, renderReservePanel, produceRate, rules, perks, promotion, pricing, tips, layout, dashboard, daydream }) {
   class FolkSlotAction extends MasteryAction {
     constructor(namespace, data, game, skill) {
       super(namespace, data, game);
@@ -51,6 +44,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       this.guards = createGuards({ onError: (err, kind) => console.error(`[Worker Folks] a ${kind} guard failed; allowed`, err) });
       /** This mod's own rules in the same shape (qualification.mjs), asked first; they see the Folk record itself. */
       this.ownGuards = createGuards({ onError: (err, kind) => console.error(`[Worker Folks] a built-in ${kind} guard failed; allowed`, err) });
+      /** True once a save's Hiring block was read: a character without one was saved without this mod, or is new. */
+      this.saveBlockRead = false;
       /** Every hired Folk. Persisted inside this skill's save region (see encode). */
       this.crew = createCrew({
         bus: this.events,
@@ -59,6 +54,10 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         maxSlots: MAX_FOLK_SLOTS,
       });
       this.renderQueue.folks = false;
+      /** Folks whose own card has new work to show, and whether other cards may need to catch up. */
+      this.cardMarks = new Set();
+      this.sweepLeft = []; // the cards a catch-up has still to redraw
+      this.cardsStale = false;
       /** Skills currently running beside the main action (delegation.mjs). */
       this.delegated = new Set();
       /** The delegated skill whose stop() is in progress (delegation.mjs). */
@@ -90,6 +89,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       });
       // The reserve panel and the Payroll bar are drawn with the Folk cards; a Folk's card shows what its hex allows.
       ['reserveChanged', 'folkMoved'].forEach((name) => this.events.on(name, () => { this.renderQueue.folks = true; }));
+      this.events.on('folkActionDone', ({ folk }) => this.markCard(folk));
       this.events.on('folkReleased', ({ skill: released, folk }) => {
         if (folk === undefined) return;
         this.pending.forEach((id, skill) => {
@@ -120,6 +120,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
     }
 
     decode(reader, version) {
+      this.saveBlockRead = true;
       super.decode(reader, version);
       if (peekUint32(reader) !== SAVE_MAGIC) return;
       reader.getUint32();
@@ -237,6 +238,13 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       return why !== '';
     }
 
+    /** This Folk's card has something new. Cards that show it from elsewhere catch up on the next full draw. */
+    markCard(folk) {
+      if (folk === undefined) return;
+      this.cardMarks.add(folk.id);
+      this.cardsStale = true;
+    }
+
     /** Guarded buttons and the Shop's lines follow a change outside this mod (the player moved, a guard came). */
     refreshGuarded() {
       this.renderQueue.folks = true;
@@ -324,6 +332,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       const tip = [getLangString('MOD_WF_CTRL_NET_TIP'), templateLangString('MOD_WF_CTRL_NET_MAKES', { amount: signed(p.makes), currency })];
       if (p.spends > 0) tip.push(templateLangString('MOD_WF_CTRL_NET_INPUTS', { amount: signed(-p.spends), currency }));
       if (p.wageCounted && p.wage > 0) tip.push(templateLangString('MOD_WF_CTRL_NET_WAGE', { amount: signed(-p.wage), currency }));
+      if (p.courier > 0) tip.push(templateLangString('MOD_WF_CTRL_NET_COURIER', { amount: signed(-p.courier), currency }));
       tip.push({ text: getLangString('MOD_WF_CTRL_NET_LEFT_OUT'), cls: 'text-muted' });
       return {
         segments: [{ icon: gp?.media, text: templateLangString('MOD_WF_CTRL_NET', { amount: signed(p.net), currency }) }],
@@ -386,14 +395,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       const skill = this.skillOf(folk);
       const cls = `wf-text-${status} font-w700`;
       lines.push({ icon: this.getMediaURL(`assets/status_${status}.webp`), text: getLangString(`MOD_WF_STATUS_${status}`), cls });
-      // A Folk that can't be picked says how to get it back (build .55).
-      if (status === 'strike') lines.push({ text: getLangString('MOD_WF_TILE_FIX_strike'), cls: 'text-warning' });
-      if (status === 'cooldown') lines.push({ text: templateLangString('MOD_WF_TILE_FIX_cooldown', { time: this.cooldownLeft(folk) }), cls: 'text-warning' });
       const where = this.whereText(folk);
       if (where !== '') lines.push({ text: where, cls: 'wf-subtle' });
-      // Refused by another mod for this page's skill (Voyage: not on this hex): the reason on the tile, never a popup.
-      const why = this.pickRefusal(folk, pageSkill);
-      if (why !== '') lines.push({ text: why, cls: 'text-warning' });
       // On a job: its icon and name, as a skill's line.
       const job = this.jobs?.of(folk);
       if (job !== undefined) lines.push({ segments: [{ icon: job.media, text: job.name }], cls });
@@ -418,10 +421,20 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       return skill.name;
     }
 
+    /** Why a Worker tile can't be picked ('' = it can): on hover and in a toast, never written on the tile. */
+    pickWhy(folk, skill) {
+      const status = this.statusOf(folk);
+      if (status === 'strike') return getLangString('MOD_WF_TILE_FIX_strike');
+      if (status === 'cooldown') return templateLangString('MOD_WF_TILE_FIX_cooldown', { time: this.cooldownLeft(folk) });
+      const refused = this.pickRefusal(folk, skill);
+      if (refused !== '') return refused;
+      return this.folkAvailable(folk) ? '' : getLangString(`MOD_WF_STATUS_${status}`);
+    }
+
     /** Entries for a skill page's Worker dropdown. */
     workerOptions(skill) {
       return rules.workerOptions({
-        folks: this.crew.all.map((f) => ({ id: f.id, name: f.name, tier: f.tier, skillId: f.skillId, available: this.folkAvailable(f) && this.pickRefusal(f, skill) === '', lines: this.folkLines(f, skill) })),
+        folks: this.crew.all.map((f) => ({ id: f.id, name: f.name, tier: f.tier, skillId: f.skillId, available: this.folkAvailable(f) && this.pickRefusal(f, skill) === '', why: this.pickWhy(f, skill), lines: this.folkLines(f, skill) })),
         skillId: skill.id,
         skillNameOf: (id) => this.skillName(id),
       });
@@ -558,6 +571,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         locked: capacityHours === 0,
         noCrew: this.crew.size === 0,
         tip: (el, content) => tips?.set(el, content),
+        short: numbers.shortNumber,
         owed: [...owed].map(([id, amount]) => ({ amount, name: this.game.currencies.getObjectByID(id)?.name ?? id })),
         currencies: ['melvorD:GP', 'melvorItA:AbyssalPieces']
           .map((id) => ({ id, currency: this.game.currencies.getObjectByID(id) }))
@@ -596,16 +610,53 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
     }
 
     renderFolks() {
-      if (!this.renderQueue.folks) return;
-      this.wireHelp();
-      dashboard?.wire(); // before the layout: it finds the Overview block by id
-      this.workOrders?.wire(); // the Work Orders block, likewise
-      this.commissions?.wire(); // and the Township Commissions block
-      layout?.wire({ rerender: () => { this.renderQueue.folks = true; } });
-      this.renderReserve();
-      layout?.refresh();
-      dashboard?.markDirty();
-      const done = renderFolkCards(layout?.orderFolks(this.crew.all) ?? this.crew.all, {
+      const marks = this.cardMarks;
+      if (!this.renderQueue.folks && marks.size === 0 && !this.cardsStale && this.sweepLeft.length === 0) return;
+      // The cards show on this page alone. On any other the flag waits, and opening the page draws them once.
+      if (game.openPage?.id !== 'worker_folks:Hiring') return;
+      if (this.cardInput === undefined) {
+        this.cardInput = -Infinity;
+        for (const type of ['pointerup', 'keyup', 'change']) {
+          document.addEventListener(type, () => { this.cardInput = performance.now(); }, { capture: true, passive: true });
+        }
+      }
+      // Work redraws at most once a second, and only the cards it touched; what the player just did shows at once.
+      const now = performance.now();
+      let draw = cardDraw.planCardDraw({
+        all: this.renderQueue.folks,
+        marked: marks.size,
+        stale: this.cardsStale,
+        now,
+        lastInput: this.cardInput,
+        nextDraw: this.nextCardDraw ?? 0,
+        nextSweep: this.nextCardSweep ?? 0,
+      });
+      if (draw === 'sweep') {
+        // A frozen slot's countdown is drawn with the whole grid; without one the catch-up goes a few cards at a time.
+        if ((this.health?.frozenSlotsView()?.length ?? 0) > 0) draw = 'all';
+        else {
+          this.sweepLeft = this.crew.all.map((folk) => folk.id);
+          this.cardsStale = false;
+          this.nextCardSweep = now + cardDraw.CARD_SWEEP_MS;
+          this.nextSweepSlice = 0;
+          dashboard?.markDirty();
+          draw = marks.size > 0 ? 'some' : 'none';
+        }
+      }
+      const sliceDue = draw !== 'all' && this.sweepLeft.length > 0 && now >= (this.nextSweepSlice ?? 0);
+      if (draw === 'none' && !sliceDue) return;
+      if (draw !== 'none') this.nextCardDraw = now + cardDraw.CARD_WORK_MS;
+      if (draw === 'all') {
+        this.wireHelp();
+        dashboard?.wire(); // before the layout: it finds the Overview block by id
+        this.workOrders?.wire(); // the Work Orders block, likewise
+        this.commissions?.wire(); // and the Township Commissions block
+        layout?.wire({ rerender: () => { this.renderQueue.folks = true; } });
+        this.renderReserve();
+        layout?.refresh();
+      }
+      if (draw !== 'none') dashboard?.markDirty();
+      const view = {
         tip: (el, content) => tips?.set(el, content),
         dream: daydream === undefined ? undefined : (el, folk) => daydream.fill(el, folk),
         dreamSpare: daydream?.minSpare,
@@ -649,7 +700,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
               return getLangString(folk.travel !== 'idle' && job.def.travels !== true ? 'MOD_WF_CARD_JOB_AWAY' : 'MOD_WF_CARD_JOB_NO_SLOT');
             }
             const wait = this.jobs.waitText(folk);
-            return wait !== '' ? wait : getLangString('MOD_WF_CARD_JOB_WORKING');
+            if (wait !== '') return wait;
+            return this.jobs.workingText(folk) || getLangString('MOD_WF_CARD_JOB_WORKING');
           }
           const skill = this.skillOf(folk);
           if (skill === undefined) return getLangString('MOD_WF_CARD_SKILL_NONE_HINT');
@@ -700,7 +752,9 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
                 : d.loyal ? getLangString('MOD_WF_DEBT_NOTE_LOYAL') : templateLangString('MOD_WF_DEBT_NOTE_WORKING', { minutes: d.minutes }),
             };
           }
-          const fmt = (parts) => Object.entries(parts).map(([id, amount]) => `${numberWithCommas(amount)} ${this.game.currencies.getObjectByID(id)?.name ?? id}`).join(' + ');
+          const fmtWith = (show) => (parts) => Object.entries(parts).map(([id, amount]) => `${show(amount)} ${this.game.currencies.getObjectByID(id)?.name ?? id}`).join(' + ');
+          const fmt = fmtWith(numberWithCommas);
+          const fmtShort = fmtWith((amount) => numbers.shortNumber(amount));
           const plain = payroll.settlementOf(folk);
           const apology = payroll.settlementOf(folk, { apology: true });
           // What is missing, per currency, for a settlement the bank can't cover.
@@ -731,13 +785,15 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
             demandLines: payroll.demandsOn ? this.demands.lines(folk) : [],
             // Settle and Apologise side by side (build .153): the word, the price on the line under it.
             settleLabel: getLangString('MOD_WF_BUTTON_SETTLE'),
-            settleAmount: fmt(plain.parts),
+            // Short on the half-width buttons; the exact price is the first line of each tooltip.
+            settleAmount: fmtShort(plain.parts),
+            settleTip: [fmt(plain.parts), ...settleWhy],
             apologyLabel: getLangString('MOD_WF_BUTTON_APOLOGY'),
             apologyAmount: this.levels !== undefined && !this.levels.apologyUnlocked()
-              ? `${fmt(apology.parts)} (${this.levels.lockText(this.levels.apologyLevel)})`
-              : fmt(apology.parts),
+              ? `${fmtShort(apology.parts)} (${this.levels.lockText(this.levels.apologyLevel)})`
+              : fmtShort(apology.parts),
             // What it buys sits in its tooltip, not on the button (the user, build .155), above what is missing.
-            apologyTip: [getLangString('MOD_WF_APOLOGY_NO_COOLDOWN'), ...apologyWhy],
+            apologyTip: [fmt(apology.parts), getLangString('MOD_WF_APOLOGY_NO_COOLDOWN'), ...apologyWhy],
             canSettle,
             canApologise,
             onSettle: () => { if (!this.refused('staff', { action: 'settle', folk })) payroll.settle(folk); },
@@ -820,9 +876,29 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         frozenReason: () => this.health?.freezeReason() ?? '',
         whereText: (folk) => this.whereText(folk),
         cooldownText: (folk) => (folk.cooldownTicks > 0 ? templateLangString('MOD_WF_CARD_COOLDOWN', { time: this.cooldownLeft(folk) }) : ''),
-      });
+      };
+      if (draw !== 'all') {
+        const ids = draw === 'some' ? [...marks] : [];
+        const drawn = new Set(ids);
+        if (sliceDue) {
+          const next = cardDraw.nextSweepSlice(this.sweepLeft, drawn);
+          ids.push(...next.slice);
+          this.sweepLeft = next.left;
+          this.nextSweepSlice = now + cardDraw.CARD_SWEEP_GAP_MS;
+        } else if (drawn.size > 0) this.sweepLeft = this.sweepLeft.filter((id) => !drawn.has(id));
+        if (draw === 'some') marks.clear();
+        const folks = ids.map((id) => this.crew.byId(id)).filter((folk) => folk !== undefined);
+        if (!refreshFolkCards(folks, view)) this.renderQueue.folks = true;
+        return;
+      }
+      const done = renderFolkCards(layout?.orderFolks(this.crew.all) ?? this.crew.all, view);
       layout?.dressCards();
-      if (done) this.renderQueue.folks = false;
+      if (!done) return;
+      this.renderQueue.folks = false;
+      marks.clear();
+      this.cardsStale = false;
+      this.sweepLeft = [];
+      this.nextCardSweep = now + cardDraw.CARD_SWEEP_MS;
     }
 
     render() {
@@ -841,7 +917,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
     renderPageOpen() {
       const open = game.openPage?.id === 'worker_folks:Hiring';
       // Cards show live skill state: refresh whenever this page opens.
-      if (open && !this.pageWasOpen) this.renderQueue.folks = true;
+      if (open && !this.pageWasOpen) { this.renderQueue.folks = true; this.nextCardDraw = 0; }
       this.pageWasOpen = open;
       if (!open) return;
       // The game shows "Game Guide" under every skill page's title, but Hiring has no guide page, so the link did
@@ -1162,7 +1238,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       const masteryIcon = typeof cdnMedia === 'function' ? `<img class="skill-icon-xs mr-1" src="${cdnMedia('assets/media/main/mastery_header.png')}" alt="">` : '';
       const diplomaText = plan.diploma === undefined ? '?' : `<img class="skill-icon-xs mr-1" src="${plan.diploma.media}" alt="">${plan.diploma.name}`;
       const gpShort = plan.blockers.includes('gp');
-      const fee = `<img class="skill-icon-xs mr-1" src="${this.game.gp.media}" alt="GP"><span class="font-w600 ${gpShort ? 'text-danger' : 'text-warning'}">${numberWithCommas(plan.cost)}</span>`;
+      const fee = `<img class="skill-icon-xs mr-1" src="${this.game.gp.media}" alt="GP"><span class="font-w600 ${gpShort ? 'text-danger' : 'text-warning'}">${numbers.shortNumber(plan.cost)}</span>`;
       // A higher tier may need more of your level on the Folk's skill: said before the click, never a blocker.
       const qualifyAfter = this.qualification?.afterPromotion(folk, plan.nextTier) ?? '';
       const feeRow = `<div data-wf-req="gp" tabindex="0"><span class="${gpShort ? 'text-danger' : 'text-success'}">${gpShort ? '✗' : '✓'}</span> ${templateLangString('MOD_WF_PROMO_COST', { cost: fee, percent: `${Math.round((this.levels?.promotionCostRate() ?? promotion.PROMOTION_COST_RATE) * 100)}` })}</div>`;
@@ -1191,6 +1267,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         // Promote is an upgrade: the game's primary blue, not the green of agreeing (user, build .55).
         customClass: swalClass({ popup: 'wf-ui wf-pic', confirmButton: 'btn btn-primary m-1' }),
         showCancelButton: true,
+        cancelButtonText: getLangString('MOD_WF_BUTTON_CANCEL'),
         // Blocked: focus on Cancel, so a keyboard user lands in the dialog (scan C-32, build .112).
         focusCancel: !plan.ok,
         confirmButtonText: getLangString('MOD_WF_BUTTON_PROMOTE'),
@@ -1292,6 +1369,7 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         // Firing loses the Folk for good: red confirm, blue-outline cancel; the portrait alone, no second icon.
         customClass: swalClass({ popup: 'wf-ui wf-pic', confirmButton: 'btn btn-danger m-1' }),
         showCancelButton: true,
+        cancelButtonText: getLangString('MOD_WF_BUTTON_CANCEL'),
         focusCancel: short,
         confirmButtonText: getLangString('MOD_WF_BUTTON_FIRE'),
         didOpen: () => {
@@ -1331,14 +1409,26 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
       input.id = inputId;
       input.type = 'text';
       input.autocomplete = 'off';
-      input.maxLength = Math.max(folkModel.NICK_MAX, [...original].length);
+      // The field stops at the limit in characters, as its counter counts; a hired name may be longer. The browser's own
+      // limit counts UTF-16 units, so it only stands behind that.
+      const fieldMax = Math.max(folkModel.NICK_MAX, [...original].length, [...folk.name].length);
+      input.maxLength = 2 * fieldMax;
+      const stopAtLimit = () => { const chars = [...input.value]; if (chars.length > fieldMax) input.value = chars.slice(0, fieldMax).join(''); };
       input.value = folk.name;
       const foot = node('div', 'wf-rename-foot');
       const was = node('small', 'wf-subtle', templateLangString('MOD_WF_RENAME_ORIGINAL', { name: original }));
       const count = node('small', 'wf-subtle');
       const showCount = () => {
-        count.textContent = templateLangString('MOD_WF_RENAME_COUNT', { count: `${[...folkModel.cleanNick(input.value)].length}`, max: `${folkModel.NICK_MAX}` });
+        const nick = folkModel.cleanNick(input.value);
+        const size = [...nick].length;
+        // The name it has now and the one it was hired with may be longer than a nickname may be.
+        const long = size > folkModel.NICK_MAX && nick !== folkModel.cleanNick(folk.name) && nick !== folkModel.cleanNick(original);
+        count.textContent = templateLangString('MOD_WF_RENAME_COUNT', { count: `${size}`, max: `${folkModel.NICK_MAX}` });
+        count.className = long ? 'text-warning' : 'wf-subtle';
         Swal.resetValidationMessage?.();
+        const save = Swal.getConfirmButton?.();
+        if (save) save.disabled = long;
+        if (long) Swal.showValidationMessage(templateLangString('MOD_WF_RENAME_LONG', { max: `${folkModel.NICK_MAX}` }));
       };
       foot.append(was, count);
       body.append(label, input, foot);
@@ -1348,7 +1438,8 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         back.addEventListener('click', () => { input.value = original; showCount(); input.focus(); });
         body.append(back);
       }
-      input.addEventListener('input', showCount);
+      input.addEventListener('input', (e) => { if (!e.isComposing) stopAtLimit(); showCount(); });
+      input.addEventListener('compositionend', () => { stopAtLimit(); showCount(); });
       input.addEventListener('keydown', (e) => {
         if (e.key !== 'Enter') return;
         e.preventDefault();
@@ -1364,10 +1455,11 @@ export function createHiringClass({ popupDidRender, titleName = (s) => s, time, 
         imageAlt: folk.name,
         customClass: swalClass({ popup: 'wf-ui wf-pic', confirmButton: 'btn btn-success m-1' }),
         showCancelButton: true,
+        cancelButtonText: getLangString('MOD_WF_BUTTON_CANCEL'),
         confirmButtonText: getLangString('MOD_WF_BUTTON_SAVE'),
         didOpen: () => { showCount(); input.focus(); input.select(); },
         preConfirm: () => {
-          const problem = this.crew.rename(folk.id, input.value);
+          const problem = this.crew.rename(folk.id, input.value, { reserved: ['You', getLangString('MOD_WF_CTRL_YOU')] });
           if (problem === null) return true;
           Swal.showValidationMessage(templateLangString(`MOD_WF_RENAME_${problem.toUpperCase()}`, { max: `${folkModel.NICK_MAX}` }));
           return false;

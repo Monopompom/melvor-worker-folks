@@ -447,9 +447,17 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     setInterval(() => {
       if (game.openPage?.id !== 'worker_folks:Hiring') return;
       const bank = [GP_ID, AP_ID].map((id) => currency(id)?.amount ?? 0).join('|');
-      // A strike's demands follow the bank's items and your kills: redrawn every second while one waits on them.
-      if (bank !== bankSeen || hiring.crew.all.some((f) => f.cooldownTicks > 0 || (api.demandsOn && f.onStrike && (f.demand?.length ?? 0) > 0))) hiring.renderQueue.folks = true;
+      const moved = bank !== bankSeen;
       bankSeen = bank;
+      // The reserve follows the bank at once; a card only when it shows a countdown, a strike or a debt.
+      if (moved) {
+        hiring.renderReserve();
+        hiring.cardsStale = true;
+      }
+      // A strike's demands follow the bank's items and your kills: redrawn every second while one waits on them.
+      for (const f of hiring.crew.all) {
+        if (f.cooldownTicks > 0 || (api.demandsOn && f.onStrike && (f.demand?.length ?? 0) > 0) || (moved && (f.onStrike || f.debt > 0))) hiring.markCard(f);
+      }
     }, 1000);
   });
 

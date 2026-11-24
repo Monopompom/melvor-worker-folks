@@ -129,12 +129,12 @@ test('api v11: a job is registered with Folk views, listed with its holder, set 
   registered[0].work(folk, 500);
   assert.deepEqual(seen, [true, folk.id, 500], 'the job sees a frozen view, never the record');
   assert.equal(registered[0].refusal, undefined);
-  assert.deepEqual(api.jobs(), [{ id: 'voyage:Courier', name: 'Courier', holder: null }]);
+  assert.deepEqual(api.jobs(), [{ id: 'voyage:Courier', name: 'Courier', holder: null, holders: [] }]);
   assert.equal(api.setJob(folk.id, 'voyage:Nope'), false);
   assert.equal(api.setJob('nobody', 'voyage:Courier'), false);
   assert.equal(api.setJob(folk.id, 'voyage:Courier'), true);
   assert.equal(api.folkById(folk.id).job, 'voyage:Courier');
-  assert.deepEqual(api.jobs(), [{ id: 'voyage:Courier', name: 'Courier', holder: folk.id }]);
+  assert.deepEqual(api.jobs(), [{ id: 'voyage:Courier', name: 'Courier', holder: folk.id, holders: [folk.id] }]);
   off();
   assert.deepEqual(api.jobs(), []);
 });
@@ -146,6 +146,18 @@ test('folkView copies the place and leaves the record alone', () => {
   folk.place.q = 9;
   assert.deepEqual(v.place, { q: 2, r: 3 });
   assert.equal(v.status, 'working');
+});
+
+test('folkView finds a portrait only when it is read, and once', () => {
+  const folk = model.createFolk({ id: 'a', slot: 0, tier: 'Newbie', name: 'A' });
+  let calls = 0;
+  const v = folkView(folk, 'idle', undefined, () => { calls += 1; return 'a.svg'; });
+  assert.equal(calls, 0);
+  assert.equal(v.portrait, 'a.svg');
+  assert.equal(v.portrait, 'a.svg');
+  assert.equal(calls, 1);
+  assert.equal(folkView(folk, 'idle', undefined, 'b.svg').portrait, 'b.svg');
+  assert.equal(folkView(folk, 'idle').portrait, undefined);
 });
 
 test('api v2: workerOf asks the skill who would act; registerLocationText sets and clears the line', () => {

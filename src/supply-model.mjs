@@ -77,3 +77,18 @@ export function covers(perAction, stockOf, bankOf) {
 export function bonus(receiverId, links, working) {
   return links.some((l) => l.receiverId === receiverId && working(l.supplierId)) ? LINK_BONUS : 0;
 }
+
+/** How a line's goods reach the receiver: 'carried' by a courier, anything else 'direct'. */
+export function normalizeReach(answer) {
+  return answer === 'carried' ? 'carried' : 'direct';
+}
+
+/**
+ * Whether the receiver's stock holds one action of every input this line brings: a carried line's bonus needs delivered
+ * goods. `perAction`: [{ id, qty }], `linkedIds` what the supplier makes, `stockOf(id)` the count in stock.
+ */
+export function holdsAction(perAction, linkedIds, stockOf) {
+  const linked = new Set(linkedIds ?? []);
+  const needs = (perAction ?? []).filter(({ id, qty }) => qty > 0 && linked.has(id));
+  return needs.length > 0 && needs.every(({ id, qty }) => stockOf(id) >= qty);
+}

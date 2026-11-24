@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { counts, mergeItems, runningBank, payable, byReason, settleWhy } from '../src/bulk-model.mjs';
+import { counts, restockable, mergeItems, runningBank, payable, byReason, settleWhy } from '../src/bulk-model.mjs';
 
 const row = (o) => ({ working: false, hasSkill: true, available: true, onStrike: false, ownStock: false, onHaul: false, ...o });
 
@@ -12,6 +12,17 @@ test('counts: working Folks stop, idle ones with a skill that may work restart',
 test('counts: restock leaves out the haul', () => {
   const c = counts([row({ ownStock: true }), row({ ownStock: true, onHaul: true, working: true })]);
   assert.equal(c.restock, 1);
+});
+
+test('restock counts only Folks with a skill that takes inputs', () => {
+  const walker = row({ ownStock: true, hasSkill: false, onHaul: true });
+  const gatherer = row({ ownStock: true, noInputs: true });
+  const smith = row({ ownStock: true });
+  assert.equal(restockable(walker), false);
+  assert.equal(restockable(gatherer), false);
+  assert.equal(restockable(smith), true);
+  assert.equal(counts([walker, gatherer]).restock, 0);
+  assert.equal(counts([walker, gatherer, smith]).restock, 1);
 });
 
 test('mergeItems sums by id in first-seen order and drops empty entries', () => {

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MS_PER_HOUR, expectedPrimaryQuantity, folkYield, netPerHour } from '../src/profit-model.mjs';
+import { MS_PER_HOUR, courierPerHour, expectedPrimaryQuantity, folkYield, netPerHour } from '../src/profit-model.mjs';
 
 const close = (a, b, eps = 1e-9) => assert.ok(Math.abs(a - b) < eps, `${a} ≈ ${b}`);
 
@@ -78,6 +78,27 @@ test('net per hour: full preservation spends nothing; no success makes nothing a
   close(none.actionsPerHour, MS_PER_HOUR / 6000);
   assert.equal(none.makes, 0);
   close(none.net, -none.spends - 100);
+});
+
+test('net per hour: a courier part comes off the net and stays apart from the wage', () => {
+  const r = netPerHour({ intervalMs: 3000, outputs: [{ qty: 1, value: 50 }], wagePerHour: 10_000, courierPerHour: 2500 });
+  assert.equal(r.courier, 2500);
+  assert.equal(r.wage, 10_000);
+  assert.equal(r.net, 60_000 - 10_000 - 2500);
+  assert.equal(netPerHour({ intervalMs: 3000 }).courier, 0);
+  assert.equal(netPerHour({ intervalMs: 3000, courierPerHour: -5 }).courier, 0);
+});
+
+test('courier part: each courier counts its share of wage and fares', () => {
+  close(courierPerHour([{ share: 0.25, wagePerHour: 8000, faresPerHour: 400 }, { share: 0.5, wagePerHour: 1000, faresPerHour: 0 }]), 2100 + 500);
+  assert.equal(courierPerHour([{ share: 0, wagePerHour: 8000, faresPerHour: 400 }]), 0);
+});
+
+test('courier part: bad numbers count as nothing, a share stays within 0 to 1', () => {
+  assert.equal(courierPerHour(null), 0);
+  assert.equal(courierPerHour([null, { share: 'x', wagePerHour: 100 }]), 0);
+  assert.equal(courierPerHour([{ share: 3, wagePerHour: 100, faresPerHour: -50 }]), 100);
+  assert.equal(courierPerHour([{ share: -1, wagePerHour: 100 }]), 0);
 });
 
 test('net per hour: chance and preservation outside 0-100% are clamped', () => {

@@ -3,7 +3,7 @@
 
 const NS = 'worker_folks';
 
-export function install(ctx, { getHiring, model, art, popupDidRender, titleName, tips, log }) {
+export function install(ctx, { swalClass, getHiring, model, art, popupDidRender, titleName, tips, log }) {
   let hiring;
   /** Look key → the drawing's URL. Pictures shown anywhere keep theirs, so one is never taken back. */
   const drawn = new Map();
@@ -78,7 +78,6 @@ export function install(ctx, { getHiring, model, art, popupDidRender, titleName,
     return b;
   };
   const say = (key) => getLangString(`MOD_WF_LOOK_${key}`);
-  const swalClass = (c) => (typeof createSwalCustomClass === 'function' ? createSwalCustomClass(c) : c);
   const fullFace = (look) => ({ color: -1, colorAt: 'scarf', ...look, hide: [...(look.hide ?? [])] });
 
   const openEdit = (folk) => {
@@ -148,15 +147,16 @@ export function install(ctx, { getHiring, model, art, popupDidRender, titleName,
       list.forEach((x, i) => row.append(swatch(say(`${prefix}_${i}`), colorOf(x), () => draft[key] === i, () => setDraft({ [key]: i }))));
       return row;
     };
+    const icon = (cls) => { const i = node('i', cls); i.setAttribute('aria-hidden', 'true'); return i; };
     const stepper = (label, names, key, prefix) => {
       const row = node('div', 'wf-look-step');
       const prev = button('btn btn-outline-info wf-look-arrow');
-      prev.append(node('i', 'fa fa-chevron-left'));
+      prev.append(icon('fa fa-chevron-left'));
       prev.setAttribute('aria-label', `${say('PREV')}: ${label}`);
       const value = node('span', 'wf-look-value');
       const place = node('span', 'wf-look-count');
       const next = button('btn btn-outline-info wf-look-arrow');
-      next.append(node('i', 'fa fa-chevron-right'));
+      next.append(icon('fa fa-chevron-right'));
       next.setAttribute('aria-label', `${say('NEXT')}: ${label}`);
       prev.addEventListener('click', () => setDraft({ [key]: (draft[key] + names.length - 1) % names.length }));
       next.addEventListener('click', () => setDraft({ [key]: (draft[key] + 1) % names.length }));
@@ -175,7 +175,7 @@ export function install(ctx, { getHiring, model, art, popupDidRender, titleName,
     const colors = swatches(say('COLOR'), art.COLORS, 'color', 'COL', (x) => x.c);
     const none = swatch(say('COLOR_NONE'), 'transparent', () => draft.color < 0, () => setDraft({ color: -1 }));
     none.classList.add('wf-look-none');
-    none.append(node('i', 'fa fa-times'));
+    none.append(icon('fa fa-times'));
     colors.prepend(none);
     addRow(say('COLOR'), colors);
     const places = node('div', 'wf-look-places');
@@ -259,6 +259,7 @@ export function install(ctx, { getHiring, model, art, popupDidRender, titleName,
       width: 'min(64rem, calc(100vw - 16px))',
       customClass: swalClass({ popup: 'wf-ui wf-look-popup', confirmButton: 'btn btn-success m-1' }),
       showCancelButton: true,
+      cancelButtonText: getLangString('MOD_WF_BUTTON_CANCEL'),
       confirmButtonText: getLangString('MOD_WF_BUTTON_SAVE'),
       didDestroy: () => tips?.sweep(),
       preConfirm: () => {

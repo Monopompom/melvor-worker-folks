@@ -2,6 +2,10 @@
 // "View Milestones" modal and level-up modal, Hiring XP for the time Folks work
 // (rate setting), and the live gates other slices read via hiring.levels. Game-facing.
 
+const XP_RATE_MIN = 0;
+const XP_RATE_MAX = 1000;
+const validRate = (value) => { const v = Number(value); return value !== '' && value !== null && Number.isFinite(v) && v >= XP_RATE_MIN && v <= XP_RATE_MAX; };
+
 export function install(ctx, { getHiring, rules, log }) {
   let hiring;
   const section = ctx.settings.section('Hiring');
@@ -12,14 +16,23 @@ export function install(ctx, { getHiring, rules, log }) {
       label: getLangString('MOD_WF_SETTING_XP_RATE'),
       hint: getLangString('MOD_WF_SETTING_XP_RATE_HINT'),
       default: rules.DEFAULT_XP_RATE,
-      min: 0,
-      max: 1000,
+      min: XP_RATE_MIN,
+      max: XP_RATE_MAX,
+      // Refused with its limits, so the box never shows a rate the game doesn't use.
+      onChange: (value) => (validRate(value) ? undefined : getLangString('MOD_WF_SETTING_XP_RATE_BAD')),
     },
   ]);
   const xpRate = () => {
     const v = Number(section.get('hiringXPRate'));
-    return Number.isFinite(v) ? Math.min(1000, Math.max(0, v)) : rules.DEFAULT_XP_RATE;
+    return Number.isFinite(v) ? Math.min(XP_RATE_MAX, Math.max(XP_RATE_MIN, v)) : rules.DEFAULT_XP_RATE;
   };
+  // A rate kept from before the limits were enforced, or from a backup code, comes back to what is really used.
+  ctx.onCharacterLoaded(() => {
+    try {
+      const stored = section.get('hiringXPRate');
+      if (!validRate(stored)) section.set('hiringXPRate', xpRate());
+    } catch (e) { log('xp rate check failed', e); }
+  });
 
   const api = {
     level: () => hiring.level,

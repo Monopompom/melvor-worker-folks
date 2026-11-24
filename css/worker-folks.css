@@ -87,12 +87,18 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 .wf-ui .btn-sm { font-size: 0.9rem; padding: 0.3rem 0.65rem; }
 .wf-ui .btn-sm.wf-help { font-size: 1.1rem; } /* the "?" stays 1.1rem: .btn-sm above outranked .wf-help (scan A-01, build .112) */
 .wf-ui .badge { font-size: 0.9rem; }
-.wf-ui .swal2-html-container { font-size: 1rem; }
+.wf-ui .swal2-html-container { font-size: 1rem; word-break: normal; overflow-wrap: break-word; } /* only a word wider than a whole line can break: a typed name with no space */
 /* A long popup scrolls inside its body, the title, the ✕ and the buttons stay on screen; at its end the wheel goes on
    to the modal (as Voyage's; scan B-06, B-32, C-06, C-25, build .112). A popup with a
    picture on top (wf-pic) leaves room for it. */
 .wf-ui .swal2-html-container { max-height: calc(100vh - 14rem); overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--wf-thumb) transparent; }
-.wf-ui.wf-pic .swal2-html-container { max-height: calc(100vh - 20rem); }
+/* A portrait popup never outgrows the screen: its body scrolls, the title and the buttons stay. The library sets its own display. */
+.wf-ui.wf-pic { display: flex !important; flex-direction: column; max-height: calc(100vh - 1.25em); max-height: calc(100dvh - 1.25em); }
+.wf-ui.wf-pic > * { flex-shrink: 0; }
+.wf-ui.wf-pic .swal2-html-container { flex: 0 1 auto; min-height: 0; max-height: none; }
+/* A refusal is an amber line under the field, not the library's light strip. */
+.wf-ui .swal2-validation-message { margin: 8px 0 0; padding: 0 1em; background: transparent; color: var(--wf-debt); font-size: 1rem; font-weight: 400; justify-content: center; text-wrap: pretty; }
+.wf-ui .swal2-validation-message::before { display: none; }
 /* Tool windows with a ✕ (Worker, Gear): the title keeps clear of it on both sides, so it stays centred (scan B-05). */
 .wf-ui.wf-tool .swal2-title { padding-left: 3rem; padding-right: 3rem; }
 /* A long popup title wraps onto balanced lines, never cut (build .109); skill-names.mjs ties where it may break. */
@@ -229,13 +235,21 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 .wf-help-body .wf-help-head { color: var(--wf-head); font-weight: 600; margin-bottom: 4px; }
 .wf-help-body .wf-help-p { margin: 0; }
 .wf-help-body .wf-help-p + .wf-help-p { margin-top: 6px; }
+/* No last line of one word in popups, on cards, in Welcome Back or on the Payroll lines. The Worker popup's tiles are one line each. */
+.wf-ui:not(.wf-tool) .swal2-html-container, .wf-card, .wf-order, .wf-offline-line, .wf-dash-next-text, .wf-pay-covers, .wf-pay-why { text-wrap: pretty; }
+/* A short note in a narrow card column: two even lines, where the rule above would still leave one word alone. */
+.wf-card [data-wf="room-status"], .wf-card [data-wf="own-stock-note"] { text-wrap: balance; }
 /* Numbers in a small table, not in a sentence (TIP_12, build .112). */
-.wf-help-table { margin: 8px auto 0; border-collapse: collapse; } /* centred under the centred lines; its cells keep their columns */
-.wf-help-table th, .wf-help-table td { padding: 3px 16px 3px 0; text-align: left; }
+.wf-help-table { width: 100%; margin: 8px 0 0; border-collapse: collapse; } /* fills its band; its cells keep their columns */
+.wf-help-table th, .wf-help-table td { padding: 3px 16px 3px 0; text-align: left; overflow-wrap: normal; } /* a cell grows to its longest word, it never splits one */
 .wf-help-table th { color: var(--wf-head); font-weight: 600; }
 .wf-help-table tr + tr td { border-top: 1px solid var(--wf-row-line); }
 /* An amount column lines up on its right edge, its head too (the user, build .112). */
-.wf-help-table th.wf-num, .wf-help-table td.wf-num { text-align: right; padding-right: 0; }
+.wf-help-table th.wf-num, .wf-help-table td.wf-num { text-align: right; padding-right: 0; white-space: nowrap; }
+/* Each Standing: its name over its text, one column at every width. A word breaks only if it can't fit the line. */
+.wf-help-ranks { margin: 4px 0 8px; }
+.wf-help-rank { padding: 6px 0; overflow-wrap: normal; text-wrap: balance; }
+.wf-help-rank + .wf-help-rank { border-top: 1px solid var(--wf-row-line); }
 /* Back up and Restore (the user, 5 Nov 2026), under everything; the code's box in their popups, as Voyage's. A band
    about what a restore loses has the amber edge. */
 .wf-backup-foot { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 4px 0 12px; }
@@ -274,10 +288,11 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 .wf-text-overtime { color: var(--wf-cooldown); }
 .wf-card-skill { font-size: 1.05em; }
 /* A long name wraps onto balanced lines, never cut: the whole name on the card on every device (scan A-06, C-12). */
-.wf-card-name { text-wrap: balance; overflow-wrap: anywhere; }
+.wf-card-name { display: flex; align-items: flex-start; text-wrap: balance; overflow-wrap: anywhere; }
+.wf-card-name [data-wf="name"] { min-width: 0; }
 /* The pencil comes before the name, so it holds one spot on every card however the name wraps. The side margin lines
    the icon up with the rank line below; the top and bottom ones keep the 26 px button from stretching the name's line. */
-.wf-card-name .wf-rename { position: relative; width: 26px; height: 26px; padding: 0; margin: -2px 2px -2px -6px; vertical-align: top; color: var(--wf-help); font-size: 0.8rem; line-height: 1; }
+.wf-card-name .wf-rename { flex: none; position: relative; width: 26px; height: 26px; padding: 0; margin: -2px 2px -2px -6px; vertical-align: top; color: var(--wf-help); font-size: 0.8rem; line-height: 1; }
 @media (pointer: coarse) { .wf-rename::after { content: ''; position: absolute; inset: -7px; } }
 .wf-rename:hover, .wf-rename:focus-visible { color: var(--wf-hover); }
 .wf-rename-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; }
@@ -310,6 +325,7 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 /* Fixed 19.5rem columns, as many as fit (3 / 2 / 1) and never more than there are tiles; the steps are the game's widths
    (1200 and 768; build .110 moved the two-column step from 1100); the popup's auto width
    then hugs the grid, so it is centred with no empty column (build .52). */
+html.wf-popup-steady { scrollbar-gutter: stable; }
 .wf-worker-grid { display: grid; grid-template-columns: repeat(var(--wf-cols3, 3), 19.5rem); gap: 8px; justify-content: center; text-align: left; }
 @media (max-width: 1199.98px) { .wf-worker-grid { grid-template-columns: repeat(var(--wf-cols2, 2), 19.5rem); } }
 @media (max-width: 767.98px) { .wf-worker-popup { width: 96vw !important; } .wf-worker-grid { grid-template-columns: 1fr; } }
@@ -663,10 +679,10 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-guild-tile { flex: 0 0 9.5rem; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 8px; border-radius: 6px;
   background: var(--wf-band); border: 1px solid var(--wf-line-soft); text-align: center; white-space: nowrap; min-width: 0; }
 .wf-guild-img { width: 48px; height: 48px; object-fit: contain; margin-bottom: 2px; }
-.wf-guild-name { font-size: 0.8rem; font-weight: 600; color: var(--wf-head); text-transform: uppercase; letter-spacing: 0.04em; }
+.wf-guild-name { font-size: 0.9rem; font-weight: 600; color: var(--wf-head); text-transform: uppercase; letter-spacing: 0.04em; }
 .wf-guild-count { font-size: 1.5rem; font-weight: 700; line-height: 1.15; }
 .wf-guild-of { font-size: 0.95rem; font-weight: 400; color: var(--wf-subtle); }
-.wf-guild-effect { font-size: 0.85rem; line-height: 1.3; }
+.wf-guild-effect { font-size: 0.9rem; line-height: 1.3; }
 .wf-guild-heirlooms { display: grid; grid-template-columns: repeat(3, 22px); gap: 3px; height: 48px; align-content: center; margin-bottom: 2px; }
 .wf-guild-heirloom { width: 22px; height: 22px; object-fit: contain; }
 .wf-guild-missing { opacity: 0.25; filter: grayscale(1); }
@@ -675,6 +691,7 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-comm-foot { gap: 6px; margin-top: auto; padding-top: 8px; }
 /* Decline and Send (build .248): the pair at the foot's right, the outline first; Send gives way on a narrow card. */
 .wf-comm-pair { gap: 6px; width: 100%; min-width: 0; }
+.wf-comm-who { flex: 0 0 100%; min-width: 0; margin-bottom: 4px; text-align: right; text-wrap: balance; overflow-wrap: anywhere; }
 .wf-comm-pair .btn-info { flex: 0 1 auto; }
 .wf-comm-folk { gap: 8px; width: 100%; }
 .wf-comm-folk-name { font-size: 0.9rem; line-height: 1.2; }
@@ -715,7 +732,6 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-dash-head .wf-help { margin: -4px 0; }
 .wf-dash-work { overflow: visible; } /* the Sort menu opens over the list; the list scrolls in its own box */
 .wf-dash-work .wf-dash-head { flex-wrap: wrap; row-gap: 4px; }
-.wf-dash-sort .btn { padding: 1px 8px; font-size: 0.8rem; line-height: 1.5; }
 .wf-dash-strikes { font-size: 0.75rem; }
 .wf-dash-sort-hint { display: block; width: 13rem; white-space: normal; }
 .wf-dash-roster-mine .wf-dash-row { grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-areas: "grip icon name status" "grip icon skill skill"; cursor: grab; }
@@ -732,7 +748,7 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-dash-row + .wf-dash-row { border-top: 1px solid var(--wf-row-line); }
 .wf-dash-row > :first-child { grid-area: icon; width: 24px; height: 24px; margin-right: 0; }
 .wf-dash-row-name { grid-area: name; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 1.25; }
-.wf-dash-row-skill { grid-area: skill; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 0.8rem; line-height: 1.25; }
+.wf-dash-row-skill { grid-area: skill; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 0.9rem; line-height: 1.25; }
 .wf-dash-row-blank { display: inline-block; flex: none; }
 .wf-dash-row-status { grid-area: status; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; font-size: 0.9rem; line-height: 1.25; }
 .wf-dash-row-status img { width: 18px; height: 18px; }
@@ -859,7 +875,7 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-look-badge { position: absolute; right: -4px; bottom: -4px; display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #1f5f86; color: #fff; font-size: 11px; line-height: 1; opacity: 0; transition: opacity .12s; }
 .wf-look-btn:hover .wf-look-badge, .wf-look-btn:focus-visible .wf-look-badge { opacity: 1; }
 @media (hover: none) { .wf-look-badge { opacity: 1; } }
-.wf-look { display: grid; grid-template-columns: 13rem minmax(0, 1fr) 16rem; gap: 12px; align-items: start; text-align: left; }
+.wf-look { display: grid; grid-template-columns: 13rem minmax(0, 1fr) 17rem; gap: 12px; align-items: start; text-align: left; }
 .wf-look-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .wf-look .wf-band { margin: 0; padding: 12px; }
 /* The portrait stays in view while the choices scroll under it, so it needs the popup's solid colour behind its band. */
@@ -884,10 +900,10 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-look-arrow { flex: 0 0 auto; width: 40px; height: 36px; padding: 0; }
 .wf-look-value { flex: 1 1 auto; min-width: 0; text-align: center; font-weight: 600; }
 .wf-look-count { flex: 0 0 auto; min-width: 2.6rem; text-align: right; color: var(--wf-subtle); font-size: .9rem; }
-.wf-look-places { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.wf-look-places .btn { min-height: 32px; }
+.wf-look-places { display: flex; flex-wrap: wrap; gap: 6px; }
+.wf-look-places .btn { flex: 1 1 auto; min-height: 32px; white-space: nowrap; }
 .wf-look-tools { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--wf-line-soft); }
-.wf-look-tools .btn { flex: 1 1 8rem; min-height: 40px; }
+.wf-look-tools .btn { flex: 1 1 auto; min-height: 40px; white-space: nowrap; }
 .wf-look-list { display: flex; flex-direction: column; gap: 6px; }
 .wf-look-head { font-weight: 700; }
 .wf-look-note { color: var(--wf-subtle); font-size: .9rem; line-height: 1.3; }
@@ -895,17 +911,20 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-look-worn input { flex: 0 0 auto; width: 18px; height: 18px; margin: 0; accent-color: var(--wf-working); }
 .wf-look-worn:has(input:not(:checked)) .wf-look-worn-icon { opacity: .45; }
 .wf-look-worn-icon { flex: 0 0 auto; width: 32px; height: 32px; }
-.wf-look-mark { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 8px; align-items: center; min-height: 32px; margin: 0; font-weight: 400; cursor: pointer; }
+.wf-look-mark { display: grid; grid-template-columns: 18px minmax(min-content, 1fr) auto; gap: 8px; align-items: center; min-height: 32px; margin: 0; font-weight: 400; cursor: pointer; }
 .wf-look-mark input { width: 18px; height: 18px; margin: 0; accent-color: var(--wf-working); }
 .wf-look-mark input:disabled { cursor: default; }
 .wf-look-mark:has(input:disabled) { cursor: default; }
-.wf-look-mark-words { display: flex; flex-direction: column; min-width: 0; }
+.wf-look-mark-words { display: flex; flex-direction: column; min-width: 0; overflow-wrap: normal; }
 .wf-look-mark-state { color: var(--wf-subtle); font-size: .9rem; white-space: nowrap; }
 .wf-look-mark-state.is-earned { color: var(--wf-working); font-weight: 600; }
 @media (max-width: 1079.98px) {
   .wf-look { grid-template-columns: 13rem minmax(0, 1fr); }
   .wf-look > .wf-look-col:first-child { grid-row: 1 / span 2; }
   .wf-look > .wf-look-col:last-child { grid-column: 2; display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); align-items: start; }
+  .wf-look-mark { grid-template-columns: 18px minmax(0, 1fr); }
+  .wf-look-mark input { grid-row: 1 / span 2; }
+  .wf-look-mark-state { grid-column: 2; }
 }
 @media (max-width: 699.98px) {
   .wf-ui.wf-look-popup .swal2-title { font-size: 1.25rem; line-height: 1.25; padding-top: .5rem; }

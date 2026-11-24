@@ -13,6 +13,10 @@ export function install(ctx, { getHiring, model, log }) {
   const inputsCache = new Map();
   /** Receivers a delivery may have unblocked: looked at after the tick (never inside the supplier's action). */
   const toWake = new Set();
+  /** `supplierId|receiverId` → 'direct' | 'carried', another mod's answer, kept until a move, a load or refreshLinks. */
+  const reach = new Map();
+  /** True while a recipe is being read: its modifiers may ask for a rate, which must not read a recipe again. */
+  let readingInputs = false;
 
   const unlocked = () => (hiring?.level ?? 0) >= model.UNLOCK_LEVEL;
   const room = () => hiring.room;
@@ -23,11 +27,37 @@ export function install(ctx, { getHiring, model, log }) {
     const now = Date.now();
     const kept = inputsCache.get(folk.id);
     if (kept !== undefined && now - kept.at < 250) return kept.value;
-    const value = room()?.inputsOf?.(folk) ?? { perAction: [], intervalMs: 0 };
+    if (readingInputs) return kept?.value ?? { perAction: [], intervalMs: 0 };
+    readingInputs = true;
+    let value;
+    try {
+      value = room()?.inputsOf?.(folk) ?? { perAction: [], intervalMs: 0 };
+    } finally {
+      readingInputs = false;
+    }
     inputsCache.set(folk.id, { at: now, value });
     return value;
   };
   const inputIds = (folk) => (folk.job !== null ? [] : inputsOf(folk).perAction.map(({ id }) => id));
+
+  /** How this line's goods travel: 'direct' with no hook (they reach the receiver at once), or the hook's answer. */
+  const reachOf = (supplier, receiver) => {
+    const hook = hiring?.linkReachHook;
+    if (typeof hook !== 'function') return 'direct';
+    const key = `${supplier.id}|${receiver.id}`;
+    const kept = reach.get(key);
+    if (kept !== undefined) return kept;
+    let answer = 'direct';
+    try {
+      answer = model.normalizeReach(hook(supplier, receiver));
+    } catch (err) {
+      log('link reach hook failed', err);
+    }
+    reach.set(key, answer);
+    return answer;
+  };
+  /** Whether the receiver's stock holds an action of what this supplier brings. */
+  const stocked = (supplier, receiver) => model.holdsAction(inputsOf(receiver).perAction, productsOf(supplier), (id) => room()?.stockQty?.(receiver, id) ?? 0);
 
   /** What the Folk's skill makes with its selection now, plus what it made since it took the skill. */
   const productsOf = (folk) => {
@@ -96,8 +126,24 @@ export function install(ctx, { getHiring, model, log }) {
       if (!unlocked() || folk === undefined) return 0;
       return model.bonus(folk.id, crew().links, (id) => {
         const f = crew().byId(id);
-        return f !== undefined && hiring.isWorking(f);
+        if (f === undefined || !hiring.isWorking(f)) return false;
+        // A carried line counts only while delivered goods are here.
+        return reachOf(f, folk) !== 'carried' || stocked(f, folk);
       });
+    },
+    reachOf,
+    /** Forgets the kept answers, for one Folk's lines or all, so the next look asks the hook again. */
+    refreshLinks(folk) {
+      if (folk === undefined) reach.clear();
+      else [...reach.keys()].forEach((key) => { if (key.split('|').includes(folk.id)) reach.delete(key); });
+      if (hiring !== undefined) hiring.renderQueue.folks = true;
+    },
+    /** What this supplier keeps in its room for a courier: its receiver's recipe items, on a carried line; else none. */
+    carriedIds(folk) {
+      if (folk?.supplies == null || !unlocked()) return [];
+      const receiver = crew().byId(folk.supplies);
+      if (receiver?.room === undefined || receiver.job !== null || reachOf(folk, receiver) !== 'carried') return [];
+      return inputIds(receiver);
     },
     refusal,
     /** Sets who the Folk supplies (null: none). A refusal shows as a toast. True when it is set. */
@@ -125,6 +171,8 @@ export function install(ctx, { getHiring, model, log }) {
       if (receiver?.room === undefined || receiver.job !== null) return 0;
       const { perAction, intervalMs } = inputsOf(receiver);
       const per = model.unitMs(perAction, intervalMs, item.id);
+      // Carried: it waits in the supplier's own room for a courier, as far as that holds; the rest goes on as usual.
+      if (reachOf(folk, receiver) === 'carried') return per > 0 ? room().keepForLine(acting, item, quantity) : 0;
       const free = room().capMs(receiver) - room().usedMs(receiver);
       const { toRoom } = model.split(quantity, free, per);
       if (toRoom === 0) return 0;
@@ -184,11 +232,12 @@ export function install(ctx, { getHiring, model, log }) {
       }));
       const bonus = api.bonus(folk);
       const step = `${model.LINK_BONUS}`;
+      const waiting = bonus === 0 && suppliers.some((s) => reachOf(s, folk) === 'carried' && !stocked(s, folk));
       return {
         head: getLangString('MOD_WF_SUPPLY_BY_HEAD'),
-        rate: templateLangString('MOD_WF_SUPPLY_BY_RATE', { bonus: step }),
+        rate: waiting ? getLangString('MOD_WF_SUPPLY_WAITING') : templateLangString('MOD_WF_SUPPLY_BY_RATE', { bonus: step }),
         on: bonus > 0,
-        rateTip: templateLangString(bonus > 0 ? 'MOD_WF_SUPPLY_BY_RATE_ON_TIP' : 'MOD_WF_SUPPLY_BY_RATE_OFF_TIP', { bonus: step }),
+        rateTip: templateLangString(waiting ? 'MOD_WF_SUPPLY_WAITING_TIP' : bonus > 0 ? 'MOD_WF_SUPPLY_BY_RATE_ON_TIP' : 'MOD_WF_SUPPLY_BY_RATE_OFF_TIP', { bonus: step }),
         rows,
       };
     },
@@ -220,7 +269,10 @@ export function install(ctx, { getHiring, model, log }) {
     hiring.events.on('folkAssigned', ({ folk }) => { madeBy.delete(folk.id); inputsCache.delete(folk.id); });
     hiring.events.on('folkFired', ({ folk }) => { madeBy.delete(folk.id); inputsCache.delete(folk.id); });
     hiring.events.on('folkSupplyChanged', () => { hiring.renderQueue.folks = true; });
+    hiring.events.on('folkMoved', ({ folk } = {}) => { if (folk !== undefined) api.refreshLinks(folk); });
   });
+
+  ctx.onCharacterLoaded(() => { reach.clear(); });
 
   return api;
 }

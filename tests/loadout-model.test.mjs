@@ -86,3 +86,14 @@ test('slotLayout: every slot with the tier that opens it; expansion slots only w
   assert.equal(all.length, 15);
   assert.ok(all.every((s) => s.open));
 });
+
+test('equipAmount: empty means all, a whole number is that amount, anything else is refused', async () => {
+  const { equipAmount } = await import('../src/loadout-model.mjs');
+  assert.deepEqual(equipAmount(''), { kind: 'all' });
+  assert.deepEqual(equipAmount('  '), { kind: 'all' });
+  assert.deepEqual(equipAmount('5'), { kind: 'qty', qty: 5 });
+  assert.deepEqual(equipAmount('９９'), { kind: 'qty', qty: 99 });
+  for (const bad of ['0', '-5', '0.5', '1.5', '5-', '1e', '1e9', '1,000', '-', 'abc', '99999999999999999999']) {
+    assert.deepEqual(equipAmount(bad), { kind: 'bad' }, bad);
+  }
+});

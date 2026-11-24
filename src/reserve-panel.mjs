@@ -62,11 +62,11 @@ function renderMini(model, shown, hoursText) {
     const text = part.lastElementChild;
     const put = (el, cls, t) => { if (el.className !== cls) el.className = cls; if (el.textContent !== t) el.textContent = t; };
     if (model.locked) {
-      put(text, 'font-w600', `${formatNumber(Math.floor(c.perHour))} ${c.name}/h`);
+      put(text, 'font-w600', templateLangString('MOD_WF_RATE_SHORT', { amount: formatNumber(Math.floor(c.perHour)), name: c.name }));
     } else {
       // Nobody paid from it right now: the amount in it, not an empty hours count.
       put(text, c.amount <= 0 && c.perHour > 0 && c.bank < c.perHour ? 'text-danger font-w600' : c.low ? 'text-warning font-w600' : 'font-w600',
-        c.hours === Infinity ? formatNumber(Math.floor(c.amount)) : `${hoursText(c.hours)}\u00a0h`);
+        c.hours === Infinity ? formatNumber(Math.floor(c.amount)) : templateLangString('MOD_WF_HOURS_SHORT', { hours: hoursText(c.hours) }));
       model.tip?.(part, c.hours === Infinity
         ? templateLangString('MOD_WF_DASH_MINI_TIP_IDLE', { amount: numberWithCommas(Math.floor(c.amount)), currency: c.name })
         : templateLangString('MOD_WF_DASH_MINI_TIP', { amount: numberWithCommas(Math.floor(c.amount)), currency: c.name, hours: hoursText(c.hours) }));
@@ -85,8 +85,11 @@ export function renderReservePanel(model) {
   const state = band.wfPayroll ?? (band.wfPayroll = { key: '', refs: new Map(), latest: new Map(), owed: null });
   model.currencies.forEach((c) => state.latest.set(c.id, c));
   const n = (v) => numberWithCommas(Math.floor(v));
+  // Amounts read as on the cards ("2.8M"); where that shortens one, its tooltip has the exact figure.
+  const amt = (v) => (model.short ?? n)(Math.floor(v));
+  const exact = (target, text, ...values) => model.tip?.(target, values.some((v) => amt(v) !== n(v)) ? text : '');
   // As time-format.mjs hoursText: rounded down, so "Covers 1.0 h" is never 0.96 h; the game's own formatters.
-  const hoursText = (h) => (h >= 100 ? numberWithCommas(Math.floor(h)) : formatFixed(Math.floor(h * 10) / 10, 1));
+  const hoursText = (h) => (h >= 10000 ? formatNumber(Math.floor(h)) : h >= 100 ? numberWithCommas(Math.floor(h)) : formatFixed(Math.floor(h * 10) / 10, 1));
   const roomOf = (c) => (c.room === undefined ? Infinity : c.room);
   const mostOf = (c) => Math.max(0, Math.floor(Math.min(c.bank, roomOf(c))));
   // No crew: the capacity is 0 because there are no wages to hold, not because it is full (scan A-04, build .112).
@@ -153,9 +156,13 @@ export function renderReservePanel(model) {
   for (const c of shown) {
     const r = state.refs.get(c.id);
     if (r === undefined) continue;
-    if (r.perHourText) put(r.perHourText, templateLangString('MOD_WF_DASH_PER_HOUR', { amount: n(c.perHour), currency: c.name }));
-    if (r.amount) put(r.amount, n(c.amount));
-    if (r.capacity) put(r.capacity, ` / ${n(c.capacity)}`);
+    if (r.perHourText) {
+      put(r.perHourText, templateLangString('MOD_WF_DASH_PER_HOUR', { amount: amt(c.perHour), currency: c.name }));
+      exact(r.perHourText, templateLangString('MOD_WF_DASH_PER_HOUR', { amount: n(c.perHour), currency: c.name }), c.perHour);
+    }
+    if (r.amount) put(r.amount, amt(c.amount));
+    if (r.capacity) put(r.capacity, ` / ${amt(c.capacity)}`);
+    if (r.amounts) exact(r.amounts, `${n(c.amount)}${r.capacity ? ` / ${n(c.capacity)}` : ''} ${c.name}`, c.amount, r.capacity ? c.capacity : 0);
     if (r.fill) {
       const width = `${Math.max(0, Math.min(100, (c.amount / c.capacity) * 100))}%`;
       if (r.fill.style.width !== width) r.fill.style.width = width;
@@ -165,7 +172,8 @@ export function renderReservePanel(model) {
     if (r.covers) {
       // Empty while the bank pays is no fault: grey, and says where wages come from; red only when the bank can't pay
       // either (scan A-26, C-35, build .112). Rates "GP/h" everywhere (A-17).
-      const vars = { hours: hoursText(c.hours), perHour: n(c.perHour), currency: c.name };
+      const vars = { hours: hoursText(c.hours), perHour: amt(c.perHour), currency: c.name };
+      exact(r.covers, templateLangString('MOD_WF_DASH_PER_HOUR', { amount: n(c.perHour), currency: c.name }), c.hours === Infinity ? 0 : c.perHour);
       if (c.hours === Infinity) put(r.covers, getLangString('MOD_WF_RESERVE_IDLE'), 'wf-pay-covers wf-subtle');
       else if (c.amount <= 0 && c.perHour > 0) {
         const broke = c.bank < c.perHour;
@@ -175,12 +183,17 @@ export function renderReservePanel(model) {
     if (r.why) {
       const why = whyOf(c);
       put(r.why, why === 'nocrew' ? getLangString('MOD_WF_RESERVE_NO_CREW')
-        : why === 'full' ? templateLangString('MOD_WF_RESERVE_FULL', { capacity: n(c.capacity ?? 0), currency: c.name })
+        : why === 'full' ? templateLangString('MOD_WF_RESERVE_FULL', { capacity: amt(c.capacity ?? 0), currency: c.name })
           : templateLangString('MOD_WF_RESERVE_NOTHING', { currency: c.name }), why === 'nocrew' ? 'wf-subtle wf-pay-why' : 'text-warning wf-pay-why');
+      exact(r.why, `${n(c.capacity ?? 0)} ${c.name}`, why === 'full' ? c.capacity ?? 0 : 0);
     }
   }
   renderMini(model, shown, hoursText);
-  if (state.owed !== null) put(state.owed, model.owed.map((o) => templateLangString('MOD_WF_DASH_OWED', { amount: `${n(o.amount)} ${o.name}` })).join(' · '));
+  if (state.owed !== null) {
+    const owedLine = (f) => model.owed.map((o) => templateLangString('MOD_WF_DASH_OWED', { amount: `${f(o.amount)} ${o.name}` })).join(' · ');
+    put(state.owed, owedLine(amt));
+    exact(state.owed, owedLine(n), ...model.owed.map((o) => o.amount));
+  }
   return true;
 
   /** One currency: name and amount / capacity, bar, Covers, then the field, presets and Deposit (or why not). */
@@ -195,6 +208,7 @@ export function renderReservePanel(model) {
     img.alt = '';
     name.append(img, document.createTextNode(c.name));
     const amounts = el('span');
+    refs.amounts = amounts;
     refs.amount = el('span', 'font-w600');
     amounts.append(refs.amount);
     const bounded = c.capacity !== undefined && c.capacity !== Infinity && c.capacity > 0;
@@ -231,7 +245,7 @@ export function renderReservePanel(model) {
     const now = () => state.latest.get(c.id) ?? c;
     const current = () => Math.max(0, Math.floor(Number(input.value) || 0));
     const addPreset = (label, value) => {
-      const b = el('button', 'btn btn-sm btn-info', label);
+      const b = el('button', 'btn btn-sm btn-outline-info', label);
       b.type = 'button';
       b.onclick = () => { input.value = `${value()}`; };
       presets.append(b);

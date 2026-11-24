@@ -65,6 +65,7 @@ export function workerOptions({ folks, skillId, skillNameOf }) {
     current: f.skillId === skillId,
     elsewhere: f.skillId !== null && f.skillId !== skillId ? skillNameOf(f.skillId) : null,
     available: f.available,
+    why: f.why ?? '',
     lines: Array.isArray(f.lines) ? f.lines : [],
   }));
 }

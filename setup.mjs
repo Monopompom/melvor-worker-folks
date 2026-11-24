@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-11-22.286';
+export const BUILD = '2026-11-24.309';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -27,6 +27,7 @@ export async function setup(ctx) {
   // 0. Incompatible mods (Multitasking): both change which skill the game treats as active.
   //    Checked now (mods loaded before us) and again once every mod is in (loaded after us).
   await lang.install(ctx, { mergeLang });
+  const { swalClass, fireQuick } = await ctx.loadModule('src/popup-class.mjs');
   const state = { disabled: false };
   const loadedNames = () => { try { return mod.manager.getLoadedModList(); } catch { return []; } };
   const hasNamespace = (ns) => { try { return game.registeredNamespaces.hasNamespace(ns); } catch { return false; } };
@@ -42,7 +43,8 @@ export async function setup(ctx) {
         // Message popup layout: centred however many lines (build .109; left past two lines before), the
         // mod's name bold each time; OK is green like every agree (build .75).
         html: `<div class="text-center">${templateLangString('MOD_WF_CONFLICT_TEXT', { mod: conflict.title })}</div>`,
-        customClass: (() => { const c = { popup: 'wf-ui', confirmButton: 'btn btn-success m-1' }; return typeof createSwalCustomClass === 'function' ? createSwalCustomClass(c) : c; })(),
+        confirmButtonText: getLangString('MOD_WF_BUTTON_GOT_IT'),
+        customClass: swalClass(),
       });
     });
   };
@@ -64,7 +66,8 @@ export async function setup(ctx) {
   const apiModule = await ctx.loadModule('src/api.mjs');
   const { pickName } = await ctx.loadModule('src/names.mjs');
   const { createCrew } = await ctx.loadModule('src/crew.mjs');
-  const { renderFolkCards, effectsFragment, marqueeLine, LIST_ID: cardListId } = await ctx.loadModule('src/cards.mjs');
+  const { renderFolkCards, refreshFolkCards, effectsFragment, marqueeLine, LIST_ID: cardListId } = await ctx.loadModule('src/cards.mjs');
+  const cardDraw = await ctx.loadModule('src/card-draw-model.mjs');
   const { renderReservePanel } = await ctx.loadModule('src/reserve-panel.mjs');
   // One way to write a time left (build .112, scan A-12 / C-26).
   const time = await ctx.loadModule('src/time-format.mjs');
@@ -80,7 +83,7 @@ export async function setup(ctx) {
   const layoutModel = await ctx.loadModule('src/layout-model.mjs');
   const layout = (await ctx.loadModule('src/layout.mjs')).install(ctx, { log, tips, model: layoutModel });
   // Stop / Restart / Restock / Settle all under the Overview's At work list (build .218).
-  const bulk = (await ctx.loadModule('src/bulk.mjs')).install(ctx, {
+  const bulk = (await ctx.loadModule('src/bulk.mjs')).install(ctx, { swalClass,
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     model: await ctx.loadModule('src/bulk-model.mjs'),
     time,
@@ -88,7 +91,7 @@ export async function setup(ctx) {
     tips,
     log,
   });
-  const dashboard = (await ctx.loadModule('src/dashboard.mjs')).install(ctx, {
+  const dashboard = (await ctx.loadModule('src/dashboard.mjs')).install(ctx, { swalClass,
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     model: await ctx.loadModule('src/dashboard-model.mjs'),
     milestones: await ctx.loadModule('src/milestones.mjs'),
@@ -156,8 +159,9 @@ export async function setup(ctx) {
 
   // 3. Register the skill class first, then the data package that references it.
   const { Hiring } = createHiringClass({
+    swalClass,
     popupDidRender, titleName, time, numbers,
-    selectDelegable, log, createCrew, createEventBus, createGuards, folkView: apiModule.folkView, folkModel, pickName, renderFolkCards, cardListId, renderReservePanel, produceRate,
+    selectDelegable, log, createCrew, createEventBus, createGuards, folkView: apiModule.folkView, folkModel, pickName, renderFolkCards, refreshFolkCards, cardDraw, cardListId, renderReservePanel, produceRate,
     rules: delegationRules,
     perks,
     promotion,
@@ -291,7 +295,7 @@ export async function setup(ctx) {
   });
 
   // 5b. "Worker" control on every delegable skill page.
-  skillControl.install(ctx, {
+  skillControl.install(ctx, { swalClass, fireQuick,
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     isDisabled: () => state.disabled,
     popupDidRender,
@@ -301,7 +305,7 @@ export async function setup(ctx) {
   });
 
   // 5b2. Loadouts: slots by tier, picker, modifier sources.
-  loadout.install(ctx, {
+  loadout.install(ctx, { swalClass,
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     rules: loadoutRules,
     consumptionRules,
@@ -390,6 +394,15 @@ export async function setup(ctx) {
     log,
   });
 
+  // 5d3''''. Carriers (with Voyage): a job with a bigger room moves goods between Folks, depots and your bank.
+  (await ctx.loadModule('src/carry.mjs')).install(ctx, {
+    getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+    model: await ctx.loadModule('src/carry-model.mjs'),
+    roomModel: roomRules,
+    depotModel,
+    log,
+  });
+
   // 5d4. Mastery displays found without searching the whole page (setting in the Hiring section).
   const masteryIndex = (await ctx.loadModule('src/mastery-index.mjs')).install(ctx, { log });
   // 5d5. Wage and completion log draws held to a few a second while Folks work (the same setting).
@@ -407,7 +420,7 @@ export async function setup(ctx) {
   });
 
   // 5f. Each Folk's own portrait: its face, what it wears, the marks it earned, and the window that edits them.
-  (await ctx.loadModule('src/looks.mjs')).install(ctx, {
+  (await ctx.loadModule('src/looks.mjs')).install(ctx, { swalClass,
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     model: await ctx.loadModule('src/look-model.mjs'),
     art: await ctx.loadModule('src/look-art-model.mjs'),
@@ -484,7 +497,7 @@ export async function setup(ctx) {
   });
 
   // 9. Earned traits: counted from what each Folk does, after payroll (Frugal reads whether a wage was paid).
-  traits.install(ctx, {
+  traits.install(ctx, { swalClass,
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     model: traitRules,
     popupDidRender,
@@ -494,7 +507,7 @@ export async function setup(ctx) {
 
   // 10. Work Orders: the board on the Hiring page, after payroll (an order's wages are the ones its actions paid).
   // Board amounts count the whole chain from raw materials (build .248).
-  workOrders.install(ctx, {
+  workOrders.install(ctx, { swalClass,
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     model: workOrderRules,
     costs: materialCosts.create({ model: materialRules, log }),
@@ -507,7 +520,7 @@ export async function setup(ctx) {
 
   // 11. Township Commissions: the town's board on the Hiring page, after Work Orders (it reads their candidates) and
   // the room (a commission's items wait on its town side).
-  commissions.install(ctx, {
+  commissions.install(ctx, { swalClass,
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     model: commissionRules,
     stories,
@@ -523,7 +536,7 @@ export async function setup(ctx) {
   // 12. Backups (the user, 5 Nov 2026): Back up and Restore at the Hiring page's foot, by hand only. A failure: no buttons.
   let backup;
   try {
-    backup = (await ctx.loadModule('src/backup.mjs')).install(ctx, {
+    backup = (await ctx.loadModule('src/backup.mjs')).install(ctx, { swalClass,
       getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
       B: await ctx.loadModule('src/backup-model.mjs'),
       folkModel,
@@ -533,6 +546,12 @@ export async function setup(ctx) {
     });
   } catch (err) { console.error('[Worker Folks] backups failed to load; the rest runs', err); }
   backupApi = backup?.api;
+  // Automatic safety copies: a save made without this mod loses the crew, and the next load brings the best copy back.
+  if (backup !== undefined) {
+    try {
+      (await ctx.loadModule('src/safety.mjs')).install(ctx, { M: await ctx.loadModule('src/safety-model.mjs'), ns: 'worker_folks', active: () => !state.disabled, hadSave: () => game.skills.getObjectByID('worker_folks:Hiring')?.saveBlockRead === true, ...backup.safety, log });
+    } catch (err) { console.error('[Worker Folks] safety copies failed to load; the rest runs', err); }
+  }
   ctx.onInterfaceReady(() => {
     if (state.disabled || backup === undefined) return;
     try { backup.mount(tips); } catch (err) { console.error('[Worker Folks] backup buttons failed', err); }

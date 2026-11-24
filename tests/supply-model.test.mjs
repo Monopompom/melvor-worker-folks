@@ -58,3 +58,22 @@ test('the receiver gains the bonus while one of its suppliers works', () => {
   assert.equal(S.bonus('r', links, () => false), 0);
   assert.equal(S.bonus('a', links, () => true), 0, 'a supplier gains nothing');
 });
+
+test('a line reads as direct unless the answer is carried', () => {
+  assert.equal(S.normalizeReach('carried'), 'carried');
+  assert.equal(S.normalizeReach('direct'), 'direct');
+  assert.equal(S.normalizeReach(undefined), 'direct');
+  assert.equal(S.normalizeReach('far'), 'direct');
+});
+
+test('a carried line counts while the stock holds one action of every input it brings', () => {
+  const perAction = [{ id: 'ore', qty: 2 }, { id: 'coal', qty: 1 }];
+  const stock = { ore: 2 };
+  const of = (id) => stock[id] ?? 0;
+  assert.equal(S.holdsAction(perAction, ['ore'], of), true);
+  assert.equal(S.holdsAction(perAction, ['ore', 'coal'], of), false);
+  stock.ore = 1;
+  assert.equal(S.holdsAction(perAction, ['ore'], of), false);
+  assert.equal(S.holdsAction(perAction, ['gem'], of), false);
+  assert.equal(S.holdsAction([], ['ore'], of), false);
+});

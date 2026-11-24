@@ -233,6 +233,21 @@ export function bankSnapshot(record, bankOf) {
 }
 
 /**
+ * What comes out of your currencies so a restore never pays a purse twice: [[id, n]], for a crew that lived on. What
+ * the backup's crew held in purses beyond the crew now reached you when it was collected; `have(id)` caps it at what
+ * you hold. A crew lost with the mod never paid it out, so its restore doesn't call this.
+ */
+export function currencyTakes(nowRecord, backupRecord, have) {
+  const now = heldBy(nowRecord).currencies;
+  const out = [];
+  for (const [id, n] of Object.entries(heldBy(backupRecord).currencies)) {
+    const take = Math.min(n - (now[id] ?? 0), count(have(id)));
+    if (take > 0) out.push([id, take]);
+  }
+  return out;
+}
+
+/**
  * Did the crew live on since the backup? Hiring XP never drops in play, and the game starts it from 0 when it loses
  * the mod's save; so XP now at least the backup's means the crew, its Work Orders and its commissions are still here.
  */
@@ -244,6 +259,7 @@ export const livedOn = (nowXP, backupXP) => amount(nowXP) >= amount(backupXP);
  * Folks: `commissions` the state now, `folks` the restored Folk records. Returns { commissions, home } with the runs of
  * Folks not in the crew dropped (a commission whose Folk is gone is let go when the game loads), and `home` the ids of
  * Folks whose room holds commission items for no commission and no run: those go over to what the room holds for you.
+ * A Folk on a job stays out of `home`: a courier's town goods are other Folks', and its next hand-in sorts them.
  */
 export function keepCommissions(commissions, folks) {
   if (!isObj(commissions)) return { commissions: null, home: [] };
@@ -253,7 +269,7 @@ export function keepCommissions(commissions, folks) {
   const kept = { ...commissions, runs };
   const busy = new Set([...Object.keys(runs), ...(Array.isArray(kept.commissions) ? kept.commissions : []).map((c) => c?.folkId).filter(Boolean)]);
   const home = (Array.isArray(folks) ? folks : [])
-    .filter((f) => isObj(f?.room?.town) && Object.keys(f.room.town).length > 0 && !busy.has(f.id))
+    .filter((f) => isObj(f?.room?.town) && Object.keys(f.room.town).length > 0 && !busy.has(f.id) && (f.job ?? null) === null)
     .map((f) => f.id);
   return { commissions: kept, home };
 }

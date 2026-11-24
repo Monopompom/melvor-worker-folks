@@ -9,7 +9,7 @@ const FLUSH_TICKS = 20;
 /** A hit that leaves a Folk at or under this share of its max HP teaches Sickly. */
 const LOW_HP_SHARE = 0.25;
 
-export function install(ctx, { getHiring, model, popupDidRender, titleName = (s) => s, log }) {
+export function install(ctx, { swalClass, getHiring, model, popupDidRender, titleName = (s) => s, log }) {
   let hiring;
   let ticks = 0;
 
@@ -184,7 +184,6 @@ export function install(ctx, { getHiring, model, popupDidRender, titleName = (s)
     const trait = stateOf(folk).traits[index];
     if (trait === undefined) return;
     const cost = forgetPrice(folk);
-    const swalClass = (c) => (typeof createSwalCustomClass === 'function' ? createSwalCustomClass(c) : c);
     SwalLocale.fire({
       didRender: popupDidRender,
       title: templateLangString('MOD_WF_FORGET_TITLE', { trait: nameOf(trait) }),
@@ -194,8 +193,9 @@ export function install(ctx, { getHiring, model, popupDidRender, titleName = (s)
       imageHeight: 64,
       imageAlt: nameOf(trait),
       // The trait goes for good: red confirm, blue-outline cancel, like Fire.
-      customClass: swalClass({ popup: 'wf-ui wf-pic', confirmButton: 'btn btn-danger m-1', cancelButton: 'btn btn-outline-info m-1' }),
+      customClass: swalClass({ popup: 'wf-ui wf-pic', confirmButton: 'btn btn-danger m-1' }),
       showCancelButton: true,
+      cancelButtonText: getLangString('MOD_WF_BUTTON_CANCEL'),
       confirmButtonText: getLangString('MOD_WF_BUTTON_FORGET'),
     }).then((result) => {
       if (result.isConfirmed) api.forget(folk, index);
@@ -354,7 +354,7 @@ export function install(ctx, { getHiring, model, popupDidRender, titleName = (s)
         imageAlt: folk.name,
         showConfirmButton: false,
         showCloseButton: true,
-        customClass: (typeof createSwalCustomClass === 'function' ? createSwalCustomClass({ popup: 'wf-ui wf-tool wf-pic' }) : { popup: 'wf-ui wf-tool wf-pic' }),
+        customClass: swalClass({ popup: 'wf-ui wf-tool wf-pic' }),
       });
     },
     nameOf,

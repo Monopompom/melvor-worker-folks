@@ -55,9 +55,10 @@ const sum = (list) => (Array.isArray(list) ? list : []).reduce((s, e) => s + Mat
  *  batches       expected batches on a success (Produce Rate over 100)
  *  failExtraMs   time a failed action adds (a Thieving stun)
  *  wagePerHour   the Folk's GP wage for an hour of work
- * Returns { actionsPerHour, makes, spends, wage, net }, all per hour.
+ *  courierPerHour  its part of the couriers that serve it, in GP (courierPerHour below)
+ * Returns { actionsPerHour, makes, spends, wage, courier, net }, all per hour.
  */
-export function netPerHour({ intervalMs, outputs = [], inputs = [], preservation = 0, chance = 1, batches = 1, failExtraMs = 0, wagePerHour = 0 }) {
+export function netPerHour({ intervalMs, outputs = [], inputs = [], preservation = 0, chance = 1, batches = 1, failExtraMs = 0, wagePerHour = 0, courierPerHour: courierCost = 0 }) {
   const interval = num(intervalMs);
   if (!(interval > 0)) return null;
   const c = Math.min(1, Math.max(0, num(chance)));
@@ -66,5 +67,17 @@ export function netPerHour({ intervalMs, outputs = [], inputs = [], preservation
   const makes = actionsPerHour * c * Math.max(0, num(batches)) * sum(outputs);
   const spends = actionsPerHour * (1 - pct(preservation)) * sum(inputs);
   const wage = Math.max(0, num(wagePerHour));
-  return { actionsPerHour, makes, spends, wage, net: makes - spends - wage };
+  const courier = Math.max(0, num(courierCost));
+  return { actionsPerHour, makes, spends, wage, courier, net: makes - spends - wage - courier };
+}
+
+/**
+ * A served Folk's part of its couriers, in GP per hour. Each line is one courier: `share` (0 to 1) of its whole
+ * `wagePerHour` and `faresPerHour`.
+ */
+export function courierPerHour(lines) {
+  return (Array.isArray(lines) ? lines : []).reduce((total, line) => {
+    const share = Math.min(1, Math.max(0, num(line?.share)));
+    return total + share * (Math.max(0, num(line?.wagePerHour)) + Math.max(0, num(line?.faresPerHour)));
+  }, 0);
 }

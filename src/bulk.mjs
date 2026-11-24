@@ -4,7 +4,7 @@
 // all: each skill starts again on what its Folk last started on); Restock all and Settle all show their bill first.
 // Nothing goes in the save. Game-facing; the rules are in bulk-model.mjs.
 
-export function install(ctx, { getHiring, model, time, popupDidRender, tips, log }) {
+export function install(ctx, { swalClass, getHiring, model, time, popupDidRender, tips, log }) {
   let hiring;
   /** Called once a bulk action has run (the Overview redraws). */
   let after = () => {};
@@ -27,7 +27,6 @@ export function install(ctx, { getHiring, model, time, popupDidRender, tips, log
     ? templateLangString(`${key}_ONE`, { name: folks[0].name })
     : templateLangString(key, { count: `${folks.length}` }));
   const names = (folks) => folks.map((f) => f.name).join(getLangString('MOD_WF_LIST_SEP'));
-  const swalClass = (cls) => (typeof createSwalCustomClass === 'function' ? createSwalCustomClass(cls) : cls);
   const room = () => hiring.room;
 
   const rowOf = (folk) => {
@@ -55,8 +54,8 @@ export function install(ctx, { getHiring, model, time, popupDidRender, tips, log
     const c = model.counts(all);
     return {
       ...c,
-      // Restock all only once some Folk works from its own stock; Settle all only while wages are on.
-      showRestock: all.some((r) => r.ownStock),
+      // Restock all only once some Folk's stock can be filled; Settle all only while wages are on.
+      showRestock: all.some(model.restockable),
       showSettle: hiring.payroll?.enabled !== false,
     };
   };
@@ -100,7 +99,7 @@ export function install(ctx, { getHiring, model, time, popupDidRender, tips, log
     const nothing = [];
     const noInputs = [];
     for (const r of rows()) {
-      if (!r.ownStock || r.onHaul) continue;
+      if (!r.ownStock || r.onHaul || !r.hasSkill) continue;
       // Said apart: "room full or no inputs in your bank" would send you to the bank for a skill that takes nothing.
       if (r.noInputs) { noInputs.push(r); continue; }
       const plan = room().restockPlanOf(r.folk, bank.qty);
@@ -134,7 +133,7 @@ export function install(ctx, { getHiring, model, time, popupDidRender, tips, log
       focusCancel: !ok,
       confirmButtonText: go,
       cancelButtonText: getLangString('MOD_WF_BUTTON_CANCEL'),
-      customClass: swalClass({ popup: 'wf-ui', confirmButton: 'btn btn-success m-1', cancelButton: 'btn btn-outline-primary m-1' }),
+      customClass: swalClass(),
       didOpen: () => {
         room()?.tipTiles?.(Swal.getHtmlContainer());
         if (!ok) { const b = Swal.getConfirmButton(); if (b) b.disabled = true; }

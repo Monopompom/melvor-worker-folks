@@ -13,6 +13,10 @@ const TIER_SET = new Set(TIERS);
 /** The longest nickname the player can give a Folk. */
 export const NICK_MAX = 24;
 const NICK_SHAPE = /^[\p{L}\p{N}][\p{L}\p{M}\p{N} .’-]*$/u;
+/** More accents on one letter than any language writes: they would stack far above the line. */
+const STACKED_MARKS = /\p{M}{4}/u;
+/** The longest name a save or a backup code may bring in. */
+const NAME_MAX = 64;
 
 /** A typed name tidied: single spaces, trimmed, a straight apostrophe made typographic. */
 export function cleanNick(text) {
@@ -20,15 +24,16 @@ export function cleanNick(text) {
 }
 
 /**
- * What is wrong with a nickname: 'empty', 'long', 'chars', 'taken', or null when it is fine. Letters of any language,
+ * What is wrong with a nickname: 'empty', 'long', 'chars', 'reserved', 'taken', or null when it is fine. Letters of any language,
  * digits, spaces, hyphens, full stops and apostrophes only, because a Folk's name goes into popup markup as it is.
  */
-export function nickProblem(text, takenNames = []) {
+export function nickProblem(text, takenNames = [], reserved = []) {
   const nick = cleanNick(text);
   if (nick === '') return 'empty';
   if ([...nick].length > NICK_MAX) return 'long';
-  if (!NICK_SHAPE.test(nick)) return 'chars';
+  if (!NICK_SHAPE.test(nick) || STACKED_MARKS.test(nick)) return 'chars';
   const low = nick.toLocaleLowerCase();
+  if (reserved.some((n) => cleanNick(n).toLocaleLowerCase() === low)) return 'reserved';
   return takenNames.some((n) => cleanNick(n).toLocaleLowerCase() === low) ? 'taken' : null;
 }
 
@@ -72,7 +77,7 @@ export function normalizeMarks(raw) {
 }
 
 /** A name from a save or a backup code, with what could break popup markup taken out. */
-const plainName = (text) => text.replace(/[<>&"`]/g, '').trim();
+const plainName = (text) => [...text.replace(/[<>&"`]/g, '').trim()].slice(0, NAME_MAX).join('').trim();
 
 export function isTier(tier) {
   return TIER_SET.has(tier);

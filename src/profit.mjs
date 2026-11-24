@@ -161,9 +161,20 @@ export function install(ctx, { getHiring, model, rate, log }) {
     return null;
   };
 
+  /** This Folk's part of the couriers now running for it, in GP per hour. A job's wage is always in GP. */
+  const courierCost = (folk) => {
+    const payroll = hiring.payroll;
+    const paid = payroll !== undefined && payroll.enabled;
+    return model.courierPerHour((hiring.carry?.routesOf(folk) ?? []).map(({ courier, share, faresPerHour }) => ({
+      share,
+      faresPerHour,
+      wagePerHour: paid ? payroll.hourlyWageOf(courier) : 0,
+    })));
+  };
+
   /**
    * The estimate for `folk` on the recipe open on `skill`'s page:
-   * { actionsPerHour, makes, spends, wage, net, wageCounted } per hour in GP, or null when there is none.
+   * { actionsPerHour, makes, spends, wage, courier, net, wageCounted } per hour in GP, or null when there is none.
    */
   const profitOf = (folk, skill) => {
     if (folk === undefined || skill === undefined || typeof hiring?.asFolk !== 'function') return null;
@@ -190,6 +201,7 @@ export function install(ctx, { getHiring, model, rate, log }) {
       batches,
       failExtraMs: read.failExtraMs ?? 0,
       wagePerHour: wageCounted ? payroll.hourlyWageOf(folk) : 0,
+      courierPerHour: courierCost(folk),
     });
     return result === null ? null : { ...result, wageCounted };
   };

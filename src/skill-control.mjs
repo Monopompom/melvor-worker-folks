@@ -4,7 +4,7 @@
 const TEMPLATE_ID = 'wf-skill-control-template';
 const EVENTS = ['crewChanged', 'folkAssigned', 'folkFired', 'folkHired', 'folkStarted', 'folkReleased', 'folkPromoted', 'folkPending', 'folkMoved'];
 
-export function install(ctx, { getHiring, isDisabled = () => false, popupDidRender, effectsFragment, tips, log }) {
+export function install(ctx, { swalClass, fireQuick, getHiring, isDisabled = () => false, popupDidRender, effectsFragment, tips, log }) {
   let hiring;
   /** skill → control root element */
   const controls = new Map();
@@ -71,13 +71,16 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
     const shown = pending === undefined ? holder : pending ?? undefined;
     const root = document.createElement('div');
     root.className = 'wf-worker-grid';
-    const tile = ({ media, title, lines = [], gear, active = false, disabled = false, onClick }) => {
+    const tile = ({ media, title, lines = [], gear, active = false, disabled = false, why = '', onClick }) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = `wf-worker-tile${active ? ' wf-worker-tile-active' : ''}`;
-      // Unavailable stays focusable (aria-disabled, not disabled), so the keyboard reaches its reason; the chosen tile
-      // says so beyond its colour (scan C-34, build .112).
-      if (disabled) b.setAttribute('aria-disabled', 'true');
+      // Unavailable stays focusable (aria-disabled, not disabled): greyed, its reason on hover and, when pressed, in a
+      // toast, never written on the tile. The chosen tile says so beyond its colour (scan C-34, build .112).
+      if (disabled) {
+        b.setAttribute('aria-disabled', 'true');
+        if (why !== '') tips?.set(b, why);
+      }
       if (active) b.setAttribute('aria-current', 'true');
       const img = document.createElement('img');
       img.className = 'wf-worker-portrait';
@@ -143,7 +146,14 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
         text.append(s);
       }
       b.append(text);
-      b.onclick = () => { if (disabled) return; onClick(); Swal.close(); };
+      b.onclick = () => {
+        if (disabled) {
+          if (why !== '') game.notifications.createErrorNotification('wf-worker-pick', why);
+          return;
+        }
+        onClick();
+        Swal.close();
+      };
       root.append(b);
     };
     tile({
@@ -161,6 +171,7 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
       gear: (() => { const f = hiring.crew.byId(opt.id); return f === undefined ? undefined : hiring.loadout?.summary(f); })(),
       active: shown !== undefined && opt.id === shown.id,
       disabled: !opt.available,
+      why: opt.why,
       onClick: () => hiring.setWorker(skill, opt.id),
     }));
     if (options.length === 0) {
@@ -182,7 +193,7 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
     const n = root.childElementCount;
     root.style.setProperty('--wf-cols3', `${Math.max(1, Math.min(n, 3))}`);
     root.style.setProperty('--wf-cols2', `${Math.max(1, Math.min(n, 2))}`);
-    SwalLocale.fire({
+    fireQuick({
       didRender: popupDidRender,
       title: templateLangString('MOD_WF_CTRL_PICK_TITLE', { skill: hiring.skillName(skill) }),
       html: root,
@@ -190,7 +201,7 @@ export function install(ctx, { getHiring, isDisabled = () => false, popupDidRend
       showCloseButton: true,
       // A tile's tooltip shown when the popup closes under the pointer would stay: the gone tiles' tooltips go with it.
       didClose: () => tips?.sweep(),
-      customClass: (typeof createSwalCustomClass === 'function' ? createSwalCustomClass({ popup: 'wf-worker-popup wf-ui wf-tool' }) : { popup: 'wf-worker-popup wf-ui wf-tool' }),
+      customClass: swalClass({ popup: 'wf-worker-popup wf-ui wf-tool' }),
     });
   };
 

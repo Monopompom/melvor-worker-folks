@@ -14,7 +14,7 @@ const AOD_INHERIT = {
   'melvorAoD:Cartography': ['melvorAoD:Cartography_Skillcape', 'melvorAoD:Superior_Cartography_Skillcape'],
 };
 
-export function install(ctx, { getHiring, rules, consumptionRules, numbers, popupDidRender, titleName, tips, log }) {
+export function install(ctx, { swalClass, getHiring, rules, consumptionRules, numbers, popupDidRender, titleName, tips, log }) {
   let hiring;
   const expansions = () => ({
     hasAoD: game.registeredNamespaces.hasNamespace('melvorAoD'),
@@ -365,7 +365,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, numbers, popu
         const lines = api.summaryLines(folk, skill);
         const toggle = document.createElement('button');
         toggle.type = 'button';
-        toggle.className = 'wf-stats-toggle';
+        toggle.className = 'btn btn-sm wf-stats-toggle';
         const summary = document.createElement('div');
         summary.className = 'wf-gear-summary';
         summary.id = `wf-gear-stats-${String(folk.id).replace(/[^A-Za-z0-9_-]/g, '_')}`;
@@ -448,6 +448,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, numbers, popu
         // time). A typed number stays through other picks; All, or an emptied field, goes back to the whole stack.
         let qtyAll = true;
         const stack = () => (picked === undefined ? 0 : game.bank.getQty(picked));
+        const badQty = () => qtyInput !== undefined && !qtyAll && rules.equipAmount(qtyInput.value).kind === 'bad';
         const markAll = () => {
           allQty.classList.toggle('btn-info', qtyAll);
           allQty.classList.toggle('btn-outline-info', !qtyAll);
@@ -465,8 +466,8 @@ export function install(ctx, { getHiring, rules, consumptionRules, numbers, popu
           qtyLabel.className = 'font-w600';
           qtyLabel.textContent = getLangString('MOD_WF_PICKER_QTY');
           qtyInput = document.createElement('input');
-          qtyInput.type = 'number';
-          qtyInput.min = '1';
+          // Text, not a number field: that one reports "" for what it can't read, which would mean the whole stack.
+          qtyInput.type = 'text';
           qtyInput.inputMode = 'numeric';
           qtyInput.value = '';
           qtyInput.placeholder = getLangString('MOD_WF_RESERVE_QUICK_ALL');
@@ -478,7 +479,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, numbers, popu
           allQty.textContent = getLangString('MOD_WF_RESERVE_QUICK_ALL');
           allQty.disabled = true;
           allQty.onclick = () => { qtyAll = true; showQty(); refreshPicked(); };
-          qtyInput.addEventListener('input', () => { qtyAll = qtyInput.value.trim() === ''; markAll(); refreshPicked(); });
+          qtyInput.addEventListener('input', () => { qtyAll = rules.equipAmount(qtyInput.value).kind === 'all'; markAll(); refreshPicked(); });
           row.append(qtyLabel, qtyInput, allQty);
           root.append(row);
         }
@@ -492,7 +493,8 @@ export function install(ctx, { getHiring, rules, consumptionRules, numbers, popu
         equip.className = 'btn btn-success wf-picker-equip';
         equip.textContent = getLangString('MOD_WF_BUTTON_EQUIP');
         equip.onclick = () => {
-          if (picked !== undefined && api.equip(folk, slotId, picked, qtyInput === undefined ? 1 : qtyAll ? stack() : qtyInput.value)) showGrid();
+          if (picked === undefined || badQty()) return;
+          if (api.equip(folk, slotId, picked, qtyInput === undefined ? 1 : qtyAll ? stack() : rules.equipAmount(qtyInput.value).qty)) showGrid();
         };
         const select = (item, button) => {
           picked = item;
@@ -516,12 +518,14 @@ export function install(ctx, { getHiring, rules, consumptionRules, numbers, popu
         };
         const refreshPicked = () => {
           const missing = picked === undefined ? null : needs(picked);
-          equip.disabled = picked === undefined || missing !== null;
+          const bad = picked !== undefined && missing === null && badQty();
+          equip.disabled = picked === undefined || missing !== null || bad;
           if (allQty !== undefined) allQty.disabled = picked === undefined || missing !== null;
           pickedLine.classList.toggle('font-w600', picked !== undefined);
-          pickedLine.classList.toggle('text-warning', missing !== null);
+          pickedLine.classList.toggle('text-warning', missing !== null || bad);
           pickedLine.textContent = picked === undefined ? getLangString('MOD_WF_PICKER_PICK')
             : missing !== null ? templateLangString('MOD_WF_PICKER_LOCKED', { item: picked.name, needs: missing })
+              : bad ? getLangString('MOD_WF_PICKER_QTY_BAD')
               : templateLangString(qtyInput !== undefined && qtyAll ? 'MOD_WF_PICKER_PICKED_ALL' : 'MOD_WF_PICKER_PICKED', { item: picked.name, count: numberWithCommas(game.bank.getQty(picked)) });
         };
         const fill = () => {
@@ -626,7 +630,7 @@ export function install(ctx, { getHiring, rules, consumptionRules, numbers, popu
         showConfirmButton: false,
         showCloseButton: true,
         willClose: clearTips,
-        customClass: (typeof createSwalCustomClass === 'function' ? createSwalCustomClass({ popup: 'wf-ui wf-tool wf-pic' }) : { popup: 'wf-ui wf-tool wf-pic' }),
+        customClass: swalClass({ popup: 'wf-ui wf-tool wf-pic' }),
       });
     },
     /** Kept for callers that open one slot directly. */

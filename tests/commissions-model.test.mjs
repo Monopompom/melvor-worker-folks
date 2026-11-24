@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { handInOrder, claimsMore, townStray } from '../src/commissions-model.mjs';
 import {
   BOARD_LEVEL, TICKS_PER_HOUR, DAY_TICKS, REFRESH_TICKS, RUN_TICKS, OVERDUE_TICKS, FIGURES, TIERS, BONUS, LINES,
   figureOf, tierOf, nextTierPoints, slotsFor, resourceScale, niceQuantity, quantityFor, rewardFor, figureWeight,
@@ -592,4 +593,31 @@ test('decline: only with no Folk on it, a quarter of its Standing, a story ends,
   const step = { state: 'open', folkId: null, standing: 8, qty: 10, delivered: 0, resources: 100, story: { id: 'Mill_Bridge', step: 1 } };
   m.decline(s, step);
   assert.equal(s.stories.active, null);
+});
+
+test('a courier hands in to open commissions with a Folk on them, soonest deadline first', () => {
+  const list = [
+    { id: 'later', state: 'open', folkId: 'a', deadline: 900, age: 0 },
+    { id: 'late', state: 'open', folkId: 'b', deadline: 100, age: 150 },
+    { id: 'soon', state: 'open', folkId: 'c', deadline: 200, age: 0 },
+    { id: 'nobody', state: 'open', folkId: null, deadline: 10, age: 0 },
+    { id: 'done', state: 'done', folkId: null, deadline: 10, age: 0 },
+  ];
+  assert.deepEqual(handInOrder(list).map((c) => c.id), ['late', 'soon', 'later']);
+  assert.equal(list[0].id, 'later');
+});
+
+test('a served Folk claims until its goods and those aboard cover the rest', () => {
+  assert.equal(claimsMore({ townQty: 3, aboard: 4, remaining: 8 }), true);
+  assert.equal(claimsMore({ townQty: 4, aboard: 4, remaining: 8 }), false);
+  assert.equal(claimsMore({ townQty: 0, aboard: 9, remaining: 8 }), false);
+});
+
+test('town goods go home only when nothing can still hand them in', () => {
+  const free = { hasCommission: false, onRun: false, onStrike: false, carrier: false };
+  assert.equal(townStray(free), true);
+  assert.equal(townStray({ ...free, hasCommission: true }), false);
+  assert.equal(townStray({ ...free, onRun: true }), false);
+  assert.equal(townStray({ ...free, onStrike: true }), false);
+  assert.equal(townStray({ ...free, carrier: true }), false);
 });

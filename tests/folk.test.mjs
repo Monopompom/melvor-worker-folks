@@ -263,3 +263,10 @@ test('a nickname survives a save; markup in a stored name does not', () => {
   assert.equal(normalizeFolk({ id: 'a', slot: 0, tier: 'Newbie', name: '<>', born: 'Ada' }).name, 'Ada');
   assert.equal(normalizeFolk({ id: 'a', slot: 0, tier: 'Newbie', name: '<>' }).name, 'Folk');
 });
+
+test('a nickname can not be a reserved word or stack marks on one letter', () => {
+  assert.equal(nickProblem('You', [], ['You']), 'reserved');
+  assert.equal(nickProblem('you', [], ['You']), 'reserved');
+  assert.equal(nickProblem('Youri', [], ['You']), null);
+  assert.equal(nickProblem(`a${'\u0301'.repeat(23)}`), 'chars');
+});

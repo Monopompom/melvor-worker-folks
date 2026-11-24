@@ -529,6 +529,21 @@ export function runDue({ townQty, remaining: rest, usedMs, capMs, nextMs }) {
   return townQty >= rest || usedMs + Math.max(0, nextMs) > capMs;
 }
 
+/** The commissions a courier hands in to at a bank stop: open, with a Folk on them, the soonest deadline first. */
+export function handInOrder(commissions) {
+  return (commissions ?? []).filter((c) => c.state === 'open' && c.folkId !== null).sort((a, b) => deadlineLeft(a) - deadlineLeft(b));
+}
+
+/** Whether a Folk a courier serves still claims what it makes: its town goods and those aboard don't cover the rest. */
+export function claimsMore({ townQty, aboard, remaining: rest }) {
+  return townQty + aboard < rest;
+}
+
+/** Town goods that nothing will ever hand in: no commission, no run, no strike to come back from, no carrier's job. */
+export function townStray({ hasCommission, onRun, onStrike, carrier }) {
+  return !hasCommission && !onRun && !onStrike && !carrier;
+}
+
 /** Runs still to go for the rest of a commission, each carrying a room's worth (`perRunQty`, what fits in the room). */
 export function runsLeft({ rest, perRunQty }) {
   if (!(rest > 0)) return 0;
