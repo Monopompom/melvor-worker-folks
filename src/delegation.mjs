@@ -59,10 +59,13 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
         if (hiring !== undefined) {
           if (value !== undefined && decide(value) === 'delegate') {
             hiring.delegated.add(value);
-            picks.set(value, resume.selectionOf(value));
+            const pick = resume.selectionOf(value);
+            picks.set(value, pick);
             hiring.renderQueue.folks = true;
             log(`delegated: ${value.id}`);
             const started = folkFor(value);
+            // Kept on the Folk as ids too (save v11): Restart all and crew plans find it again after a reload.
+            if (started !== undefined) started.pick = resume.toSaved(pick);
             if (started !== undefined) hiring.stopNotes.delete(started.id);
             hiring.events.emit('folkStarted', { skill: value, folk: started });
             return; // main slot untouched
@@ -84,7 +87,8 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
     hiring.decideStart = decide;
     hiring.startGoesToFolk = startGoesToFolk;
     // What a Folk-held skill last started on, kept through its stop: Restart all starts it on that again.
-    hiring.lastPick = (skill) => picks.get(skill) ?? null;
+    // After a reload, what its Folk last started on, from the save.
+    hiring.lastPick = (skill) => picks.get(skill) ?? resume.fromSaved(skill, folkFor(skill)?.pick ?? null, game) ?? null;
     installAccessor();
   });
 
@@ -292,8 +296,10 @@ export function install(ctx, { getHiring, rules, resume, isDisabled = () => fals
       if (skill === undefined || !hiring.delegated.has(skill)) return;
       hiring.forceStop(skill); // even while Thieving is stunned; in a raid: dropped silently
     };
-    hiring.events.on('folkAssigned', ({ previous, skillId }) => {
+    hiring.events.on('folkAssigned', ({ folk, previous, skillId }) => {
       if (previous !== null) release(previous);
+      // Another skill: what it last started on belonged to the old one.
+      if (folk !== undefined && previous !== skillId) folk.pick = null;
       // A Folk put on the skill the player is working right now: the player's run
       // stops; the next start on that page goes to the Folk.
       if (skillId !== null) {

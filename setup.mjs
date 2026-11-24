@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-11-24.313';
+export const BUILD = '2026-11-24.326';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -27,6 +27,10 @@ export async function setup(ctx) {
   // 0. Incompatible mods (Multitasking): both change which skill the game treats as active.
   //    Checked now (mods loaded before us) and again once every mod is in (loaded after us).
   await lang.install(ctx, { mergeLang });
+  // Before any setting is added: Mod Settings' labels, hints and choices are put in the player's language when it opens.
+  const settingTexts = (await ctx.loadModule('src/setting-texts.mjs')).install(ctx, {
+    model: await ctx.loadModule('src/setting-texts-model.mjs'), log,
+  });
   const { swalClass, fireQuick } = await ctx.loadModule('src/popup-class.mjs');
   const state = { disabled: false };
   const loadedNames = () => { try { return mod.manager.getLoadedModList(); } catch { return []; } };
@@ -91,11 +95,21 @@ export async function setup(ctx) {
     tips,
     log,
   });
+  // Saved crew plans, the Plans button beside them (round 5).
+  const plans = (await ctx.loadModule('src/crew-plans.mjs')).install(ctx, { swalClass,
+    getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+    model: await ctx.loadModule('src/crew-plans-model.mjs'),
+    resume: await ctx.loadModule('src/resume.mjs'),
+    popupDidRender,
+    tips,
+    log,
+  });
   const dashboard = (await ctx.loadModule('src/dashboard.mjs')).install(ctx, { swalClass,
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
     model: await ctx.loadModule('src/dashboard-model.mjs'),
     milestones: await ctx.loadModule('src/milestones.mjs'),
     bulk,
+    plans,
     layout,
     tips,
     marquee: marqueeLine,
@@ -117,7 +131,7 @@ export async function setup(ctx) {
   // Tuning settings (polish round, 24 Nov 2026): every module prices hires and settles strikes through these, so the
   // Mod Settings knobs reach the Shop, payroll, promotions and Forget alike. At the defaults they are the plain rules.
   const tuningRules = await ctx.loadModule('src/tuning-model.mjs');
-  const tuning = (await ctx.loadModule('src/tuning.mjs')).create(ctx, { model: tuningRules, log });
+  const tuning = (await ctx.loadModule('src/tuning.mjs')).create(ctx, { model: tuningRules, settingTexts, log });
   const pricing = tuningRules.tunedPricing(pricingRules, tuning.value);
   const wages = tuningRules.tunedWages(wagesRules, tuning.value);
   const shop = await ctx.loadModule('src/shop.mjs');
@@ -392,6 +406,16 @@ export async function setup(ctx) {
     log,
   });
 
+  // 5d3'''a. Recipe queues (round 5): up to three steps per Folk in its skill, a chain kept in its own stock.
+  (await ctx.loadModule('src/queue.mjs')).install(ctx, { swalClass,
+    getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+    model: await ctx.loadModule('src/queue-model.mjs'),
+    popupDidRender,
+    titleName,
+    tips,
+    log,
+  });
+
   // 5d3'''. Tent depots (with Voyage): shared rooms another mod registers; the room shares them with their Folks.
   depots.install(ctx, {
     getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
@@ -406,6 +430,22 @@ export async function setup(ctx) {
     model: await ctx.loadModule('src/carry-model.mjs'),
     roomModel: roomRules,
     depotModel,
+    log,
+  });
+
+  // 5d3'''''. Folk moments and the "While you were away" queue (joint order round 5, API v13).
+  (await ctx.loadModule('src/moments.mjs')).install(ctx, { swalClass,
+    getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+    model: await ctx.loadModule('src/moments-model.mjs'),
+    time,
+    tips,
+    popupDidRender,
+    log,
+  });
+  // Worker Folks' own moments: a day off, better tools, a quarrel, another skill, a bonus, feeling poorly, a double shift.
+  (await ctx.loadModule('src/folk-moments.mjs')).install(ctx, {
+    getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+    bulk,
     log,
   });
 

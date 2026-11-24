@@ -155,3 +155,32 @@ export function inputsPlan({ demands, freeMs, aboard, aboardIds = [], bankQty })
     short,
   };
 }
+
+/**
+ * A band's raid on a Folk's room or a depot (v13, Voyage's debts): what it takes toward `valueGp`. First GP from the
+ * purse, then each side in the order given (haul, stock, town), the dearest stacks first by their sale value, whole
+ * units only, never past `valueGp`: a unit worth more than what is still owed is skipped for cheaper ones. Stacks are
+ * { id, qty, unit } (unit: one item's sale value in GP; worthless ones are never taken). Gear is never offered here.
+ * { purse, moves: [{ side, id, qty }], gp } with gp the value taken (purse + items).
+ */
+export function raidPlan({ purseGp = 0, sides = [] } = {}, valueGp = 0) {
+  let left = Number.isFinite(valueGp) ? Math.max(0, Math.floor(valueGp)) : 0;
+  const purse = Math.min(left, Math.max(0, Math.floor(Number.isFinite(purseGp) ? purseGp : 0)));
+  left -= purse;
+  const moves = [];
+  let items = 0;
+  for (const { side, stacks } of sides) {
+    const dearest = (stacks ?? [])
+      .filter((s) => s.qty > 0 && s.unit > 0)
+      .sort((a, b) => b.qty * b.unit - a.qty * a.unit || b.unit - a.unit);
+    for (const s of dearest) {
+      if (left <= 0) break;
+      const qty = Math.min(s.qty, Math.floor(left / s.unit));
+      if (qty <= 0) continue;
+      moves.push({ side, id: s.id, qty });
+      items += qty * s.unit;
+      left -= qty * s.unit;
+    }
+  }
+  return { purse, moves, gp: purse + items };
+}

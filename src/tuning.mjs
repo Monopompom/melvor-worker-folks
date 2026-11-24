@@ -6,7 +6,7 @@
 // by register(), late in setup, so they come after the older ones in their sections. Until then, and for a stored
 // value outside the limits, a knob reads its default or its nearest limit.
 
-export function create(ctx, { model, log }) {
+export function create(ctx, { model, settingTexts, log }) {
   let hiring;
   let registered = false;
   const sectionOf = (knob) => ctx.settings.section(knob.section);
@@ -99,8 +99,8 @@ export function create(ctx, { model, log }) {
       const menu = toggle.parentElement?.querySelector('.dropdown-menu');
       if (menu === null || menu === undefined) return;
       markChoice(menu, toggle);
-      // After the game's own handler on the option has written the new choice on the toggle.
-      menu.addEventListener('click', () => markChoice(menu, toggle));
+      // After the game's own handler on the option has written the new choice on the toggle (as first given).
+      menu.addEventListener('click', () => { settingTexts?.retext(toggle); markChoice(menu, toggle); });
     });
   };
 
@@ -111,6 +111,8 @@ export function create(ctx, { model, log }) {
       const key = HEADINGS[h2.textContent];
       if (key !== undefined) h2.textContent = getLangString(key);
     });
+    // Labels, hints and choices were given while the mod loaded, maybe before the game had the player's language.
+    settingTexts?.retext(html);
     markDropdowns(html);
   };
 

@@ -1,7 +1,13 @@
 // Folk record model, validation and save-root migrations. Pure: no game globals.
 
 export const TIERS = ['Newbie', 'Junior', 'Middle', 'Senior', 'Expert'];
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
+/** The most steps a Folk's recipe queue holds (v11, round 5). */
+export const QUEUE_MAX = 3;
+/** The most saved crew plans (v11, round 5). */
+export const PLANS_MAX = 5;
+/** A moment's or job's id: the registering mod's namespace, a colon, a name ('worker_folks:DayOff', 'voyage:Ford'). */
+export const NS_ID = /^[A-Za-z0-9_]+:[A-Za-z0-9_]+$/;
 /**
  * A Folk's travel state: 'idle' stays on its place, 'with' goes along with the player, 'walking' is on its way somewhere
  * alone (Voyage, phase 6). Only 'idle' works.
@@ -141,7 +147,38 @@ export function createFolk({ id, slot, tier, name, hiredAt = 0, paid = null }) {
     townsfolk: false,
     /** What the Folk wants to end its strike, rolled when it began (src/demands-model.mjs); empty off strike. */
     demand: [],
+    /**
+     * The moment it has brought you (v11): { id, leftMs } (the game time it stays open), or null. One at a time, its
+     * own or another mod's; an id no mod has registered yet waits as it is.
+     */
+    moment: null,
+    /** Its recipe queue (v11): up to QUEUE_MAX steps in its skill, [{ recipeId, count (null: until inputs run out), made }]. */
+    queue: [],
+    /** What it last started, as plain ids (src/resume.mjs toSaved), for Restart all and crew plans (v11); null = none. */
+    pick: null,
   };
+}
+
+/** An open moment from the save: { id, leftMs } with a namespaced id and time left, or null. */
+export function normalizeMoment(raw) {
+  if (raw === null || typeof raw !== 'object' || typeof raw.id !== 'string' || !NS_ID.test(raw.id)) return null;
+  if (!(typeof raw.leftMs === 'number' && Number.isFinite(raw.leftMs) && raw.leftMs > 0)) return null;
+  const moment = { id: raw.id, leftMs: Math.floor(raw.leftMs) };
+  // The other Folk a moment is about (a quarrel), by id.
+  if (typeof raw.with === 'string' && raw.with !== '') moment.with = raw.with;
+  return moment;
+}
+
+/** A recipe queue from the save: at most QUEUE_MAX clean steps. */
+export function normalizeQueue(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((s) => s !== null && typeof s === 'object' && typeof s.recipeId === 'string' && s.recipeId !== '')
+    .slice(0, QUEUE_MAX)
+    .map((s) => ({
+      recipeId: s.recipeId,
+      count: Number.isInteger(s.count) && s.count > 0 ? s.count : null,
+      made: Number.isInteger(s.made) && s.made > 0 ? s.made : 0,
+    }));
 }
 
 /** { slotId: { id, qty } } with whole positive quantities; anything else is dropped. */
@@ -221,6 +258,10 @@ export function normalizeFolk(raw) {
   folk.restockAt = typeof raw.restockAt === 'number' && Number.isFinite(raw.restockAt) && raw.restockAt > 0 ? raw.restockAt : null;
   folk.townsfolk = raw.townsfolk === true;
   folk.demand = folk.onStrike ? normalizeDemands(raw.demand) : [];
+  folk.moment = normalizeMoment(raw.moment);
+  // A queue belongs to a skill: a Folk on none keeps none.
+  folk.queue = folk.skillId === null ? [] : normalizeQueue(raw.queue);
+  folk.pick = savedPick(raw.pick);
   return folk;
 }
 
@@ -319,8 +360,36 @@ export function normalizeLost(raw, frozen = {}) {
   return lost;
 }
 
+/**
+ * Which frozen slots hold a Folk that died on the road and left its things with another mod (v11, Voyage's cairn):
+ * { slotIndex: folkId }. The keeper gives the card's text each time it is drawn. Kept only for slots in `frozen`.
+ */
+export function normalizeCairns(raw, frozen = {}) {
+  const cairns = {};
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return cairns;
+  for (const [slot, id] of Object.entries(raw)) if (frozen[slot] !== undefined && typeof id === 'string' && id !== '') cairns[slot] = id;
+  return cairns;
+}
+
+/** The moments' crew-wide clock (v11): `gapMs` the game time before the next may open (null: not rolled yet), `warned` the general strike's warning shown. */
+export function normalizeMomentClock(raw) {
+  const gap = raw?.gapMs;
+  return {
+    gapMs: typeof gap === 'number' && Number.isFinite(gap) && gap >= 0 ? Math.floor(gap) : null,
+    warned: raw?.warned === true,
+  };
+}
+
+/** Saved crew plans (v11), kept as saved up to PLANS_MAX: src/crew-plans-model.mjs checks each one. */
+export function normalizePlans(raw) {
+  return Array.isArray(raw) ? raw.filter((p) => p !== null && typeof p === 'object' && !Array.isArray(p)).slice(0, PLANS_MAX) : [];
+}
+
 export function createEmptyRoot() {
-  return { v: SAVE_VERSION, folks: [], reserve: createEmptyReserve(), frozen: {}, board: null, lost: {}, commissions: null };
+  return {
+    v: SAVE_VERSION, folks: [], reserve: createEmptyReserve(), frozen: {}, board: null, lost: {}, commissions: null, depots: {},
+    moments: normalizeMomentClock(null), plans: [], cairns: {},
+  };
 }
 
 /**
@@ -401,6 +470,15 @@ export const MIGRATIONS = {
     v: 10,
     folks: (Array.isArray(root.folks) ? root.folks : []).map((f) => ({ ...f, job: null, jobMemory: {}, supplies: null })),
   }),
+  // v11: decisions and risk (joint order round 5): no moment, queue or saved pick yet; no plans; no cairns.
+  10: (root) => ({
+    ...root,
+    v: 11,
+    folks: (Array.isArray(root.folks) ? root.folks : []).map((f) => ({ ...f, moment: null, queue: [], pick: null })),
+    moments: { gapMs: null, warned: false },
+    plans: [],
+    cairns: {},
+  }),
 };
 
 /**
@@ -470,9 +548,12 @@ export function parseRoot(input) {
   // Tent depots (save v10), kept as saved: src/depot-model.mjs checks them (none yet: {}).
   const kept = migrated.root.depots;
   const depots = kept !== null && typeof kept === 'object' && !Array.isArray(kept) ? kept : {};
-  return { root: { v: SAVE_VERSION, folks, reserve, frozen, board, lost, commissions, depots }, applied: migrated.applied, dropped, corrupt: false };
+  const moments = normalizeMomentClock(migrated.root.moments);
+  const plans = normalizePlans(migrated.root.plans);
+  const cairns = normalizeCairns(migrated.root.cairns, frozen);
+  return { root: { v: SAVE_VERSION, folks, reserve, frozen, board, lost, commissions, depots, moments, plans, cairns }, applied: migrated.applied, dropped, corrupt: false };
 }
 
-export function serializeRoot(folks, reserve = {}, frozen = {}, board = null, lost = {}, commissions = null, depots = {}) {
-  return JSON.stringify({ v: SAVE_VERSION, folks, reserve, frozen, board, lost, commissions, depots });
+export function serializeRoot(folks, reserve = {}, frozen = {}, board = null, lost = {}, commissions = null, depots = {}, moments = normalizeMomentClock(null), plans = [], cairns = {}) {
+  return JSON.stringify({ v: SAVE_VERSION, folks, reserve, frozen, board, lost, commissions, depots, moments, plans, cairns });
 }

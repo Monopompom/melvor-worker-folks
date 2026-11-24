@@ -6,6 +6,8 @@ import { createEventBus } from '../src/events.mjs';
 import { createCrew } from '../src/crew.mjs';
 import * as model from '../src/folk.mjs';
 import * as traitsModel from '../src/traits-model.mjs';
+import { install as installMoments } from '../src/moments.mjs';
+import * as momentsModel from '../src/moments-model.mjs';
 
 test('guards: none means allowed; the first refusal wins; a throwing or odd guard allows', () => {
   const errors = [];
@@ -489,4 +491,87 @@ test('api v10: mastery in the view, qualifies, and the haul calls go to the room
   assert.equal(hiring.accessHook, undefined);
   assert.equal(api.accessOf(junior.id), 'bank');
   assert.deepEqual(calls.at(-1), ['refresh', undefined], 'removing the hook asks every Folk again');
+});
+
+test('api v13: version is still a plain property, now 13', () => {
+  const { hiring } = makeHiring();
+  const api = createApi({ getHiring: () => hiring, model });
+  assert.equal(API_VERSION, 13);
+  assert.equal(typeof api.version, 'number');
+  assert.ok(api.version >= 12, 'what released Voyage reads');
+});
+
+test('api v13: heal goes to health with its cause; an unknown Folk answers undefined', () => {
+  const { hiring } = makeHiring();
+  const folk = hiring.crew.hire('Junior');
+  const calls = [];
+  hiring.health = { heal: (f, hp, opts) => { calls.push([f.id, hp, opts]); return 321; } };
+  const api = createApi({ getHiring: () => hiring, model });
+  assert.equal(api.heal(folk.id, 125, { cause: 'rest' }), 321);
+  assert.deepEqual(calls, [[folk.id, 125, { cause: 'rest' }]]);
+  assert.equal(api.heal('nobody', 5), undefined);
+});
+
+test('api v13: the death keeper sees a Folk view and frozen things; bad defs are refused', () => {
+  const { hiring } = makeHiring();
+  const folk = hiring.crew.hire('Junior');
+  let set;
+  hiring.health = { maxHpOf: () => 500, setKeeper: (def) => { set = def; return () => { set = undefined; }; } };
+  const api = createApi({ getHiring: () => hiring, model });
+  assert.throws(() => api.registerDeathKeeper({}), /keep/);
+  assert.throws(() => api.registerDeathKeeper({ keep: () => true, textFor: 'x' }), /textFor/);
+  const seen = [];
+  const off = api.registerDeathKeeper({ keep: (view, things) => { seen.push([view, things]); return true; }, textFor: () => 'cairn' });
+  const things = { gear: [{ slot: 'Cape', itemId: 'bag', qty: 1 }], room: { haul: [{ itemId: 'ore', qty: 2 }], stock: [], town: [] }, purse: [], cause: 'band' };
+  assert.equal(set.keep(folk, things), true);
+  const [view, got] = seen[0];
+  assert.equal(view.id, folk.id);
+  assert.ok(Object.isFrozen(view) && Object.isFrozen(got) && Object.isFrozen(got.room.haul[0]));
+  assert.deepEqual(got, things);
+  assert.equal(set.textFor(folk.id), 'cairn');
+  off();
+  assert.equal(set, undefined);
+});
+
+test('api v13: raidRoom goes to the carriers module', () => {
+  const { hiring } = makeHiring();
+  hiring.carry = { raid: (target, gp) => ({ taken: [], gp: Math.min(gp, 5), target }) };
+  const api = createApi({ getHiring: () => hiring, model });
+  assert.deepEqual(api.raidRoom({ depot: 'tent' }, 9), { taken: [], gp: 5, target: { depot: 'tent' } });
+});
+
+test('api v13: a registered moment sees Folk views; a bad one throws; awayQueue opens items in turn', async () => {
+  const { hiring } = makeHiring();
+  const folk = hiring.crew.hire('Junior');
+  globalThis.game = { _isInOnlineLoop: true };
+  globalThis.Game ??= class {};
+  const moments = installMoments({ onModsLoaded: (fn) => fn(), patch: () => ({ after: () => {} }) }, { getHiring: () => hiring, model: momentsModel, log: () => {} });
+  const api = createApi({ getHiring: () => hiring, model });
+  assert.throws(() => api.registerMoment({ id: 'voyage:Ford' }), /fits/);
+  const seen = [];
+  const off = api.registerMoment({
+    id: 'voyage:Ford', fits: (v) => { seen.push(v); return v.travel === 'walking'; }, text: (v) => `${v.name} at a ford`,
+    answers: [{ id: 'wade', label: 'Wade', apply: () => {} }, { id: 'wait', label: () => 'Wait', why: () => '', apply: () => {} }], defaultAnswer: 'wait',
+  });
+  const def = moments.get('voyage:Ford');
+  assert.equal(def.fits(folk), false);
+  assert.equal(seen[0].id, folk.id);
+  assert.ok(Object.isFrozen(seen[0]), 'a view, not the record');
+  assert.equal(def.text(folk), `${folk.name} at a ford`);
+  assert.equal(def.answers[1].label(folk), 'Wait');
+  assert.equal(def.weight, 1);
+  off();
+  assert.equal(moments.get('voyage:Ford'), undefined);
+
+  assert.equal(api.awayQueue({ id: 'bad' }), false);
+  const opened = [];
+  let release;
+  assert.equal(api.awayQueue({ id: 'voyage:fold', title: 'Bands', open: () => new Promise((r) => { opened.push('fold'); release = r; }) }), true);
+  assert.equal(api.awayQueue({ id: 'other:x', title: 'X', open: async () => { opened.push('x'); } }), true);
+  await new Promise((r) => { setTimeout(r, 2200); });
+  assert.deepEqual(opened, ['fold'], 'the second waits for the first board to close');
+  release();
+  await new Promise((r) => { setTimeout(r, 900); });
+  assert.deepEqual(opened, ['fold', 'x']);
+  assert.deepEqual(moments.awayIds, []);
 });

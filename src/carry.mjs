@@ -248,7 +248,42 @@ export function install(ctx, { getHiring, model, roomModel, depotModel, log }) {
   };
   const servedBy = (folk, options) => routesOf(folk, options).map(({ courier }) => courier);
 
-  const api = { take, toBank, toTown, inputsPlan, loadInputs, give, servedBy, routesOf };
+  /** One item's sale value in GP (0 for an unknown item or one sold for another currency). */
+  const unitGp = (id) => {
+    const sells = itemOf(id)?.sellsFor;
+    return sells?.currency?.id === 'melvorD:GP' && sells.quantity > 0 ? sells.quantity : 0;
+  };
+  /**
+   * A band's raid (v13): takes toward `valueGp` from a Folk's room or a depot, `{ folk: id }` or `{ depot: id }`, in the
+   * order of model.raidPlan: purse GP, then the haul, stock and town goods, dearest first, never gear. What it takes is
+   * gone. { taken: [{ itemId, qty }], gp } with gp the sale value taken; undefined for an unknown place.
+   */
+  const raid = (target, valueGp) => {
+    const place = placeOf(target);
+    if (place === undefined) return undefined;
+    const sides = (place.folk !== undefined ? ['haul', 'stock', 'town'] : depotModel.DEPOT_SIDES)
+      .map((side) => ({ side, stacks: roomModel.entries(place.room, side).map(({ id, qty }) => ({ id, qty, unit: unitGp(id) })) }));
+    const purseGp = place.folk !== undefined ? (place.room.purse?.['melvorD:GP'] ?? 0) : 0;
+    const plan = model.raidPlan({ purseGp, sides }, valueGp);
+    if (plan.purse > 0) {
+      const leftGp = place.room.purse['melvorD:GP'] - plan.purse;
+      if (leftGp > 0) place.room.purse['melvorD:GP'] = leftGp;
+      else delete place.room.purse['melvorD:GP'];
+    }
+    const taken = [];
+    plan.moves.forEach(({ side, id, qty }) => {
+      const got = roomModel.take(place.room, id, qty, side);
+      if (got.qty > 0) taken.push({ itemId: id, qty: got.qty });
+    });
+    if (plan.purse > 0 || taken.length > 0) {
+      changed(place);
+      if (place.folk !== undefined) hiring.markCard(place.folk);
+      log(`raid on ${place.folk?.name ?? place.depot.id}: ${plan.gp} GP of ${valueGp}`);
+    }
+    return Object.freeze({ taken: frozen(taken), gp: plan.gp });
+  };
+
+  const api = { take, toBank, toTown, inputsPlan, loadInputs, give, servedBy, routesOf, raid };
 
   ctx.onModsLoaded(() => {
     hiring = getHiring();

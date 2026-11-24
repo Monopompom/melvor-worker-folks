@@ -144,7 +144,7 @@ test('a shared job keeps every holder; a plain job still has one', () => {
 test('load migrates a pre-version root', () => {
   const { crew } = make(4);
   const report = crew.load({ folks: [{ id: 'old', slot: 1, tier: 'Junior', name: 'Old' }] });
-  assert.deepEqual(report.applied, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  assert.deepEqual(report.applied, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
   assert.equal(crew.bySlot(1).strikes, 0);
   assert.equal(crew.bySlot(1).paid, null);
 });
@@ -300,4 +300,37 @@ test('a reserved word is refused as a new name, and a Folk keeps its own', () =>
   assert.equal(crew.rename(a.id, 'You', { reserved: ['You'] }), 'reserved');
   assert.equal(a.name, was);
   assert.equal(crew.rename(a.id, was, { reserved: [was] }), null);
+});
+
+test('a cairn is kept on its frozen slot only, and goes when the slot thaws or freezes again', () => {
+  const { crew } = make(4);
+  crew.setCairn(1, 'dead');
+  assert.equal(crew.cairnAt(1), undefined, 'not frozen: ignored');
+  crew.freeze(1, 5000);
+  crew.setLost(1, [{ id: 'ore', qty: 3 }]);
+  crew.setCairn(1, 'dead');
+  assert.equal(crew.cairnAt(1), 'dead');
+  assert.deepEqual(crew.lostAt(1), [], 'a cairn means nothing was lost');
+  const back = make(4).crew;
+  back.load(crew.serialize());
+  assert.equal(back.cairnAt(1), 'dead', 'saved with the slot');
+  crew.thaw(1);
+  assert.equal(crew.cairnAt(1), undefined);
+  crew.freeze(2, 5000);
+  crew.setCairn(2, 'x');
+  crew.freeze(2, 9000);
+  assert.equal(crew.cairnAt(2), undefined, 'a new death on the slot starts clean');
+});
+
+test('the moment clock and plans ride in the save', () => {
+  const { crew } = make(4);
+  crew.moments = { gapMs: 7200000, warned: true };
+  crew.plans = [{ id: 'p1', name: 'Orders', entries: [] }];
+  const back = make(4).crew;
+  back.load(crew.serialize());
+  assert.deepEqual(back.moments, { gapMs: 7200000, warned: true });
+  assert.deepEqual(back.plans, [{ id: 'p1', name: 'Orders', entries: [] }]);
+  back.clear();
+  assert.deepEqual(back.moments, { gapMs: null, warned: false });
+  assert.deepEqual(back.plans, []);
 });

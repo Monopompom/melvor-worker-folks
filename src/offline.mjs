@@ -6,9 +6,9 @@
 export function install(ctx, { getHiring, time, log }) {
   let hiring;
   /** Per offline session: actions completed and skills released, by skill id; wages paid, by currency id. */
-  let tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], traits: [], wages: new Map(), wageMs: new Map(), orders: [], refills: new Map(), refillOut: [], supplied: new Map(), active: false };
+  let tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], walkouts: [], traits: [], wages: new Map(), wageMs: new Map(), orders: [], refills: new Map(), refillOut: [], supplied: new Map(), active: false };
   const reset = () => {
-    tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], traits: [], wages: new Map(), wageMs: new Map(), orders: [], refills: new Map(), refillOut: [], supplied: new Map(), active: true };
+    tracker = { actions: new Map(), released: new Set(), died: [], debts: [], struck: [], walkouts: [], traits: [], wages: new Map(), wageMs: new Map(), orders: [], refills: new Map(), refillOut: [], supplied: new Map(), active: true };
   };
 
   ctx.onModsLoaded(() => {
@@ -50,7 +50,7 @@ export function install(ctx, { getHiring, time, log }) {
     const ticks = Math.floor(ms / TICK_INTERVAL);
     tracker.active = false;
     hiring.events.emit('offlineTicks', { ticks, ms });
-    if (info.offlineProgress === undefined || (tracker.actions.size === 0 && tracker.released.size === 0 && tracker.died.length === 0 && tracker.debts.length === 0 && tracker.struck.length === 0 && tracker.traits.length === 0 && tracker.wages.size === 0 && tracker.orders.length === 0 && tracker.refills.size === 0 && tracker.refillOut.length === 0 && tracker.supplied.size === 0 && !hiring.crew.all.some((f) => (hiring.room?.heldList(f).length ?? 0) > 0))) return;
+    if (info.offlineProgress === undefined || (tracker.actions.size === 0 && tracker.released.size === 0 && tracker.died.length === 0 && tracker.debts.length === 0 && tracker.struck.length === 0 && tracker.walkouts.length === 0 && tracker.traits.length === 0 && tracker.wages.size === 0 && tracker.orders.length === 0 && tracker.refills.size === 0 && tracker.refillOut.length === 0 && tracker.supplied.size === 0 && !hiring.crew.all.some((f) => (hiring.room?.heldList(f).length ?? 0) > 0))) return;
     const container = info.offlineProgress.messageContainer;
     if (container === undefined) return;
     // Welcome Back lines in the game's own style (scan C-08, C-09, C-10, build .112):
@@ -150,8 +150,11 @@ export function install(ctx, { getHiring, time, log }) {
       const key = hiring.room.onHaul(folk) ? 'MOD_WF_OFFLINE_HAUL' : 'MOD_WF_OFFLINE_ROOM';
       lines.push({ media, html: `${media ? `<span class="text-nowrap"><img class="skill-icon-xs" src="${media}" alt=""></span> ` : ''}${templateLangString(key, { name: esc(folk.name), items: esc(hiring.room.kindsText(held)) })}` });
     });
-    tracker.died.forEach(({ name, skill, media, lost }) => {
+    tracker.died.forEach(({ name, skill, media, lost, cairnId }) => {
       lines.push({ media, html: `<span class="text-danger">${fill('MOD_WF_OFFLINE_DIED', { name, skill }, {}, media)}</span>` });
+      // A Folk that died on the road and left a cairn (v13): the keeper's line, in the language of the moment.
+      const cairn = cairnId === undefined ? '' : (hiring.health?.cairnText(cairnId) ?? '');
+      if (cairn !== '') lines.push({ html: `<span class="text-danger">${esc(cairn)}</span>` });
       // What its gear and room lost to the full bank, red under the death, as a count: the frozen slot's card lists it.
       if (lost.length > 0) lines.push({ html: `<span class="text-danger">${templateLangString('MOD_WF_OFFLINE_DIED_LOST', { name: esc(name), items: esc(hiring.room.kindsText(lost)) })}</span>` });
     });
@@ -172,6 +175,10 @@ export function install(ctx, { getHiring, time, log }) {
         const taken = hiring.payroll?.autoTakenText?.(folk) ?? '';
         lines.push({ media, html: fill(taken === '' ? 'MOD_WF_OFFLINE_STRUCK_SETTLED' : 'MOD_WF_OFFLINE_STRUCK_SETTLED_ITEMS', { name: folk.name, skill, items: taken }, {}, media) });
       }
+    });
+    // A general strike (round 5): who walked out with the strikers, one line each time it came, all of it red.
+    tracker.walkouts.forEach((names) => {
+      lines.push({ media: hiring.getMediaURL('assets/status_strike.webp'), html: `<span class="text-danger">${fill('MOD_WF_OFFLINE_GENERAL_STRIKE', { names })}</span>` });
     });
     // Traits: what a Folk learned or lost while you were away, the trait's own icon first; a good one green, a bad one
     // red, a fade green (a bad trait gone).
@@ -231,11 +238,11 @@ export function install(ctx, { getHiring, time, log }) {
       if (!tracker.active) return;
       tracker.released.add(skill.id);
     });
-    hiring.events.on('folkDied', ({ folk, skill }) => {
+    hiring.events.on('folkDied', ({ folk, skill, cairn }) => {
       if (!tracker.active) return;
       // The room was emptied on folkFired, just before this event: what it lost is noted on the frozen slot.
       const lost = hiring.room === undefined ? [] : hiring.crew.lostAt(folk.slot);
-      tracker.died.push({ name: folk.name, skill: skill === undefined ? '' : hiring.skillName(skill), media: skill?.media, skillId: skill?.id, lost });
+      tracker.died.push({ name: folk.name, skill: skill === undefined ? '' : hiring.skillName(skill), media: skill?.media, skillId: skill?.id, lost, cairnId: cairn === true ? folk.id : undefined });
     });
     hiring.events.on('folkInDebt', ({ folk, skill }) => {
       if (!tracker.active) return;
@@ -244,6 +251,10 @@ export function install(ctx, { getHiring, time, log }) {
     hiring.events.on('folkStruck', ({ folk, skill }) => {
       if (!tracker.active) return;
       tracker.struck.push({ folk, skill: hiring.skillName(skill), media: skill?.media, skillId: skill?.id });
+    });
+    hiring.events.on('generalStrike', ({ folks }) => {
+      if (!tracker.active) return;
+      tracker.walkouts.push(folks.map((f) => f.name).join(getLangString('MOD_WF_LIST_SEP')));
     });
     hiring.events.on('folkTrait', ({ folk, type, trait }) => {
       if (!tracker.active) return;

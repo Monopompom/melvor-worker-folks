@@ -3,7 +3,7 @@
 // Pure: the Hiring skill and the Folk model are injected (mod modules cannot import their siblings).
 
 /** Bumped when something here changes in a way a caller must know about. Voyage refuses an older one. */
-export const API_VERSION = 12;
+export const API_VERSION = 13;
 /** The least of the hire price an outside hire pays (v7): a bargain, never a free Folk. */
 export const HIRE_SHARE_MIN = 0.25;
 
@@ -203,6 +203,67 @@ export function createApi({ getHiring, model, pricing, rules, getBackup, version
       const dead = health.damage(folk, amount, { eat: false, cause });
       return Object.freeze({ hp: dead ? 0 : health.hpOf(folk), dead });
     },
+    /**
+     * Heals a Folk by `hp` (v13), up to its max HP; `cause` ('rest', 'food') names it in the log. A Folk not in the crew
+     * (dead, its slot frozen) gets nothing. Returns its HP after, or undefined for an unknown Folk. The pair of `hurt`.
+     */
+    heal: (id, hp, { cause } = {}) => {
+      const folk = record(id);
+      const health = hiring().health;
+      if (folk === undefined || health === undefined) return undefined;
+      return health.heal(folk, hp, { cause });
+    },
+    /**
+     * The death keeper (v13): another mod that keeps what a Folk dying on the road had (Voyage's cairns). `def`:
+     * { keep(folkView, { gear: [{ slot, itemId, qty }], room: { haul, stock, town: [{ itemId, qty }] }, purse:
+     * [{ currencyId, amount }], cause }) → true when it took everything, textFor(folkId) → the frozen slot's line ('' for
+     * none), heldIds?() → the item ids its cairns hold }. Asked only for a Folk with travel 'walking'. When keep answers
+     * true, nothing goes to your bank and nothing is listed as lost; the slot still freezes for 24 h and the death is
+     * still told. textFor is asked each time the line is drawn, so it follows the language; nothing of it is saved.
+     * One keeper at a time. Returns the function that removes it.
+     */
+    registerDeathKeeper: (def) => {
+      if (def === null || typeof def !== 'object' || typeof def.keep !== 'function') throw new Error('death keeper needs keep()');
+      if (def.textFor !== undefined && typeof def.textFor !== 'function') throw new Error('death keeper textFor must be a function');
+      if (def.heldIds !== undefined && typeof def.heldIds !== 'function') throw new Error('death keeper heldIds must be a function');
+      const health = hiring().health;
+      if (health === undefined) throw new Error('health is not loaded');
+      const freeze = (things) => Object.freeze({
+        gear: Object.freeze(things.gear.map((e) => Object.freeze(e))),
+        room: Object.freeze(Object.fromEntries(Object.entries(things.room).map(([k, list]) => [k, Object.freeze(list.map((e) => Object.freeze(e)))]))),
+        purse: Object.freeze(things.purse.map((e) => Object.freeze(e))),
+        cause: things.cause,
+      });
+      return health.setKeeper({ keep: (folk, things) => def.keep(view(folk), freeze(things)), textFor: def.textFor, heldIds: def.heldIds });
+    },
+    /**
+     * A band's raid toward a debt (v13): takes up to `valueGp` of sale value from `{ folk: id }`'s room or
+     * `{ depot: id }`: purse GP first, then the dearest haul stacks, then stock, then town goods; never gear; whole items,
+     * never past `valueGp`. What it takes is gone. { taken: [{ itemId, qty }], gp } with gp the value taken; undefined
+     * for an unknown place.
+     */
+    raidRoom: (target, valueGp) => hiring().carry?.raid(target, valueGp),
+    /**
+     * Registers a moment (v13): a short question a Folk brings you, with up to three answers. `def`: { id
+     * ('namespace:Name'), weight (relative to every other moment, default 1), fits(folkView) → may this Folk bring it
+     * now, text(folkView) → the question, answers: [{ id, label(folkView), why?(folkView) → '' or why it can't be
+     * picked now (shown on hover and in a toast), apply(folkView, { offline }) }], defaultAnswer (taken when it runs
+     * out), expiresMs? (game time it stays open, 48 h by default) }. text and label return finished strings (strings are
+     * fine too). Worker Folks keeps the pace (one open moment per Folk, a crew-wide gap) and the save. A moment never
+     * holds a walk. One saved while its mod is off waits for it; one that runs out unregistered is dropped. Returns the
+     * function that removes it.
+     */
+    registerMoment: (def) => {
+      const moments = hiring().moments;
+      if (moments === undefined) throw new Error('moments are not loaded');
+      return moments.register(def, view);
+    },
+    /**
+     * Queues an item for the "While you were away" popup (v13): { id, title (string or function), open() → a promise
+     * that resolves when its own board closes }. Opened after the game's Welcome Back and Worker Folks' own moments, in
+     * the order pushed; the same id again replaces the waiting one. Returns false for a bad item.
+     */
+    awayQueue: (item) => hiring().moments?.awayPush(item) === true,
     /** Subscribes to a Worker Folks event; payloads carry Folk views. Returns the function that unsubscribes. */
     on: (name, fn) => {
       if (typeof fn !== 'function') throw new Error('listener must be a function');

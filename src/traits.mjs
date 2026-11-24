@@ -254,6 +254,32 @@ export function install(ctx, { swalClass, getHiring, model, popupDidRender, titl
       apply(folk, changes);
       return changes.length > 0;
     },
+    /** A moment's answer: `ms` of grudge toward one of our traits (Resentful), learned with the rest of its count. */
+    grudge(folk, id, ms) {
+      if (!model.addGrudge(stateOf(folk), id, ms)) return false;
+      settle(folk);
+      return true;
+    },
+    grudgeOf(folk, id) {
+      return model.grudgeOf(stateOf(folk), id);
+    },
+    clearGrudge(folk, id) {
+      return model.clearGrudge(stateOf(folk), id);
+    },
+    /** A moment's answer: the learning toward one of our traits starts again (Specialist, all skills). */
+    clearLearning(folk, id) {
+      return model.clearLearning(stateOf(folk), id);
+    },
+    /** A moment's answer: one of our traits learned at once, with the usual notice. False when it already has it. */
+    teach(folk, id) {
+      const s = stateOf(folk);
+      if (model.hasTrait(s, id) || !model.completeLearning(s, id)) return false;
+      settle(folk);
+      return true;
+    },
+    has(folk, id) {
+      return model.hasTrait(stateOf(folk), id);
+    },
     /** The ids a Folk holds and waits on: { held, waiting }. */
     idsOf(folk) {
       const s = stateOf(folk);

@@ -161,6 +161,27 @@ among your Folks, tent depots and bank places, at least one of them a bank stop.
 them in order, takes what your Folks hold and brings it to your bank, carries Township commission
 goods, and earns travel traits, Hiring XP and mastery. Without Voyage the job is not offered.
 
+## The recipe queue
+
+On Smithing, Fletching, Crafting, Runecrafting, Herblore and Summoning (and other mods' artisan skills), a Folk can
+work up to **3 recipes in a row**. Press **Queue** in the Worker box: each step is a recipe with a count (what this
+Folk makes of it) or **Until inputs run out**. The card shows the steps with what is done, and each step can be
+removed. When a step is done the Folk switches to the next recipe by itself; after the last one it keeps working that
+recipe. When a later step uses what an earlier one makes (bars, then daggers), that product goes to the Folk's own
+stock first, as far as its room holds, and the next step takes it from there before your bank. A step that can't
+start (no inputs, your level) stops the Folk with the reason on its card and waits. A new skill, or your own recipe
+click on that page, clears the queue; a strike, a break or Stop keep it. It runs offline too.
+
+## Crew plans
+
+Save who works what and switch the whole crew in one go. **Plans** under At work on the Hiring page (or **Save as
+plan** in the Worker box's popup) saves each Folk's skill, recipe and queue, or its job, under a name of up to 24
+characters; up to **5 plans**, and saving under a used name replaces that plan. **Apply** shows what will change
+first: who moves where, who is already set, and who is left as it is and why (on the road, on strike or cooling
+down, the skill held by a Folk not in the plan, not qualified). Confirm moves everyone at once, swaps included. A Folk
+that was idle when the plan was saved gets its skill and queue but isn't started (and stops if it is working that
+skill), so its Shift Slot goes to the plan's workers. Folks not in the plan are left alone.
+
 ## Supply lines
 
 From Hiring 60, **Supplies** on a Folk's card sends what it makes straight to another Folk whose
@@ -191,6 +212,16 @@ seconds. A Folk that drops to zero dies: its gear returns to your bank as far as
 frozen slot says what), it leaves the crew,
 and its slot stays frozen for 24 hours of real time before a new hire can take it.
 Abyssal NPCs hit Folks at a tenth of their listed damage.
+
+## Folk moments
+
+Now and then a Folk brings you a question with two answers, on its card in the amber row, with what each answer does
+under it: it wants an afternoon off, found better tools, quarrels with another Folk, wants to try another skill, asks
+for a bonus, feels poorly, or offers a double shift. There are a few days between moments across the whole crew, and
+the **N asking** badge in the Overview's At work head takes you to them. A moment waits **48 hours** of game time;
+unanswered, it takes the cautious answer shown on the card (often a small grudge toward Resentful). Moments open and
+run out offline too: when you come back, after the game's Welcome Back, one popup lists what was answered for you
+and lets you answer the rest. Other mods can bring their own moments (Voyage's on the road); a Folk has one at a time.
 
 ## Promotions and firing
 
@@ -300,6 +331,13 @@ says which.
 | Resentful | 50 → 800 kills (or Bones) |
 | Local (Townsfolk) | 50 → 750 Cabbages |
 | another mod's trait | 10 → 150 Rusty Keys |
+
+### General strike (optional)
+
+With **General strike** on (Settings, Wages, off by default), once at least half of the Folks at work are on strike
+(2 at least), the others walk out too, each for the rest its rank takes after a strike, and go back to work after it.
+Loyal Folks and Folks on the road keep working, and a Folk that walks out with them doesn't count a strike. One strike
+before it, a Folk warns you (**Strike talk**): Settle now opens the Settle all bill. Nothing happens on No sweat.
 
 ## Hiring levels
 
@@ -475,7 +513,7 @@ Mod Settings → Worker Folks: wage difficulty, a preset from **No sweat** (free
 strikes; a strike or unpaid wages from before are only on hold and come back if you switch to a paid
 difficulty) through Easy (¼), Relaxed (½), **Standard** (full wages, the default), Tense (×1.5),
 Hard (×2), Brutal (×3) to **Evil hardcore** (×5); Abyssal
-Pieces wages on/off, **Strike demands** (off by default, see above), when thieving Folks eat and how much
+Pieces wages on/off, **Strike demands** and **General strike** (both off by default, see above), when thieving Folks eat and how much
 (see Folk health), Hiring XP rate (default 100%), and **Hide Folks' gain popups**
 (off by default: when on, the XP, item, currency and mastery popups from your Folks' work stay hidden;
 level-ups, warnings and your own popups still show), and **Faster displays** (on by default:
@@ -496,7 +534,7 @@ outside the limits is refused with the limits.
 
 Every text of the mod comes from its language files. It ships in English, German, French,
 Simplified Chinese and Traditional Chinese. The game's language setting picks the file, and
-any other language reads in English.
+any other language reads in English. Mod Settings follow a language change at once, without a reload.
 
 ## Game modes
 
@@ -513,7 +551,9 @@ another one. With Multitasking loaded, Worker Folks switches itself off, shows a
 explaining why, and registers nothing; disable one of the two in the Mod Manager and reload.
 
 With **Voyage**, your Folks stand at places on its map: one out of reach of a bank keeps a
-haul in its room, and Folks by a pitched tent share its depot (see A Folk's room). Without Voyage nothing of that applies.
+haul in its room, and Folks by a pitched tent share its depot (see A Folk's room). Bands you owe can raid a Folk's room
+or a depot on their ground, couriers can be wounded and healed, a Folk who dies on the road leaves what it carried in a
+cairn, and Voyage brings its own moments on the road. Without Voyage nothing of that applies.
 
 Other mods' custom skills get a Worker box where their skill follows the game's skill
 classes. Mods that only add items, modifiers or UI are unaffected.

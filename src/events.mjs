@@ -35,6 +35,14 @@ export const EVENT_NAMES = [
   'commissionWithdrawn',
   // A Folk's room (API v10): it stopped with no space for the next action { folk }; it stopped out of inputs { folk };
   // what it holds or where its goods go changed { folk } (at most once a second, and at once after a collection).
+  // Folk moments (round 5): one opened on a Folk { folk, id, offline }; it was answered, or ran out { folk, id, answer,
+  // expired, offline }.
+  'momentOpened',
+  'momentAnswered',
+  // A general strike stopped the Folks at work that hadn't struck: { folks, offline } (round 5).
+  'generalStrike',
+  // A Folk's recipe queue changed: a step added, removed, done, or the queue cleared { folk } (round 5).
+  'queueChanged',
   'roomFull',
   'roomDry',
   'roomChanged',

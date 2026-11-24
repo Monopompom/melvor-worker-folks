@@ -2,7 +2,7 @@
 // skill (you or a Folk), see what the Folk is doing, stop the Folk. Game-facing.
 
 const TEMPLATE_ID = 'wf-skill-control-template';
-const EVENTS = ['crewChanged', 'folkAssigned', 'folkFired', 'folkHired', 'folkStarted', 'folkReleased', 'folkPromoted', 'folkPending', 'folkMoved'];
+const EVENTS = ['crewChanged', 'folkAssigned', 'folkFired', 'folkHired', 'folkStarted', 'folkReleased', 'folkPromoted', 'folkPending', 'folkMoved', 'queueChanged'];
 
 export function install(ctx, { swalClass, fireQuick, getHiring, isDisabled = () => false, popupDidRender, effectsFragment, tips, log }) {
   let hiring;
@@ -193,6 +193,20 @@ export function install(ctx, { swalClass, fireQuick, getHiring, isDisabled = () 
     const n = root.childElementCount;
     root.style.setProperty('--wf-cols3', `${Math.max(1, Math.min(n, 3))}`);
     root.style.setProperty('--wf-cols2', `${Math.max(1, Math.min(n, 2))}`);
+    // Save as plan (round 5): the whole crew as it works now, in the Crew plans popup with its name field ready. Under
+    // the tiles across the grid, so it never adds a column.
+    if (options.length > 0 && hiring.plans !== undefined) {
+      const foot = document.createElement('div');
+      foot.className = 'wf-worker-foot';
+      const save = document.createElement('button');
+      save.type = 'button';
+      save.className = 'btn btn-outline-info';
+      save.textContent = getLangString('MOD_WF_CTRL_SAVE_PLAN');
+      tips?.set(save, getLangString('MOD_WF_CTRL_SAVE_PLAN_TIP'));
+      save.onclick = () => { Swal.close(); setTimeout(() => hiring.plans.open(), 0); };
+      foot.append(save);
+      root.append(foot);
+    }
     // No net GP/h on the tiles: said once, over them, not on every tile (round 2 finding).
     let netWhy = '';
     try { netWhy = options.length > 0 ? hiring.profitWhy?.(skill) ?? '' : ''; } catch (err) { log('net hint failed', err); }
@@ -321,6 +335,18 @@ export function install(ctx, { swalClass, fireQuick, getHiring, isDisabled = () 
       gotoEl.classList.toggle('d-none', !goto);
       if (gotoEl.textContent !== getLangString('MOD_WF_CTRL_HIRING_PAGE')) gotoEl.textContent = getLangString('MOD_WF_CTRL_HIRING_PAGE');
       gotoEl.onclick = () => hiring.openPage();
+    }
+
+    // The Folk's recipe queue, "Queue 1/3", on the skills whose recipe it can switch.
+    const queueEl = q('queue');
+    if (queueEl !== null) {
+      const qv = pending === undefined ? hiring.queue?.buttonView(skill) ?? null : null;
+      queueEl.classList.toggle('d-none', qv === null);
+      if (qv !== null) {
+        if (queueEl.textContent !== qv.label) queueEl.textContent = qv.label;
+        queueEl.setAttribute('aria-haspopup', 'dialog');
+        queueEl.onclick = () => hiring.queue?.open(qv.folk);
+      }
     }
 
     const stop = q('stop');

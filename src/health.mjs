@@ -5,6 +5,45 @@
 export function install(ctx, { getHiring, rules, time, log }) {
   let hiring;
   let regenCounter = 0;
+  /**
+   * The death keeper (API v13, Voyage's cairns): { keep(folk, things), textFor(folkId), heldIds() }, or undefined. One
+   * at a time; registering again replaces it.
+   */
+  let keeper;
+  const escHtml = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const keeperText = (folkId) => {
+    try {
+      const text = keeper?.textFor?.(folkId);
+      return typeof text === 'string' ? text : '';
+    } catch (e) {
+      log(`death keeper text failed: ${e?.message ?? e}`);
+      return '';
+    }
+  };
+  /** What a Folk has on it, as plain ids for the keeper: gear by slot, its room's three sides, its purse. */
+  const thingsOf = (folk) => {
+    const side = (name) => Object.entries(folk.room?.[name] ?? {}).map(([itemId, { qty }]) => ({ itemId, qty }));
+    return {
+      gear: Object.entries(folk.loadout ?? {}).map(([slot, { id, qty }]) => ({ slot, itemId: id, qty })),
+      room: { haul: side('haul'), stock: side('stock'), town: side('town') },
+      purse: Object.entries(folk.room?.purse ?? {}).map(([currencyId, amount]) => ({ currencyId, amount })),
+    };
+  };
+  /** Offers a Folk dying on the road to the keeper. True when it took everything; the Folk then holds nothing. */
+  const keptByKeeper = (folk, cause) => {
+    if (keeper === undefined || folk.travel !== 'walking') return false;
+    let kept = false;
+    try {
+      kept = keeper.keep(folk, { ...thingsOf(folk), cause: cause ?? null }) === true;
+    } catch (e) {
+      log(`death keeper failed for ${folk.name}: ${e?.message ?? e}`);
+      return false;
+    }
+    if (!kept) return false;
+    folk.loadout = {};
+    folk.room = { haul: {}, stock: {}, town: {}, purse: {} };
+    return true;
+  };
   // When a thieving Folk eats and how far it heals (build .219, joint order round 2): two settings in the Hiring
   // section, after the ones added before this module.
   const section = ctx.settings.section('Hiring');
@@ -92,21 +131,61 @@ export function install(ctx, { getHiring, rules, time, log }) {
       if (eat && rules.shouldEat(result.hp, api.maxHpOf(folk), eatAt())) api.eat(folk);
       return false;
     },
-    /** Death: the skill stops, gear returns to the bank as far as it has space, the Folk leaves and its slot freezes for 24 h. */
+    /**
+     * Death: the skill stops, gear returns to the bank as far as it has space, the Folk leaves and its slot freezes for
+     * 24 h. A Folk dying on the road goes to the death keeper first (v13): when it keeps everything, nothing goes to the
+     * bank and nothing is lost, and the frozen slot shows the keeper's text instead.
+     */
     kill(folk, { skill, cause } = {}) {
       const working = skill ?? hiring.skillOf(folk);
       const offline = !game._isInOnlineLoop;
       hiring.forceStop(working); // also clears a Thieving stun so the skill really ends
-      const lost = hiring.returnLoadout?.(folk) ?? [];
+      const cairn = keptByKeeper(folk, cause);
+      const lost = cairn ? [] : (hiring.returnLoadout?.(folk) ?? []);
       const until = rules.freezeUntil(Date.now());
       hiring.crew.freeze(folk.slot, until);
+      if (cairn) hiring.crew.setCairn(folk.slot, folk.id);
       hiring.crew.fire(folk.id, { reason: 'died', lost });
-      hiring.events.emit('folkDied', { folk, skill: working, offline, cause });
+      hiring.events.emit('folkDied', { folk, skill: working, offline, cause, cairn });
       // The death names its cause (hunger on the road) or the skill it died at; a Folk with neither just died.
       const vars = { name: folk.name, skill: working === undefined ? '' : hiring.skillName(working), slot: `${folk.slot + 1}` };
       const key = cause === 'hunger' ? 'MOD_WF_DIED_HUNGER' : working === undefined ? 'MOD_WF_DIED_PLAIN' : 'MOD_WF_DIED';
-      game.notifications.createErrorNotification('worker_folks:died', templateLangString(key, vars), hiring.portraitOf(folk));
+      const where = cairn ? keeperText(folk.id) : '';
+      game.notifications.createErrorNotification('worker_folks:died', `${templateLangString(key, vars)}${where === '' ? '' : ` ${where}`}`, hiring.portraitOf(folk));
       log(`${folk.name} died on ${working?.id ?? '-'}; slot ${folk.slot} frozen until ${new Date(until).toISOString()}`);
+    },
+    /**
+     * Heals a Folk by `hp` (v13), up to its max HP. A Folk not in the crew (dead, its slot frozen) gets nothing. `cause`
+     * ('rest', 'food') is only logged. Returns its HP after, or undefined.
+     */
+    heal(folk, hp, { cause } = {}) {
+      if (folk === undefined || hiring.crew.byId(folk.id) !== folk) return undefined;
+      const before = api.hpOf(folk);
+      if (!(hp > 0) || folk.hp === null) return before;
+      api.setHp(folk, Math.min(api.maxHpOf(folk), before + Math.floor(hp)));
+      hiring.markCard(folk);
+      const after = api.hpOf(folk);
+      log(`${folk.name} heals ${after - before}${cause === undefined ? '' : ` (${cause})`} (${after}/${api.maxHpOf(folk)})`);
+      return after;
+    },
+    /** Sets the death keeper (v13), or clears it with undefined. Returns the function that removes this one. */
+    setKeeper(def) {
+      keeper = def;
+      return () => { if (keeper === def) keeper = undefined; };
+    },
+    /** The keeper's text for a Folk that left a cairn ('' without one), drawn fresh so it follows the language. */
+    cairnText(folkId) {
+      return keeperText(folkId);
+    },
+    /** Item ids the keeper holds in its cairns (Heirlooms count them as held, so none is found twice). */
+    keptIds() {
+      try {
+        const ids = keeper?.heldIds?.();
+        return Array.isArray(ids) ? ids.filter((id) => typeof id === 'string') : [];
+      } catch (e) {
+        log(`death keeper heldIds failed: ${e?.message ?? e}`);
+        return [];
+      }
     },
     /** Failed pickpocket: the Folk takes the NPC's hit instead of the player. */
     onPickpocketFail(folk, npc, skill) {
@@ -148,11 +227,15 @@ export function install(ctx, { getHiring, rules, time, log }) {
       hiring.crew.frozenSlots().forEach((until, slot) => {
         // What the dead Folk's room lost to a full bank, under the countdown while the slot stays frozen (build .151).
         const lost = hiring.crew.lostAt(slot);
+        // A Folk that died on the road and left a cairn (v13): the keeper's line instead, drawn each time.
+        const cairnId = hiring.crew.cairnAt?.(slot);
+        const cairn = cairnId === undefined ? '' : keeperText(cairnId);
         out.push({
           slot,
           text: templateLangString('MOD_WF_SLOT_FROZEN', { slot: `${slot + 1}`, time: time.shortTime(rules.freezeRemaining(until, now)) }), // never "23h 59m 60s" (scan C-26, .112)
           // HTML: each item with its own icon.
-          lostHtml: lost.length === 0 || hiring.room === undefined ? '' : `<div>${getLangString('MOD_WF_SLOT_FROZEN_LOST')}</div>${hiring.room.itemTiles(lost, { lost: true, small: true })}`,
+          lostHtml: cairn !== '' ? `<div>${escHtml(cairn)}</div>`
+            : lost.length === 0 || hiring.room === undefined ? '' : `<div>${getLangString('MOD_WF_SLOT_FROZEN_LOST')}</div>${hiring.room.itemTiles(lost, { lost: true, small: true })}`,
         });
       });
       return out;

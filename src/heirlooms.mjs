@@ -30,6 +30,8 @@ export function install(ctx, { getHiring, model, hallId = `${NS}:Guild_Hall`, bi
     if (game.bank.getQty(item) > 0) return true;
     if (game.combat?.player?.checkEquipmentSetsForItem?.(item) === true) return true;
     const full = `${NS}:${id}`;
+    // One left in a cairn on the road (another mod's death keeper, v13) is still someone's.
+    if (hiring.health?.keptIds?.().includes(full) === true) return true;
     return hiring.crew.all.some((folk) => wornIds(folk).includes(full));
   };
   const missing = () => model.missingHeirlooms(held);

@@ -127,6 +127,7 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 .wf-alert-split > :first-child { flex: 1 1 auto; }
 /* Settle and Apologise side by side, the price under the word. */
 .wf-pay-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.wf-pay-row-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .wf-pay { display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.25; white-space: normal; }
 .wf-pay small { font-weight: 400; font-size: 0.8rem; }
 /* The Folk's daydream (build .155): its line on top, then a thought bubble with a game icon, filling a card's spare
@@ -193,6 +194,14 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
    the right, then each supplier's name and what it brings, item icon first. */
 .wf-supplied { padding: 8px 10px 8px 13px; border-radius: 6px; background: var(--wf-well); box-shadow: inset 3px 0 0 var(--wf-edge-supply); }
 .wf-job:not(.d-none) ~ .wf-supplied { margin-top: 8px; } /* a step of room under the Job or Supplies button */
+/* A recipe queue on the card (round 5): one row per step, the one it works now first, a remove button on each. */
+.wf-queue { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; padding: 8px 10px; border-radius: 6px; background: var(--wf-well); font-size: 0.9rem; text-align: left; }
+.wf-queue-row { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.wf-queue-icon { width: 32px; height: 32px; object-fit: contain; }
+.wf-queue-text { min-width: 0; overflow-wrap: anywhere; line-height: 1.25; }
+.wf-queue-row:not(.wf-queue-now) .wf-queue-text .font-w600 { font-weight: 400 !important; }
+.wf-queue-remove { min-width: 32px; min-height: 32px; padding: 0 8px; }
+@media (pointer: coarse) { .wf-queue-remove { min-width: 40px; min-height: 40px; } }
 .wf-supplied-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .wf-supplied-rate { font-size: 0.875rem; font-weight: 600; color: var(--wf-working); white-space: nowrap; }
 .wf-supplied-rate.wf-off { color: var(--wf-subtle); font-weight: 400; }
@@ -745,6 +754,7 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-dash-work { overflow: visible; } /* the Sort menu opens over the list; the list scrolls in its own box */
 .wf-dash-work .wf-dash-head { flex-wrap: wrap; row-gap: 4px; }
 .wf-dash-strikes { font-size: 0.75rem; }
+.wf-dash-asking { cursor: pointer; }
 .wf-dash-sort-hint { display: block; width: 13rem; white-space: normal; }
 .wf-dash-roster-mine .wf-dash-row { grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-areas: "grip icon name status" "grip icon skill skill"; cursor: grab; }
 .wf-dash-row-grip { grid-area: grip; align-self: center; margin-right: 8px; color: var(--wf-grip); }
@@ -799,6 +809,23 @@ label[for="worker_folks:hiringXPShare"] > small { margin-top: 0.35rem; margin-bo
 .wf-bulk .wf-bulk-table tr.wf-bulk-total td { padding-top: 8px; border-top: 1px solid var(--wf-line-soft); }
 /* The bill's items in a centred row of fixed tiles, as the popup is centred (one tile sat at the far left). */
 .wf-bulk .wf-item-grid { grid-template-columns: repeat(auto-fit, 44px); justify-content: center; }
+/* Crew plans (round 5): one band per plan, its name and Folk count on the left, Apply over Delete on the right in one
+   width; on a narrow popup the two drop under the name, side by side across the band. The save band is the reserve's
+   field-and-button row: the field takes the free width, the button drops under it when it can't fit. */
+.wf-plans .wf-plan-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; text-align: left; }
+.wf-plan-text { flex: 1 1 10rem; min-width: 0; overflow-wrap: anywhere; }
+.wf-plan-btns { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; flex: 0 0 8rem; }
+.wf-plan-btns .btn, .wf-plan-save-btn { min-height: 40px; }
+.wf-plan-input { flex: 1000 1 10rem; min-width: 8rem; width: auto; min-height: 40px; }
+.wf-plan-save-btn { flex: 1 0 auto; }
+.wf-plan-note { margin-top: 8px; }
+/* The queue popup on a phone: the whole popup scrolls, the recipe grid inside it no longer does (one scroll area). */
+@media (max-width: 767.98px) { .wf-queue-popup .wf-picker-grid { max-height: none; } }
+/* The Worker popup's Save as plan: centred under the tiles, across every column. */
+.wf-worker-foot { grid-column: 1 / -1; display: flex; justify-content: center; margin-top: 4px; }
+.wf-worker-foot .btn { min-height: 40px; }
+.wf-plan-note:empty { display: none; }
+@media (max-width: 575.98px) { .wf-plan-btns { flex: 1 1 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 /* Payroll: one compact block per currency (the reserve's own field, presets and Deposit) */
 .wf-pay-cur + .wf-pay-cur { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--wf-line-soft); }
 .wf-pay-covers { margin-top: 6px; }

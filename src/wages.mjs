@@ -153,3 +153,21 @@ export const ABYSSAL_REALM_ID = 'melvorItA:Abyssal';
 export function wageCurrencyId({ workRealmId, apWages, apExists, gpId, apId }) {
   return apWages && apExists && workRealmId === ABYSSAL_REALM_ID ? apId : gpId;
 }
+
+/** [BALANCE] A general strike (round 5, its own switch, off by default): at least this many Folks on strike... */
+export const GENERAL_STRIKE_MIN = 2;
+/** ...and at least this share of the Folks at work or on strike. */
+export const GENERAL_STRIKE_SHARE = 0.5;
+
+const generalDue = (striking, working) => striking >= GENERAL_STRIKE_MIN && striking >= (striking + working) * GENERAL_STRIKE_SHARE;
+
+/**
+ * Where the crew stands toward a general strike. `striking`: Folks on strike; `working`: Folks at work (Loyal ones
+ * too: they count, though they never strike or walk out); `canStrike`: those at work that could strike (not Loyal).
+ * due: the strike holds now. warn: one more strike would bring it (only while someone could still strike).
+ */
+export function generalStrike({ striking, working, canStrike = working }) {
+  const due = generalDue(striking, working);
+  const warn = !due && canStrike > 0 && working > 0 && generalDue(striking + 1, working - 1);
+  return { due, warn };
+}

@@ -6,7 +6,7 @@
 const defaultId = () => (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
 
 export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.now(), makeId = defaultId, rng = Math.random }) {
-  const { createFolk, serializeRoot, parseRoot, normalizeReserve, normalizeFrozen, normalizeLost } = model;
+  const { createFolk, serializeRoot, parseRoot, normalizeReserve, normalizeFrozen, normalizeLost, normalizeMomentClock, normalizePlans, normalizeCairns } = model;
   let reserve = {};
   let frozen = {};
   /** What a dead Folk's room lost, by its frozen slot (folk.mjs normalizeLost). */
@@ -18,6 +18,12 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
   let commissions = null;
   /** Tent depots (depots.mjs owns their shape): { [depotId]: { name, hours, room, dropped } }. */
   let depots = {};
+  /** The moments' crew-wide clock (v11, moments.mjs owns it): { gapMs, warned }. */
+  let moments = normalizeMomentClock(null);
+  /** Saved crew plans (v11, crew-plans-model.mjs owns their shape). */
+  let plans = [];
+  /** Frozen slots whose Folk died on the road and left a cairn with another mod (v11): { slot: folkId }. */
+  let cairns = {};
 
   const emitChange = () => bus.emit('crewChanged', { folks: crew.all });
 
@@ -91,6 +97,7 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
         else {
           delete frozen[slot];
           delete lost[slot];
+          delete cairns[slot];
         }
       }
       return out;
@@ -99,15 +106,18 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
     freeze(slot, until) {
       frozen[slot] = until;
       delete lost[slot];
+      delete cairns[slot];
       emitChange();
     },
     thaw(slot) {
       if (slot === undefined) {
         frozen = {};
         lost = {};
+        cairns = {};
       } else {
         delete frozen[slot];
         delete lost[slot];
+        delete cairns[slot];
       }
       emitChange();
     },
@@ -121,6 +131,17 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
       const list = normalizeLost({ [slot]: items }, frozen)[slot];
       if (list === undefined) delete lost[slot];
       else lost[slot] = list;
+      emitChange();
+    },
+    /** The id of the Folk that died in this frozen slot and left a cairn (v11), or undefined. */
+    cairnAt(slot) {
+      return cairns[slot];
+    },
+    /** Notes that the Folk that died in this frozen slot left its things in a cairn; ignored for a slot that isn't frozen. */
+    setCairn(slot, folkId) {
+      if (frozen[slot] === undefined || typeof folkId !== 'string' || folkId === '') return;
+      cairns[slot] = folkId;
+      delete lost[slot];
       emitChange();
     },
     /** Earliest moment a frozen slot opens, or undefined. */
@@ -286,8 +307,20 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
     set commissions(value) {
       commissions = value !== null && typeof value === 'object' ? value : null;
     },
+    get moments() {
+      return moments;
+    },
+    set moments(value) {
+      moments = normalizeMomentClock(value);
+    },
+    get plans() {
+      return plans;
+    },
+    set plans(value) {
+      plans = normalizePlans(value);
+    },
     serialize() {
-      return serializeRoot(folks, reserve, frozen, board, lost, commissions, depots);
+      return serializeRoot(folks, reserve, frozen, board, lost, commissions, depots, moments, plans, cairns);
     },
     /** Replaces the crew from a serialised root. Returns the parse report. */
     load(input) {
@@ -301,6 +334,9 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
       board = report.root.board ?? null;
       commissions = report.root.commissions ?? null;
       depots = report.root.depots ?? {};
+      moments = normalizeMomentClock(report.root.moments);
+      plans = normalizePlans(report.root.plans);
+      cairns = normalizeCairns(report.root.cairns, frozen);
       report.dropped += report.root.folks.length - folks.length;
       emitChange();
       return report;
@@ -313,6 +349,9 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
       board = null;
       commissions = null;
       depots = {};
+      moments = normalizeMomentClock(null);
+      plans = [];
+      cairns = {};
       emitChange();
     },
     /** Announces an in-place change to Folk fields (debt, cooldown...). */

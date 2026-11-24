@@ -362,6 +362,16 @@ function fillCard(col, folk, view) {
     }
     view.tip(el, c.tip);
   });
+  // A recipe queue (round 5): the step it works now and the ones after, each with its remove button.
+  set('queue', (el) => {
+    const q = view.queue?.(folk) ?? null;
+    el.classList.toggle('d-none', q === null);
+    const key = q === null ? '' : q.key;
+    if (el.dataset.wfKey === key) return;
+    el.dataset.wfKey = key;
+    if (q === null) el.replaceChildren();
+    else q.fill(el);
+  });
   // Health is always shown, so cards in a row keep one height (user, build .55). Food matters on Thieving only:
   // muted elsewhere, amber when low, red with an amber card border when there is none.
   let foodAlert = false;
@@ -902,13 +912,31 @@ function fillCard(col, folk, view) {
   // A strike stops everything and comes first; a debt is paid by work, so it follows the room's row.
   // The daydream's picture and line; equalizeCards decides whether there is room to show it.
   set('dream', (el) => view.dream?.(el, folk));
+  // A moment waits for an answer: after a strike and the room, as it never stops the Folk.
+  const moment = view.moment?.(folk) ?? null;
+  set('moment', (el) => {
+    el.classList.toggle('d-none', moment === null);
+    const answers = el.querySelector('[data-wf="moment-answers"]');
+    if (moment === null) {
+      if (answers !== null && answers.dataset.wfKey !== '') { answers.dataset.wfKey = ''; answers.replaceChildren(); }
+      return;
+    }
+    const text = el.querySelector('[data-wf="moment-text"]');
+    if (text !== null) setText(text, moment.text);
+    const left = el.querySelector('[data-wf="moment-left"]');
+    if (left !== null) setText(left, moment.left);
+    if (answers !== null && answers.dataset.wfKey !== moment.key) {
+      answers.dataset.wfKey = moment.key;
+      moment.fill(answers);
+    }
+  });
   set('alert', (el) => {
     const strike = el.querySelector('[data-wf="strike"]');
     const roomRow = el.querySelector('[data-wf="room-alert"]');
     const struck = info !== null && info.debtOnly !== true;
     const order = struck ? [strike, roomRow] : [roomRow, strike];
     if (order.every((r) => r !== null) && el.firstElementChild !== order[0]) el.prepend(order[0]);
-    el.classList.toggle('d-none', info === null && !roomAlert);
+    el.classList.toggle('d-none', info === null && !roomAlert && moment === null);
     el.classList.toggle('wf-alert-strike', struck || (roomAlert && room.full));
   });
   set('stop', (el) => {

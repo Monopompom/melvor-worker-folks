@@ -271,3 +271,38 @@ test('effectsOf: another mod\u2019s trait adds its cleaned plain effects, nothin
   // Without a resolver another mod's ids add nothing, as before.
   assert.equal(effectsOf([{ id: 'voyage:Haggler' }]).wageFactor, 1);
 });
+
+test('a grudge toward Resentful outlives the settled reset and counts toward learning it', async () => {
+  const m = await import('../src/traits-model.mjs');
+  const H = 3600 * 1000;
+  const s = m.emptyTraitState();
+  assert.equal(m.addGrudge(s, 'Resentful', 6 * H), true);
+  m.addProgress(s, 'strikeOpen', 10 * H);
+  m.resetProgress(s, 'settled');
+  assert.equal(m.grudgeOf(s, 'Resentful'), 6 * H, 'the reset wipes the strike count only');
+  m.addGrudge(s, 'Resentful', 12 * H);
+  m.addProgress(s, 'strikeOpen', 6 * H);
+  const changes = m.settle(s, { level: 99, tier: 'Newbie' });
+  assert.deepEqual(changes.map((c) => [c.type, c.trait.id]), [['learned', 'Resentful']]);
+  assert.equal(m.grudgeOf(s, 'Resentful'), 0);
+  assert.equal(m.addGrudge(s, 'Resentful', H), false, 'held: no grudge');
+  assert.equal(m.addGrudge(s, 'Specialist', H), false, 'per-skill traits take none');
+  assert.equal(m.addGrudge(s, 'Nope', H), false);
+});
+
+test('clearGrudge, clearLearning and hasTrait', async () => {
+  const m = await import('../src/traits-model.mjs');
+  const s = m.emptyTraitState();
+  m.addGrudge(s, 'Lazy', 5);
+  assert.equal(m.clearGrudge(s, 'Lazy'), true);
+  assert.equal(m.clearGrudge(s, 'Lazy'), false);
+  m.addProgress(s, 'work', 10, { skillId: 'melvorD:Mining' });
+  m.addProgress(s, 'work', 10, { skillId: 'melvorD:Fishing' });
+  assert.equal(m.clearLearning(s, 'Specialist'), true);
+  assert.deepEqual(Object.keys(s.counts).filter((k) => k.startsWith('Specialist')), []);
+  assert.equal(m.hasTrait(s, 'QuickLearner'), false);
+  m.completeLearning(s, 'QuickLearner');
+  m.settle(s, { level: 99, tier: 'Newbie' });
+  assert.equal(m.hasTrait(s, 'QuickLearner'), true);
+  assert.equal(m.clearLearning(s, 'QuickLearner'), false);
+});

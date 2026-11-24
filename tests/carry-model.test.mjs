@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { takeOrder, fitStacks, giveStacks, inputsPlan } from '../src/carry-model.mjs';
+import { takeOrder, fitStacks, giveStacks, inputsPlan, raidPlan } from '../src/carry-model.mjs';
 
 const stack = (id, qty, ms) => ({ id, qty, ms });
 const stock = (o) => (id) => o[id] ?? 0;
@@ -162,4 +162,28 @@ test('inputsPlan: an empty route, or a stop with a full room, asks for nothing',
   const full = inputsPlan({ demands: [{ key: 'a', perAction: [{ id: 'ore', qty: 1 }], intervalMs: 1000, freeMs: 0 }], freeMs: 1000, aboard: stock({ ore: 4 }), aboardIds: ['ore'], bankQty: stock({ ore: 9 }) });
   assert.deepEqual(full.take, []);
   assert.deepEqual(full.spare, [], 'its recipe still uses what is aboard');
+});
+
+test('raidPlan: purse first, then each side dearest stack first, whole units, never past the value', () => {
+  const sides = [
+    { side: 'haul', stacks: [{ id: 'ore', qty: 100, unit: 5 }, { id: 'gem', qty: 2, unit: 400 }, { id: 'junk', qty: 50, unit: 0 }] },
+    { side: 'stock', stacks: [{ id: 'coal', qty: 10, unit: 20 }] },
+    { side: 'town', stacks: [{ id: 'plank', qty: 10, unit: 100 }] },
+  ];
+  assert.deepEqual(raidPlan({ purseGp: 300, sides }, 250), { purse: 250, moves: [], gp: 250 });
+  // 300 purse, then the gems (800, the dearest stack), then ore for what is left.
+  assert.deepEqual(raidPlan({ purseGp: 300, sides }, 1400), { purse: 300, moves: [{ side: 'haul', id: 'gem', qty: 2 }, { side: 'haul', id: 'ore', qty: 60 }], gp: 1400 });
+  // Everything worth something, town goods last, the worthless stack never.
+  const all = raidPlan({ purseGp: 0, sides }, 1e9);
+  assert.deepEqual(all.moves, [{ side: 'haul', id: 'gem', qty: 2 }, { side: 'haul', id: 'ore', qty: 100 }, { side: 'stock', id: 'coal', qty: 10 }, { side: 'town', id: 'plank', qty: 10 }]);
+  assert.equal(all.gp, 800 + 500 + 200 + 1000);
+});
+
+test('raidPlan skips a unit worth more than what is left for cheaper ones, and stays under the value', () => {
+  const sides = [{ side: 'haul', stacks: [{ id: 'gem', qty: 3, unit: 400 }, { id: 'ore', qty: 100, unit: 7 }] }];
+  const plan = raidPlan({ sides }, 1000);
+  assert.deepEqual(plan.moves, [{ side: 'haul', id: 'gem', qty: 2 }, { side: 'haul', id: 'ore', qty: 28 }]);
+  assert.equal(plan.gp, 996);
+  assert.deepEqual(raidPlan({ sides }, 0), { purse: 0, moves: [], gp: 0 });
+  assert.deepEqual(raidPlan({ purseGp: NaN, sides: [] }, NaN), { purse: 0, moves: [], gp: 0 });
 });

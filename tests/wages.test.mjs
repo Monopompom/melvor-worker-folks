@@ -121,3 +121,15 @@ test('depositPlan says what goes in and why', () => {
   assert.deepEqual(depositPlan({ amount: 80, bank: 100, room: 30.7 }), { deposit: 30, outcome: 'cut' });
   assert.deepEqual(depositPlan({ amount: '80.9', bank: 100, room: Infinity }), { deposit: 80, outcome: 'ok' });
 });
+
+test('general strike: at least 2 on strike and at least half of those at work or on strike; the warning one strike before', async () => {
+  const { generalStrike } = await import('../src/wages.mjs');
+  assert.deepEqual(generalStrike({ striking: 1, working: 1 }), { due: false, warn: true }, '2 Folks: one more strike and both are out');
+  assert.deepEqual(generalStrike({ striking: 2, working: 2 }), { due: true, warn: false });
+  assert.deepEqual(generalStrike({ striking: 1, working: 3 }), { due: false, warn: true }, '2 of 4 after one more');
+  assert.deepEqual(generalStrike({ striking: 1, working: 5 }), { due: false, warn: false }, '2 of 6: not yet');
+  assert.deepEqual(generalStrike({ striking: 2, working: 3 }), { due: false, warn: true });
+  assert.deepEqual(generalStrike({ striking: 0, working: 1 }), { due: false, warn: false }, 'one strike alone never makes it');
+  assert.deepEqual(generalStrike({ striking: 1, working: 1, canStrike: 0 }), { due: false, warn: false }, 'a Loyal Folk never strikes: no warning');
+  assert.deepEqual(generalStrike({ striking: 3, working: 0 }), { due: true, warn: false });
+});

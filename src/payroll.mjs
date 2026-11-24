@@ -3,6 +3,8 @@
 
 const GP_ID = 'melvorD:GP';
 const AP_ID = 'melvorItA:AbyssalPieces';
+/** The game's tick: cooldowns count in these. */
+const TICK_MS = 50;
 
 export function install(ctx, { getHiring, wages, pricing, milestones, resume, log }) {
   const { selectionOf, startAgain, toSaved, fromSaved } = resume;
@@ -34,6 +36,14 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
       hint: getLangString('MOD_WF_SETTING_DEMANDS_HINT'),
       default: false,
     },
+    {
+      // Round 5: once half the crew at work is on strike (2 at least), the rest walk out too; a warning comes first.
+      type: 'switch',
+      name: 'generalStrike',
+      label: getLangString('MOD_WF_SETTING_GENERAL_STRIKE'),
+      hint: getLangString('MOD_WF_SETTING_GENERAL_STRIKE_HINT'),
+      default: false,
+    },
   ]);
   const multiplier = () => wages.presetMultiplier(section.get('wageDifficulty'));
   const currency = (id) => game.currencies.getObjectByID(id);
@@ -50,6 +60,24 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
   const api = {
     get enabled() {
       return multiplier() > 0;
+    },
+    /** The general strike's switch, with wages on. */
+    get generalOn() {
+      return section.get('generalStrike') === true && api.enabled;
+    },
+    /** Where the crew stands toward a general strike: { striking, working, canStrike, due, warn }. */
+    generalView() {
+      let striking = 0;
+      let working = 0;
+      let canStrike = 0;
+      hiring.crew.all.forEach((f) => {
+        if (f.onStrike) striking += 1;
+        else if (hiring.isWorking(f)) {
+          working += 1;
+          if (!loyal(f)) canStrike += 1;
+        }
+      });
+      return { striking, working, canStrike, ...wages.generalStrike({ striking, working, canStrike }) };
     },
     /** Strike demands on: a strike also wants something for each trait (src/demands-model.mjs). */
     get demandsOn() {
@@ -181,11 +209,68 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
       hiring.crew.touch();
       return true;
     },
+    /**
+     * A break the Folk asked for (a moment's answer): it stops, rests `ms` of game time unpaid (resting isn't working)
+     * and, from Hiring 55, picks its recipe back up as after a settled strike. False for a Folk on a job, on strike or
+     * on no skill.
+     */
+    breakFor(folk, ms) {
+      const skill = hiring.skillOf(folk);
+      if (skill === undefined || skill.isJob === true || folk.job !== null || folk.onStrike || !(ms > 0)) return false;
+      pause(folk, Math.ceil(ms / TICK_MS));
+      log(`${folk.name} takes a break of ${ms} ms`);
+      return true;
+    },
   };
 
   // What the Folk was working on when it struck (build .81-.82; helpers in resume.mjs). The game's objects for this
   // session; the save keeps them as ids on the Folk (restartPick, build .164), found again after a reload.
   const strikeSelection = new Map();
+
+  const loyal = (folk) => hiring.traits?.neverStrikes(folk) === true;
+
+  /**
+   * Stops a Folk for `ticks` without a strike (a break, a walkout): what it worked on is kept as a strike keeps it,
+   * the cooldown holds it unpaid, and from Hiring 55 it starts again after. A job is left, its Shift Slot back at once.
+   */
+  const pause = (folk, ticks) => {
+    const working = hiring.isWorking(folk);
+    if (working && folk.job !== null) {
+      const kind = hiring.jobs?.of(folk);
+      hiring.crew.assignJob(folk.id, null);
+      if (kind !== undefined) folk.restartPick = { job: kind.id };
+    } else if (working) {
+      const skill = hiring.skillOf(folk);
+      const pick = selectionOf(skill);
+      if (pick !== null) strikeSelection.set(folk.id, pick);
+      folk.restartPick = toSaved(pick);
+      hiring.forceStop(skill);
+    }
+    folk.cooldownTicks = Math.max(folk.cooldownTicks, ticks);
+    if (working && hiring.levels?.autoRestart()) folk.restartWhenReady = true;
+    else if (!folk.restartWhenReady) folk.restartPick = null;
+    hiring.markCard(folk);
+    hiring.crew.touch();
+  };
+
+  /**
+   * The general strike (round 5): a new strike that brings half the crew at work out (2 at least) stops every other
+   * Folk at work, each into the cooldown its tier takes after a settled strike. Loyal Folks and Folks on the road work
+   * on; the ones swept up count no strike, so no Greedy or Resentful step and no demands. One notice names them.
+   */
+  const generalStrike = () => {
+    if (!api.generalOn || !api.generalView().due) return;
+    const out = hiring.crew.all.filter((f) => !f.onStrike && hiring.isWorking(f) && !loyal(f) && f.travel !== 'walking');
+    if (out.length === 0) return;
+    out.forEach((f) => pause(f, Math.floor(wages.cooldownAfterSettlement(f.tier) * (hiring.cooldownFactor?.(f) ?? 1))));
+    const offline = !game._isInOnlineLoop;
+    const names = out.map((f) => f.name).join(getLangString('MOD_WF_LIST_SEP'));
+    log(`general strike: ${out.length} walked out`);
+    if (!offline) {
+      game.notifications.createErrorNotification('worker_folks:general', templateLangString('MOD_WF_GENERAL_STRIKE', { names }), hiring.getMediaURL('assets/status_strike.webp'));
+    }
+    hiring.events.emit('generalStrike', { folks: out, offline });
+  };
 
   /** Starts the Folk's last skill again (online only); clears the flag either way. */
   const restartFolk = (folk) => {
@@ -355,6 +440,7 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
     hiring.events.emit('folkStruck', { folk, skill, debt: folk.debt, offline: !game._isInOnlineLoop });
     selfSettle(folk);
     hiring.crew.touch();
+    if (folk.onStrike) generalStrike();
   };
 
   /**
@@ -433,6 +519,8 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
   ctx.onModsLoaded(() => {
     hiring = getHiring();
     hiring.payroll = api;
+    /** The general strike's look after a strike, at once (tests, the dev panel). */
+    api.checkGeneral = generalStrike;
     /** The wage for `ms` of a Folk's time that made nothing: a run to town for a Township commission (build .163). */
     api.chargeTime = (folk, skill, ms) => charge({ skill, folk, intervalMs: ms, run: true });
     /** The wage for `ms` of a job's time (src/jobs.mjs): GP, as a skill's; Work Orders leave it out like a run. */

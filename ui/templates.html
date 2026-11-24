@@ -96,6 +96,13 @@
               <button type="button" class="btn btn-sm btn-info btn-block mt-2 wf-restock-go"></button>
             </div>
           </div>
+          <!-- A moment (round 5): the Folk's question, how long until it takes its default, and its answers, each with
+               what it does under its label. -->
+          <div class="wf-alert-row d-none" data-wf="moment">
+            <div class="font-w600" data-wf="moment-text"></div>
+            <small class="d-block wf-subtle" data-wf="moment-left"></small>
+            <div class="wf-pay-row mt-2" data-wf="moment-answers"></div>
+          </div>
         </div>
         <!-- The Folk's daydream (build .155): a game icon in a thought bubble and a line to match, changed every so often.
              Only in a card's spare height while the alert band is empty (equalizeCards in cards.mjs). -->
@@ -119,6 +126,8 @@
               <small class="d-block wf-subtle" data-wf="commission-sub"></small>
             </div>
           </div>
+          <!-- A recipe queue (round 5): the step it works now and what comes next, each removable; hidden without one. -->
+          <div class="wf-queue d-none" data-wf="queue"></div>
           <mastery-display class="wf-mastery mt-1" data-wf="mastery"></mastery-display>
           <!-- The room holds the work's inputs and haul, so it sits with the work; hidden while empty and off. -->
           <div class="wf-room mt-2 d-none" data-wf="room">
@@ -248,6 +257,8 @@
       <small class="wf-subtle mr-3 my-1" data-wf="status"></small>
       <!-- Where the line sends the player, a link there (scan B-37, C-04, build .112). -->
       <button type="button" class="btn btn-sm btn-outline-info my-1 mr-2 d-none" data-wf="goto"></button>
+      <!-- The Folk's recipe queue (round 5): its steps and the picker for the next one. -->
+      <button type="button" class="btn btn-sm btn-outline-info my-1 mr-2 d-none" data-wf="queue"></button>
       <button type="button" class="btn btn-sm btn-danger my-1 d-none" data-wf="stop"></button>
     </div>
   </div>

@@ -329,7 +329,8 @@ export function install(ctx, { getHiring, model, depotModel, resume, time, tips,
     const left = [];
     const items = moveSide(folk, 'haul', undefined, left);
     if (folk.ownStock !== true && !isCarrier(folk) && !model.isEmpty(folk.room, 'stock')) {
-      const recipe = inputsOf(folk).perAction.map(({ id }) => id);
+      // What its recipe uses stays, and what any step of its queue uses (a chain's goods, a later step's inputs).
+      const recipe = [...inputsOf(folk).perAction.map(({ id }) => id), ...(hiring.queue?.inputIds(folk) ?? [])];
       const spare = model.leftoverIds(folk.room, recipe);
       if (spare.length > 0) items.push(...moveSide(folk, 'stock', spare, left));
     }
@@ -977,6 +978,13 @@ export function install(ctx, { getHiring, model, depotModel, resume, time, tips,
       hiring.events.emit('folkMade', { folk, skill: acting.skill, item, quantity, held: true, town: true });
       hiring.renderQueue.folks = true;
       return true;
+    }
+    // A queue's chain: what a later step of the Folk's own queue uses stays in its stock as far as its room holds.
+    const kept = hiring.queue?.route(acting, item, quantity) ?? 0;
+    if (kept > 0) {
+      hiring.events.emit('folkMade', { folk, skill: acting.skill, item, quantity: kept, held: true, supplied: true });
+      quantity -= kept;
+      if (quantity <= 0) return true;
     }
     // A supply line: what the receiver's recipe uses goes into its stock as far as its room holds (src/supply.mjs).
     const sent = hiring.supply?.route(acting, item, quantity) ?? 0;

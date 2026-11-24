@@ -17,7 +17,7 @@ const SWAL_WARN = { ...SWAL, confirmButton: 'btn btn-warning m-1' };
 /** Settings by section, as the slices register them (the names are the saved keys). */
 const SETTINGS = {
   Hiring: ['hiringXPRate', 'quietFolkPopups', 'qualification', 'fastMasteryDisplays', 'hirePriceGrowth', 'slotPriceGrowth', 'slotBasePrice', 'priceMultiplier', 'altMagicForFolks'],
-  Wages: ['wageDifficulty', 'abyssalWagesInAP', 'severanceRate', 'apologyMultiplier', 'strikeCooldown'],
+  Wages: ['wageDifficulty', 'abyssalWagesInAP', 'severanceRate', 'apologyMultiplier', 'strikeCooldown', 'generalStrike'],
 };
 /** Why a pasted code was refused (backup-model decode's reasons), as literal keys. */
 const WHY = {

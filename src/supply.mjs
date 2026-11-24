@@ -116,10 +116,14 @@ export function install(ctx, { getHiring, model, log }) {
   const api = {
     unlocked,
     productsOf,
-    /** Whether this Folk's inputs come from its stock, then your bank: it has a supplier, or supplied stock left. */
+    /**
+     * Whether this Folk's inputs come from its stock, then your bank: it has a supplier, or stock left (a supply line's,
+     * or its own queue's chain, which needs no supply lines).
+     */
     fed(folk) {
-      if (folk?.room === undefined || !unlocked()) return false;
-      return crew().suppliersOf(folk.id).length > 0 || Object.keys(folk.room.stock ?? {}).length > 0;
+      if (folk?.room === undefined) return false;
+      if (Object.keys(folk.room.stock ?? {}).length > 0) return true;
+      return unlocked() && crew().suppliersOf(folk.id).length > 0;
     },
     /** The receiver's Produce Rate bonus now. */
     bonus(folk) {

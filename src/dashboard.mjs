@@ -27,9 +27,9 @@ const SORT_KEY = 'worker_folks:overview-sort';
 const MADE_SCROLL_HOLD_MS = 1500;
 
 /** Each bulk action looks like the same action on a card: Stop red, Restock blue, Restart and Settle green. */
-const BULK_LOOK = { stop: 'btn-outline-danger', restock: 'btn-outline-info' };
+const BULK_LOOK = { stop: 'btn-outline-danger', restock: 'btn-outline-info', plans: 'btn-outline-info' };
 
-export function install(ctx, { swalClass, getHiring, model, milestones, bulk, layout, tips, marquee, popupDidRender, log }) {
+export function install(ctx, { swalClass, getHiring, model, milestones, bulk, plans, layout, tips, marquee, popupDidRender, log }) {
   let hiring;
   const tally = model.createTally();
   let dirty = true;
@@ -61,6 +61,7 @@ export function install(ctx, { swalClass, getHiring, model, milestones, bulk, la
     }
     hiring.events.on('folkMade', ({ item, quantity }) => { if (tally.addItem(item?.id, quantity)) dirty = true; });
   });
+  plans?.onChange(mark);
 
   // What a Folk's action brings in. Only while that Folk acts, never the player's own actions.
   ctx.patch(Skill, 'addXP').replace(function (original, amount, action) {
@@ -279,7 +280,9 @@ export function install(ctx, { swalClass, getHiring, model, milestones, bulk, la
         working: hiring.isWorking(folk),
       };
     }), sort, mine);
-    return { rows, sort, strikes: rows.filter((r) => r.status === 'strike').length, working: rows.filter((r) => r.working).length, total: rows.length, bulk: rows.length === 0 ? null : bulk?.view() ?? null };
+    // Folks with a moment waiting for an answer (round 5), in the list's order: the head's count goes to the first card.
+    const asking = rows.filter((r) => hiring.moments?.isOpen(hiring.crew.byId(r.id)) === true).map((r) => r.id);
+    return { rows, sort, asking, strikes: rows.filter((r) => r.status === 'strike').length, working: rows.filter((r) => r.working).length, total: rows.length, bulk: rows.length === 0 ? null : bulk?.view() ?? null, plans: plans?.count() ?? 0 };
   };
 
   const madeView = () => {
@@ -391,14 +394,22 @@ export function install(ctx, { swalClass, getHiring, model, milestones, bulk, la
     menu.append(el('div', 'dropdown-divider'), el('small', 'dropdown-item-text wf-subtle wf-dash-sort-hint', getLangString('MOD_WF_DASH_SORT_MINE_TIP')));
     drop.append(toggle, menu);
     const strikes = el('span', 'badge badge-danger wf-dash-strikes d-none');
+    // Moments waiting: a button that brings the first of those cards into view.
+    const asking = el('button', 'badge badge-warning border-0 ml-1 wf-dash-asking d-none');
+    asking.type = 'button';
+    asking.addEventListener('click', () => {
+      const id = asking.dataset.wfFirst;
+      const card = id === undefined ? null : document.querySelector(`[data-wf-folk="${CSS.escape(id)}"]`);
+      card?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
     const count = el('span', 'ml-auto font-w600');
-    head.append(drop, strikes, count);
+    head.append(drop, strikes, asking, count);
     const list = el('div', 'wf-dash-scroll wf-dash-roster');
     list.addEventListener('pointerdown', () => { workHeld = true; });
     window.addEventListener('pointerup', releasePointers);
     window.addEventListener('pointercancel', releasePointers);
     workBand.append(head, list);
-    work = { drop, toggle, menu, strikes, count, list, bulk: null, drag: null };
+    work = { drop, toggle, menu, strikes, asking, count, list, bulk: null, drag: null };
     wireRosterDrag();
     layout?.onOrderChange(() => { if (sort === 'mine') { shownKeys.work = ''; dirty = true; } });
   };
@@ -421,6 +432,12 @@ export function install(ctx, { swalClass, getHiring, model, milestones, bulk, la
     const showStrikes = v.sort !== 'trouble' && v.strikes > 0;
     work.strikes.classList.toggle('d-none', !showStrikes);
     if (showStrikes) work.strikes.textContent = templateLangString('MOD_WF_DASH_STRIKES', { count: `${v.strikes}` });
+    work.asking.classList.toggle('d-none', v.asking.length === 0);
+    if (v.asking.length > 0) {
+      work.asking.textContent = templateLangString('MOD_WF_DASH_ASKING', { count: `${v.asking.length}` });
+      work.asking.dataset.wfFirst = v.asking[0];
+      tips?.set(work.asking, getLangString('MOD_WF_DASH_ASKING_TIP'));
+    }
     const rows = [];
     if (v.rows.length === 0) rows.push(note(getLangString('MOD_WF_DASH_NOBODY')));
     for (const r of v.rows) {
@@ -455,6 +472,7 @@ export function install(ctx, { swalClass, getHiring, model, milestones, bulk, la
    * do, the tooltip saying what it does and who it would act on. Last, Open shop (build .250, a player's idea: it fills
    * the cell beside Settle all; on a row of its own it takes the whole row); with nobody hired it is the only one. It goes
    * to another page rather than acting on the crew, so it looks apart: the game's Shop icon on a gold tint (build .251).
+   * Plans (round 5) sits before it: it opens the saved crew plans and is never greyed, since it also saves one.
    */
   const bulkButtons = (b) => {
     const row = el('div', 'wf-dash-bulk');
@@ -488,6 +506,14 @@ export function install(ctx, { swalClass, getHiring, model, milestones, bulk, la
     button('restart', 'RESTART', b.restart);
     button('restock', 'RESTOCK', b.restock, b.showRestock);
     button('settle', 'SETTLE', b.settle, b.showSettle);
+    if (plans !== undefined) {
+      const btn = el('button', `btn btn-sm ${BULK_LOOK.plans} wf-dash-bulk-btn`, getLangString('MOD_WF_BULK_PLANS'));
+      btn.type = 'button';
+      btn.addEventListener('click', () => plans.open(mark));
+      const n = plans.count();
+      tips?.set(btn, [getLangString('MOD_WF_BULK_PLANS_TIP'), { text: n === 0 ? getLangString('MOD_WF_BULK_PLANS_NONE') : templateLangString('MOD_WF_BULK_PLANS_COUNT', { count: `${n}`, max: `${plans.max}` }), cls: n === 0 ? 'text-muted' : 'font-w600' }]);
+      row.append(btn);
+    }
     row.append(shop());
     return row;
   };

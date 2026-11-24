@@ -71,6 +71,8 @@ export function emptyTraitState() {
 
 const has = (state, id) => state.traits.some((t) => t.id === id) || state.waiting.some((t) => t.id === id);
 const fadeKey = (id) => `${id}.fade`;
+/** A grudge toward a trait (Folk moments): progress no reset clears, only learning it, Forget or clearGrudge. */
+const grudgeKey = (id) => `${id}.grudge`;
 const specialistPrefix = 'Specialist:';
 
 /** Sends a trait's learning count back to zero (Forget, fading). */
@@ -81,6 +83,44 @@ function restartLearning(state, id) {
     delete state.counts[id];
   }
   delete state.counts[fadeKey(id)];
+  delete state.counts[grudgeKey(id)];
+}
+
+/**
+ * Adds `amount` toward a trait the Folk lacks, kept apart from its learning count so the trait's own reset doesn't wipe
+ * it (a refused moment leaves a grudge toward Resentful though the Folk isn't on strike). Learned when count and grudge
+ * together reach the target. Returns true when it was added.
+ */
+export function addGrudge(state, id, amount) {
+  const n = Number(amount);
+  const def = BY_ID.get(id);
+  if (!(n > 0) || def === undefined || def.learn.perSkill || has(state, id)) return false;
+  state.counts[grudgeKey(id)] = (state.counts[grudgeKey(id)] ?? 0) + n;
+  return true;
+}
+
+/** The grudge a Folk holds toward a trait (0 for none). */
+export function grudgeOf(state, id) {
+  return state.counts[grudgeKey(id)] ?? 0;
+}
+
+/** Lets a grudge go. Returns true when there was one. */
+export function clearGrudge(state, id) {
+  if (!(grudgeOf(state, id) > 0)) return false;
+  delete state.counts[grudgeKey(id)];
+  return true;
+}
+
+/** Sends a trait's learning back to zero for a Folk that lacks it (a moment's answer). False when it holds the trait. */
+export function clearLearning(state, id) {
+  if (BY_ID.get(id) === undefined || has(state, id)) return false;
+  restartLearning(state, id);
+  return true;
+}
+
+/** True when the Folk holds the trait or waits on a slot for it. */
+export function hasTrait(state, id) {
+  return has(state, id);
 }
 
 /**
@@ -156,8 +196,9 @@ export function settle(state, { level, tier }) {
       if (done === undefined) continue;
       restartLearning(state, t.id);
       place({ id: t.id, skillId: done[0].slice(specialistPrefix.length) });
-    } else if ((state.counts[t.id] ?? 0) >= t.learn.target) {
+    } else if ((state.counts[t.id] ?? 0) + (state.counts[grudgeKey(t.id)] ?? 0) >= t.learn.target) {
       delete state.counts[t.id];
+      delete state.counts[grudgeKey(t.id)];
       // A bad trait that would fade at once (Clumsy learned by a Journeyman) is never learned.
       if (t.fade?.tier !== undefined && tierRank(tier) >= tierRank(t.fade.tier)) continue;
       place({ id: t.id });

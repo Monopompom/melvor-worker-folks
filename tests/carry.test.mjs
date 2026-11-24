@@ -284,3 +284,21 @@ test('48 offline hours of courier rounds leave the heap where it settled', () =>
   assert.ok(twoDays < 1, `heap grew ${twoDays} MB over 48 h`);
   assert.ok(twoDays - day < 0.1, `heap still growing after the first day: ${day} → ${twoDays} MB`);
 });
+
+test('raidRoom takes a Folk\'s purse and dearest goods, gone for good; a depot from its haul; never more than asked', () => {
+  w.hiring.markCard = () => {};
+  const price = (id, gp) => { game.items.getObjectByID(id).sellsFor = { currency: { id: 'melvorD:GP' }, quantity: gp }; };
+  price('gem', 400);
+  price('ore', 5);
+  const miner = w.addFolk('m', { room: { haul: { gem: { qty: 2, ms: 20 }, ore: { qty: 100, ms: 100 } }, stock: { ore: { qty: 10, ms: 10 } }, town: {}, purse: { 'melvorD:GP': 300 } } });
+  const r = w.api.raid({ folk: 'm' }, 1300);
+  assert.deepEqual(r, { taken: [{ itemId: 'gem', qty: 2 }, { itemId: 'ore', qty: 40 }], gp: 1300 });
+  assert.deepEqual(miner.room.purse, {});
+  assert.deepEqual(miner.room.haul, { ore: { qty: 60, ms: 60 } });
+  assert.deepEqual(miner.room.stock, { ore: { qty: 10, ms: 10 } }, 'the stock is reached only after the haul');
+  assert.equal(w.counts.ore, 100, 'nothing went to the bank');
+  assert.deepEqual(w.moved, ['m']);
+  w.depots.set('tent', { id: 'tent', room: { haul: { ore: { qty: 10, ms: 10 } }, stock: {}, town: {}, purse: {} } });
+  assert.deepEqual(w.api.raid({ depot: 'tent' }, 22), { taken: [{ itemId: 'ore', qty: 4 }], gp: 20 });
+  assert.equal(w.api.raid({ folk: 'nobody' }, 10), undefined);
+});
