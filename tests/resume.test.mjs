@@ -64,6 +64,43 @@ test('a skill that keeps its own pick gets a plain start()', () => {
   assert.equal(started, 1);
 });
 
+test('Fishing and Thieving: area and NPC come back through their starters once a reload has dropped them', () => {
+  const calls = [];
+  const fishing = { activeFishingArea: 'sea', onAreaStartButtonClick(a) { calls.push(`fish ${a}`); }, start() { calls.push('start'); } };
+  const area = selectionOf(fishing);
+  assert.deepEqual(area, { area: 'sea' });
+  startAgain(fishing, area);
+  fishing.activeFishingArea = undefined;
+  assert.equal(selectionOf(fishing), null, 'no area: nothing to keep');
+  startAgain(fishing, area);
+  const thieving = { currentArea: 'town', currentNPC: 'man', startThieving(a, n) { calls.push(`thieve ${a} ${n}`); }, start() { calls.push('start'); } };
+  const npc = selectionOf(thieving);
+  assert.deepEqual(npc, { area: 'town', npc: 'man' });
+  startAgain(thieving, npc);
+  Object.assign(thieving, { currentArea: undefined, currentNPC: undefined });
+  assert.equal(selectionOf(thieving), null);
+  startAgain(thieving, npc);
+  assert.deepEqual(calls, ['start', 'fish sea', 'start', 'thieve town man']);
+});
+
+test('Fishing and Thieving picks go into the save as ids and come back as objects', () => {
+  const fishing = { areas: registry('sea'), actions: registry('crab'), onAreaStartButtonClick() {} };
+  const saved = toSaved({ area: { id: 'sea' } });
+  assert.deepEqual(saved, { area: 'sea' });
+  assert.equal(fromSaved(fishing, saved).area, fishing.areas.getObjectByID('sea'));
+  assert.equal(fromSaved(fishing, { area: 'lake' }), null, 'an area the game lacks');
+  const thieving = { areas: registry('town'), actions: registry('man'), startThieving() {} };
+  const npc = toSaved({ area: { id: 'town' }, npc: { id: 'man' } });
+  assert.deepEqual(npc, { area: 'town', npc: 'man' });
+  const back = fromSaved(thieving, npc);
+  assert.equal(back.npc, thieving.actions.getObjectByID('man'));
+  assert.equal(back.area, thieving.areas.getObjectByID('town'));
+  assert.equal(fromSaved(thieving, { area: 'town', npc: 'king' }), null, 'an NPC the game lacks');
+  assert.equal(fromSaved(fishing, npc), null, 'an NPC pick on Fishing');
+  assert.equal(fromSaved(thieving, { area: 'town' }), null, 'an area pick on Thieving');
+  assert.equal(toSaved({ npc: { id: 'man' } }), null, 'an NPC with no area');
+});
+
 test('Cooking: the pick is the active category, replayed through its Cook button once the category is gone', () => {
   const calls = [];
   const cooking = { selectedRecipes: new Map(), activeCookingCategory: 'fire', onActiveCookButtonClick(c) { calls.push(`cook ${c}`); }, start() { calls.push('start'); } };

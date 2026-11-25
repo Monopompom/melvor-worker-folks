@@ -19,6 +19,12 @@ export function selectionOf(skill) {
   if ('selectedRock' in skill && typeof skill.onRockClick === 'function' && skill.selectedRock !== undefined) return { rock: skill.selectedRock };
   if (typeof skill.startDigging === 'function' && skill.currentDigSite !== undefined) return { digSite: skill.currentDigSite };
   if (typeof skill.onVeinClick === 'function' && skill.selectedVein !== undefined) return { vein: skill.selectedVein };
+  // Thieving and Fishing keep their NPC or area through a stop, but the game saves it only while the skill runs: after
+  // a stop and a reload there is none, and start() finds nothing to do (Restart all, 25 Nov 2026).
+  if (typeof skill.startThieving === 'function') {
+    return skill.currentArea === undefined || skill.currentNPC === undefined ? null : { area: skill.currentArea, npc: skill.currentNPC };
+  }
+  if (typeof skill.onAreaStartButtonClick === 'function') return skill.activeFishingArea === undefined ? null : { area: skill.activeFishingArea };
   // Cartography has no start(): it starts through the starter of its mode.
   if (typeof skill.startAutoSurvey === 'function') {
     switch (skill._actionMode) {
@@ -38,6 +44,8 @@ export function startAgain(skill, pick) {
   else if (pick?.trees?.length > 0 && skill.activeTrees.size === 0) pick.trees.forEach((tree) => skill.selectTree(tree));
   else if (pick?.rock !== undefined && skill.selectedRock === undefined) skill.onRockClick(pick.rock);
   else if (pick?.vein !== undefined && skill.selectedVein === undefined) skill.onVeinClick(pick.vein);
+  else if (pick?.npc !== undefined && pick.area !== undefined && skill.currentNPC === undefined) skill.startThieving(pick.area, pick.npc);
+  else if (pick?.area !== undefined && pick.npc === undefined && skill.activeFishingArea === undefined) skill.onAreaStartButtonClick(pick.area);
   else if (pick?.mode !== undefined) {
     if (pick.mode === 1 && pick.hexes.length > 0) { pick.hexes.forEach((hex) => skill.surveyQueue.queue(hex)); skill.startSurveyQueue(); }
     else if (pick.mode === 2 && pick.hex !== undefined) skill.startAutoSurvey(pick.hex);
@@ -67,7 +75,12 @@ export function toSaved(pick) {
     }
   }
   if (Array.isArray(pick.trees)) { const trees = pick.trees.map(idOf).filter(defined); return trees.length > 0 ? { trees } : null; }
-  for (const key of ['cook', 'rock', 'vein', 'digSite']) {
+  if (pick.npc !== undefined) {
+    const npc = idOf(pick.npc);
+    const area = idOf(pick.area);
+    return npc === undefined || area === undefined ? null : { area, npc };
+  }
+  for (const key of ['cook', 'rock', 'vein', 'digSite', 'area']) {
     if (pick[key] === undefined) continue;
     const id = idOf(pick[key]);
     return id === undefined ? null : { [key]: id };
@@ -105,5 +118,11 @@ export function fromSaved(skill, saved, game) {
   if (saved.rock !== undefined) return one('rock', 'onRockClick', action(saved.rock));
   if (saved.vein !== undefined) return one('vein', 'onVeinClick', action(saved.vein));
   if (saved.digSite !== undefined) return one('digSite', 'startDigging', action(saved.digSite));
+  if (saved.npc !== undefined) {
+    const npc = action(saved.npc);
+    const area = find(skill.areas, saved.area);
+    return typeof skill.startThieving === 'function' && npc !== undefined && area !== undefined ? { area, npc } : null;
+  }
+  if (saved.area !== undefined) return one('area', 'onAreaStartButtonClick', find(skill.areas, saved.area));
   return null;
 }
