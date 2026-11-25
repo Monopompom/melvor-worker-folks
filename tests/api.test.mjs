@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createGuards, GUARD_KINDS } from '../src/guards.mjs';
-import { createApi, folkView, API_VERSION } from '../src/api.mjs';
+import { createApi, folkView, lazyFolkView, API_VERSION } from '../src/api.mjs';
 import { createEventBus } from '../src/events.mjs';
 import { createCrew } from '../src/crew.mjs';
 import * as model from '../src/folk.mjs';
@@ -160,6 +160,46 @@ test('folkView finds a portrait only when it is read, and once', () => {
   assert.equal(calls, 1);
   assert.equal(folkView(folk, 'idle', undefined, 'b.svg').portrait, 'b.svg');
   assert.equal(folkView(folk, 'idle').portrait, undefined);
+});
+
+test('lazyFolkView reads like folkView, finding the costly fields only when read, and once', () => {
+  const folk = model.createFolk({ id: 'a', slot: 1, tier: 'Junior', name: 'A' });
+  folk.place = { q: 2, r: 3 };
+  const calls = { status: 0, maxHp: 0, mastery: 0, portrait: 0 };
+  const find = {
+    status: () => { calls.status += 1; return 'working'; },
+    maxHp: () => { calls.maxHp += 1; return 120; },
+    mastery: () => { calls.mastery += 1; return 7; },
+    portrait: () => { calls.portrait += 1; return 'a.svg'; },
+  };
+  const v = lazyFolkView(folk, find);
+  assert.ok(Object.isFrozen(v));
+  assert.equal(v.id, 'a');
+  assert.deepEqual(calls, { status: 0, maxHp: 0, mastery: 0, portrait: 0 }, 'reading the id finds nothing');
+  assert.deepEqual({ ...v }, { ...folkView(folk, 'working', 120, 'a.svg', 7) });
+  assert.equal(v.status, 'working');
+  assert.equal(v.maxHp, 120);
+  assert.deepEqual(calls, { status: 1, maxHp: 1, mastery: 1, portrait: 1 }, 'each found once');
+  folk.place.q = 9;
+  assert.deepEqual(v.place, { q: 2, r: 3 }, 'the place as it was when made');
+});
+
+test('api.on payloads carry lazy views: a listener reading only the id costs no status', () => {
+  const { hiring } = makeHiring();
+  let looked = 0;
+  hiring.statusOf = () => { looked += 1; return 'idle'; };
+  const api = createApi({ getHiring: () => hiring, model });
+  const folk = hiring.crew.hire('Junior');
+  const ids = [];
+  const statuses = [];
+  api.on('folkMoved', (p) => ids.push(p.folk.id));
+  api.setPlace(folk.id, { q: 1, r: 1 });
+  assert.deepEqual(ids, [folk.id]);
+  assert.equal(looked, 0);
+  api.on('folkMoved', (p) => statuses.push(p.folk.status));
+  api.setPlace(folk.id, { q: 2, r: 1 });
+  assert.deepEqual(statuses, ['idle']);
+  assert.equal(looked, 1);
 });
 
 test('api v2: workerOf asks the skill who would act; registerLocationText sets and clears the line', () => {

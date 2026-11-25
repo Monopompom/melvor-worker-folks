@@ -241,7 +241,8 @@ export function install(ctx, { getHiring, bulk, rand = Math.random, log }) {
     const on = payroll.generalOn;
     const { warn } = on ? payroll.generalView() : { warn: false };
     if (!warn) {
-      hiring.crew.all.forEach((folk) => moments.dismiss(folk, STRIKE_TALK));
+      // Runs every second: only a Folk that still holds the talk is touched.
+      for (const folk of hiring.crew.all) if (folk.moment?.id === STRIKE_TALK) moments.dismiss(folk, STRIKE_TALK);
       if (clock.warned) hiring.crew.moments = { ...clock, warned: false };
       return;
     }

@@ -73,6 +73,45 @@ export function checkTraitDef(def) {
   return undefined;
 }
 
+/**
+ * The same view for event payloads, where most listeners read only `id` (Voyage's per-action one does, about 400k
+ * times in a 24 h catch-up): the fields are copied at once, as folkView's, except the looked-up `status`, `maxHp`,
+ * `mastery` and `portrait`, which are worked out on their first read and kept. `find` holds { status, maxHp, mastery,
+ * portrait }, each a function of nothing. Read those inside the listener: a view kept for later shows them as they
+ * were when first read.
+ */
+export function lazyFolkView(folk, find) {
+  const once = (fn) => {
+    let done = false;
+    let value;
+    return () => {
+      if (!done) { value = fn(); done = true; }
+      return value;
+    };
+  };
+  const status = once(() => find.status?.());
+  const maxHp = once(() => find.maxHp?.());
+  const mastery = once(() => find.mastery?.());
+  const portrait = once(() => find.portrait?.());
+  return Object.freeze({
+    id: folk.id,
+    name: folk.name,
+    tier: folk.tier,
+    slot: folk.slot,
+    skillId: folk.skillId,
+    job: folk.job ?? null,
+    supplies: folk.supplies ?? null,
+    get status() { return status(); },
+    place: placeCopy(folk.place),
+    travel: folk.travel,
+    hp: folk.hp,
+    get maxHp() { return maxHp(); },
+    get portrait() { return portrait(); },
+    traits: Object.freeze((folk.traitState?.traits ?? []).map((t) => t.id)),
+    get mastery() { return mastery(); },
+  });
+}
+
 /** Event payloads with every Folk record swapped for its view. */
 function viewPayload(payload, view) {
   if (payload === null || typeof payload !== 'object') return payload;
@@ -95,6 +134,13 @@ export function createApi({ getHiring, model, pricing, rules, getBackup, version
   const { normalizePlace, TRAVEL } = model;
   const hiring = () => getHiring();
   const view = (folk) => folkView(folk, hiring().statusOf(folk), hiring().health?.maxHpOf(folk), () => hiring().portraitOf?.(folk) ?? hiring().portrait?.(folk.tier), hiring().masteryLevelOf?.(folk));
+  /** An event payload's view: the same fields, the costly ones found when read (see lazyFolkView). */
+  const eventView = (folk) => lazyFolkView(folk, {
+    status: () => hiring().statusOf(folk),
+    maxHp: () => hiring().health?.maxHpOf(folk),
+    mastery: () => hiring().masteryLevelOf?.(folk),
+    portrait: () => hiring().portraitOf?.(folk) ?? hiring().portrait?.(folk.tier),
+  });
   /** The room's calls (v10) go to room.mjs; an unknown Folk, or no room module, answers undefined. */
   const roomCall = (id, fn) => {
     const folk = record(id);
@@ -267,7 +313,7 @@ export function createApi({ getHiring, model, pricing, rules, getBackup, version
     /** Subscribes to a Worker Folks event; payloads carry Folk views. Returns the function that unsubscribes. */
     on: (name, fn) => {
       if (typeof fn !== 'function') throw new Error('listener must be a function');
-      return hiring().events.on(name, (payload) => fn(viewPayload(payload, view)));
+      return hiring().events.on(name, (payload) => fn(viewPayload(payload, eventView)));
     },
     /** kind 'staff' | 'work' | 'gear'; fn(request) returns undefined or { reason }. Requests carry Folk views. */
     registerGuard: (kind, fn) => {
