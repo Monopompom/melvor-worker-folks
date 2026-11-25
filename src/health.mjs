@@ -152,7 +152,8 @@ export function install(ctx, { getHiring, rules, time, log }) {
       const key = cause === 'hunger' ? 'MOD_WF_DIED_HUNGER' : working === undefined ? 'MOD_WF_DIED_PLAIN' : 'MOD_WF_DIED';
       const where = cairn ? keeperText(folk.id) : '';
       game.notifications.createErrorNotification('worker_folks:died', `${templateLangString(key, vars)}${where === '' ? '' : ` ${where}`}`, hiring.portraitOf(folk));
-      log(`${folk.name} died on ${working?.id ?? '-'}; slot ${folk.slot} frozen until ${new Date(until).toISOString()}`);
+      const at = working?.id ?? (cause === 'hunger' || cairn ? 'the road' : 'no skill');
+      log(`${folk.name} died on ${at}${cause ? ` (${cause})` : ''}; slot ${folk.slot + 1} frozen until ${new Date(until).toISOString()}`);
     },
     /**
      * Heals a Folk by `hp` (v13), up to its max HP. A Folk not in the crew (dead, its slot frozen) gets nothing. `cause`
