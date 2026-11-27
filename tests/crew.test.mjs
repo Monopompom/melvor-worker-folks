@@ -144,7 +144,7 @@ test('a shared job keeps every holder; a plain job still has one', () => {
 test('load migrates a pre-version root', () => {
   const { crew } = make(4);
   const report = crew.load({ folks: [{ id: 'old', slot: 1, tier: 'Junior', name: 'Old' }] });
-  assert.deepEqual(report.applied, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  assert.deepEqual(report.applied, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
   assert.equal(crew.bySlot(1).strikes, 0);
   assert.equal(crew.bySlot(1).paid, null);
 });
@@ -333,4 +333,36 @@ test('the moment clock and plans ride in the save', () => {
   back.clear();
   assert.deepEqual(back.moments, { gapMs: null, warned: false });
   assert.deepEqual(back.plans, []);
+});
+
+test('a path: picked with the promotion to Master, kept at Foreman, changed or cleared by setPath, saved', () => {
+  const { bus, crew } = make();
+  const folk = crew.hire('Middle');
+  assert.equal(folk.path, null);
+  crew.promote(folk.id, 'Senior', { path: 'Craftsman' });
+  assert.equal(folk.path, null, 'an unknown path is ignored');
+  let changes = 0;
+  bus.on('crewChanged', () => { changes += 1; });
+  assert.equal(crew.setPath(folk.id, 'Hustler'), true);
+  assert.equal(folk.path, 'Hustler');
+  assert.equal(changes, 1);
+  assert.equal(crew.setPath(folk.id, 'Hustler'), true);
+  assert.equal(changes, 1, 'the same path changes nothing');
+  crew.promote(folk.id, 'Expert');
+  assert.equal(folk.path, 'Hustler', 'a Foreman keeps its path');
+  assert.equal(crew.setPath(folk.id, 'Scholar'), true);
+  assert.equal(crew.setPath(folk.id, 'Nope'), false);
+  assert.equal(folk.path, 'Scholar');
+  const { crew: other } = make();
+  other.load(crew.serialize());
+  assert.equal(other.byId(folk.id).path, 'Scholar');
+  assert.equal(crew.setPath(folk.id, null), true);
+  assert.equal(folk.path, null);
+  const low = crew.hire('Junior');
+  assert.equal(crew.setPath(low.id, 'Steady'), false, 'below Master');
+  assert.equal(crew.setPath(low.id, null), false);
+  assert.equal(crew.setPath('nobody', 'Steady'), false);
+  const master = crew.hire('Middle');
+  crew.promote(master.id, 'Senior', { path: 'Steady' });
+  assert.equal(master.path, 'Steady');
 });

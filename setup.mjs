@@ -5,7 +5,7 @@
 // are covered by Node tests in tests/.
 
 /** Bumped on every zip build so the console shows which build is running. */
-export const BUILD = '2026-11-25.329';
+export const BUILD = '2026-11-27.336';
 /**
  * Dev tooling switch. false for shipping builds: no `[Worker Folks]` debug logging and no
  * `workerFolksDev` console helpers (src/dev.mjs is not loaded and the release build leaves it out of
@@ -80,6 +80,7 @@ export async function setup(ctx) {
   const wagesRules = await ctx.loadModule('src/wages.mjs');
   const perks = await ctx.loadModule('src/mastery-perks.mjs');
   const promotion = await ctx.loadModule('src/promotion.mjs');
+  const paths = await ctx.loadModule('src/paths-model.mjs');
   const loadoutRules = await ctx.loadModule('src/loadout-model.mjs');
   const loadout = await ctx.loadModule('src/loadout.mjs');
   // Every tooltip in the mod goes through one module (build .91, the user: the same look as Voyage's).
@@ -160,6 +161,7 @@ export async function setup(ctx) {
   const steward = await ctx.loadModule('src/steward.mjs');
   const traitRules = await ctx.loadModule('src/traits-model.mjs');
   const traits = await ctx.loadModule('src/traits.mjs');
+  const pathsSlice = await ctx.loadModule('src/paths.mjs');
   const qualificationRules = await ctx.loadModule('src/qualification-model.mjs');
   const qualification = await ctx.loadModule('src/qualification.mjs');
   const materialRules = await ctx.loadModule('src/material-cost-model.mjs');
@@ -181,7 +183,7 @@ export async function setup(ctx) {
   const { Hiring } = createHiringClass({
     swalClass,
     popupDidRender, titleName, time, numbers,
-    selectDelegable, log, createCrew, createEventBus, createGuards, folkView: apiModule.folkView, folkModel, pickName, renderFolkCards, refreshFolkCards, cardDraw, cardListId, renderReservePanel, produceRate,
+    selectDelegable, log, createCrew, createEventBus, createGuards, folkView: apiModule.folkView, folkModel, pickName, renderFolkCards, refreshFolkCards, cardDraw, cardListId, renderReservePanel, produceRate, paths,
     rules: delegationRules,
     perks,
     promotion,
@@ -548,6 +550,18 @@ export async function setup(ctx) {
     model: traitRules,
     popupDidRender,
     titleName,
+    log,
+  });
+
+  // 9b. Paths at Master and Foreman: the pick in the promotion popup, the card's chip, Change path.
+  pathsSlice.install(ctx, { swalClass,
+    getHiring: () => game.skills.getObjectByID('worker_folks:Hiring'),
+    model: paths,
+    popupDidRender,
+    titleName,
+    effectsFragment,
+    numbers,
+    tips,
     log,
   });
 

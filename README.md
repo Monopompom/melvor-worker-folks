@@ -237,6 +237,24 @@ of what the Folk cost you (its hire price and its promotion fees), 5% from Hirin
 nothing from Hiring 90. A Folk hired before this rule counts as having cost its tier's
 first-hire price. Fire stays disabled while you can't pay the severance.
 
+### Paths at Master and Foreman
+
+A Folk promoted to **Master** picks one of three **paths** in the promotion popup, the same set for every skill. Each
+one gains something and costs something, so none is best everywhere:
+
+| Path | Master | Foreman ("II") | Suits |
+| --- | --- | --- | --- |
+| Hustler | +10% Produce Rate, +25% wage | +15% Produce Rate, +35% wage | a money skill, where each batch is worth more than the extra wage |
+| Steady | −20% wage, +5% action time | −30% wage, +5% action time | a cheap skill, or a crew whose wages run ahead of its income |
+| Scholar | +10% skill XP, +50% Folk mastery XP, −10% Produce Rate | +15% skill XP, +50% Folk mastery XP, −10% Produce Rate | raising a Folk toward mastery 99, or levelling the skill yourself |
+
+Produce Rate above 100% is the chance of a bonus batch, and a path never takes it below 100%. The wage part works like
+a trait's (outside the relief cap). A Folk holding a job (the Quartermaster, a courier) gets nothing from its path.
+Promoted to **Foreman**, a Folk keeps its path at the stronger step. A Master or Foreman without a path (one from before
+this update, or bought at that tier) shows **Choose a path** on its card: the first pick is free. After that, the path
+on the card opens **Change path**, for the tier's diploma (Infernal Core for a Master, Elder Crown for a Foreman) and a
+quarter of the tier's next hire price; not while the Folk is on strike.
+
 ## A Folk's name and look
 
 Click a Folk's **portrait** to edit its look: skin, hair and hair colour, facial hair, an extra

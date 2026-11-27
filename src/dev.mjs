@@ -28,6 +28,13 @@ export function install({ hiring, log, tiers, masteryIndex }) {
     fire(id) {
       return hiring.crew.fire(ref(id), { reason: 'dev' });
     },
+    /** workerFolksDev.path('Mira', 'Hustler') — sets a Master's or Foreman's path (round 6; free, no diploma; null: none) and reports what it adds now. */
+    path(id, pathId = null) {
+      const folk = hiring.crew.byId(ref(id));
+      if (folk === undefined) return 'no such Folk';
+      if (!hiring.crew.setPath(folk.id, pathId)) return `refused: ${folk.name} is ${folk.tier}, path ${pathId}`;
+      return { name: folk.name, tier: folk.tier, path: folk.path, effects: hiring.pathEffects(folk), rate: hiring.rateOf(folk), wagePerHour: hiring.payroll?.hourlyWageOf(folk) };
+    },
     /** workerFolksDev.job(0, 'worker_folks:Quartermaster') — puts a Folk on a job (null: none), its rules applied. */
     job(id, jobId = 'worker_folks:Quartermaster') {
       const folk = hiring.crew.byId(ref(id));

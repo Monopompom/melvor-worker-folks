@@ -95,6 +95,8 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 /* A portrait popup never outgrows the screen: its body scrolls, the title and the buttons stay. The library sets its own display. */
 .wf-ui.wf-pic { display: flex !important; flex-direction: column; max-height: calc(100vh - 1.25em); max-height: calc(100dvh - 1.25em); }
 .wf-ui.wf-pic > * { flex-shrink: 0; }
+/* The close × keeps its top-right corner: the library places it with justify-self, which a flex column ignores. */
+.wf-ui.wf-pic > .swal2-close { align-self: flex-end; }
 .wf-ui.wf-pic .swal2-html-container { flex: 0 1 auto; min-height: 0; max-height: none; }
 /* A refusal is an amber line under the field, not the library's light strip. */
 .wf-ui .swal2-validation-message { margin: 8px 0 0; padding: 0 1em; background: transparent; color: var(--wf-debt); font-size: 1rem; font-weight: 400; justify-content: center; text-wrap: pretty; }
@@ -230,7 +232,7 @@ body:not(.darkMode) .wf-ui .badge-warning { color: #fff; background-color: var(-
 }
 /* On Thieving without food: the card's top border turns amber (the food line says why). */
 .wf-card-alert { border-color: var(--wf-alert) !important; }
-.wf-card-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.wf-card-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
 .wf-gap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 /* Secondary text that must stay readable: lighter than body text, brighter than the game's text-muted. */
 .wf-subtle { color: var(--wf-subtle); }
@@ -367,6 +369,22 @@ html.wf-popup-steady { scrollbar-gutter: stable; }
 .wf-trait-row.wf-trait-bad { border-color: var(--wf-alert); }
 /* Local, born with it: no Forget, so its row has no third column. */
 .wf-trait-row.wf-trait-born { grid-template-columns: 40px minmax(0, 1fr); }
+/* Paths (round 6): the pick's chips (tap to select, filled btn-info), the band under them with the selected path's
+   lines, and the card's chip in the badge row. */
+.wf-path-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.wf-path-pick { display: inline-flex; flex: 1 1 auto; justify-content: center; align-items: center; gap: 6px; min-height: 40px; white-space: normal; text-align: left; }
+.wf-path-icon { width: 24px; height: 24px; object-fit: contain; flex: none; }
+.wf-path-detail { margin-top: 8px; text-align: left; }
+.wf-path-stack { display: grid; }
+.wf-path-stack > .wf-path-pane { grid-area: 1 / 1; }
+.wf-path-pane-off { visibility: hidden; }
+.wf-path-hint, .wf-path-suits { font-size: 0.9rem; }
+.wf-path-suits { margin-top: 4px; }
+/* The card's path chip is as tall as the rate and wage tags beside it, so the three texts share one line; on touch an
+   invisible margin makes it a 40px target. */
+.wf-card-badges .wf-path-chip { display: inline-flex; align-items: center; gap: 4px; padding: calc(0.25em - 1px) 0.4em; font-size: 0.9rem; line-height: 1; }
+.wf-card-badges .wf-path-chip .wf-path-icon { width: 16px; height: 16px; margin: -1px 0; }
+@media (pointer: coarse) { .wf-card-badges .wf-path-chip { position: relative; } .wf-card-badges .wf-path-chip::after { content: ''; position: absolute; inset: -9px -3px; } }
 .wf-trait-row.wf-trait-empty, .wf-trait-row.wf-trait-locked { display: block; background: transparent; border-style: dashed; color: var(--wf-subtle); }
 .wf-trait-waiting, .wf-trait-note { font-size: 0.9rem; }
 .wf-trait-note { border-top: 1px solid var(--wf-line); padding-top: 8px; margin-top: 8px; }

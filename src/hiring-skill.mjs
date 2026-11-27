@@ -13,7 +13,7 @@ export const SHIFT_SLOT_PURCHASE = 'Shift_Slot';
 export const SAVE_MAGIC = 0x574f4c4b;
 
 
-export function createHiringClass({ swalClass, popupDidRender, titleName = (s) => s, time, numbers, selectDelegable, log, createCrew, createEventBus, createGuards, folkView, folkModel, pickName, renderFolkCards, refreshFolkCards, cardDraw, cardListId, renderReservePanel, produceRate, rules, perks, promotion, pricing, tips, layout, dashboard, daydream }) {
+export function createHiringClass({ swalClass, popupDidRender, titleName = (s) => s, time, numbers, selectDelegable, log, createCrew, createEventBus, createGuards, folkView, folkModel, pickName, renderFolkCards, refreshFolkCards, cardDraw, cardListId, renderReservePanel, produceRate, paths, rules, perks, promotion, pricing, tips, layout, dashboard, daydream }) {
   class FolkSlotAction extends MasteryAction {
     constructor(namespace, data, game, skill) {
       super(namespace, data, game);
@@ -366,6 +366,10 @@ export function createHiringClass({ swalClass, popupDidRender, titleName = (s) =
       if (p.spends > 0) tip.push(templateLangString('MOD_WF_CTRL_NET_INPUTS', { amount: full(-p.spends), currency }));
       if (p.wageCounted && p.wage > 0) tip.push(templateLangString('MOD_WF_CTRL_NET_WAGE', { amount: full(-p.wage), currency }));
       if (p.courier > 0) tip.push(templateLangString('MOD_WF_CTRL_NET_COURIER', { amount: full(-p.courier), currency }));
+      // The path is already in these sums (its Produce Rate, action time and wage); named so a change is explained.
+      if (paths.isPath(folk.path) && paths.holdsPath(folk.tier) && this.paths !== undefined) {
+        tip.push(templateLangString('MOD_WF_CTRL_NET_PATH', { path: this.paths.nameOf(folk.path, folk.tier) }));
+      }
       tip.push({ text: templateLangString('MOD_WF_CTRL_NET', { amount: full(p.net), currency }), cls: 'font-w600' });
       tip.push({ text: getLangString('MOD_WF_CTRL_NET_LEFT_OUT'), cls: 'text-muted' });
       return {
@@ -905,6 +909,13 @@ export function createHiringClass({ swalClass, popupDidRender, titleName = (s) =
         traits: (folk) => this.traits?.cardView(folk),
         local: (folk) => this.commissions?.localView(folk) ?? null,
         onTraits: (folk) => this.traits?.openTraits(folk),
+        // The chip greys like Promote when another mod (Voyage) refuses staff actions for this Folk; the line under the
+        // card's buttons says why.
+        path: (folk) => {
+          const view = this.paths?.cardView(folk) ?? null;
+          return view === null ? null : { ...view, refused: this.refusal('staff', { action: 'path', folk }) };
+        },
+        onPath: (folk) => this.paths?.openPick(folk),
         hp: (folk) => this.health?.hpView(folk),
         room: (folk) => this.room?.cardView(folk),
         moment: (folk) => this.moments?.cardView(folk) ?? null,
@@ -1162,6 +1173,14 @@ export function createHiringClass({ swalClass, popupDidRender, titleName = (s) =
       return this.heirlooms?.addTo(folk, traits) ?? traits;
     }
 
+    /**
+     * What the Folk's path adds (round 6): { rate, interval, xp, masteryXP, wageFactor }, nothing below Master, without
+     * a path or while it holds a job.
+     */
+    pathEffects(folk) {
+      return paths.pathEffects(folk.path, folk.tier, { onJob: folk.job !== null && folk.job !== undefined });
+    }
+
     // Hooks read by payroll.mjs and acting.mjs
     wageDiscount(folk) {
       const p = this.perksOf(folk);
@@ -1172,7 +1191,7 @@ export function createHiringClass({ swalClass, popupDidRender, titleName = (s) =
     /** Multiplier on the tier wage: the seniority raise (40% → 100% by mastery) times the overtime factor and traits. */
     wageFactor(folk) {
       const p = this.perksOf(folk);
-      return p.wageFactor * p.wageRaise * this.traitEffects(folk).wageFactor;
+      return p.wageFactor * p.wageRaise * this.traitEffects(folk).wageFactor * this.pathEffects(folk).wageFactor;
     }
 
     wageRaise(folk) {
@@ -1216,7 +1235,7 @@ export function createHiringClass({ swalClass, popupDidRender, titleName = (s) =
     addFolkMastery(folk, intervalMs) {
       const slot = this.slotOf(folk);
       if (slot === undefined) return;
-      const modifierPercent = this.getMasteryXPModifier(slot) + this.traitEffects(folk).masteryXP;
+      const modifierPercent = this.getMasteryXPModifier(slot) + this.traitEffects(folk).masteryXP + this.pathEffects(folk).masteryXP;
       let xp = perks.masteryXPForAction({ level: this.getMasteryLevel(slot), intervalMs, tier: folk.tier, modifierPercent });
       if (this.game.modifiers.halveMasteryXP > 0) xp /= 2;
       this.addMasteryXP(slot, xp);
@@ -1281,6 +1300,11 @@ export function createHiringClass({ swalClass, popupDidRender, titleName = (s) =
       const fee = `<img class="skill-icon-xs mr-1" src="${this.game.gp.media}" alt="GP"><span class="font-w600 ${gpShort ? 'text-danger' : 'text-warning'}">${numbers.shortNumber(plan.cost)}</span>`;
       // A higher tier may need more of your level on the Folk's skill: said before the click, never a blocker.
       const qualifyAfter = this.qualification?.afterPromotion(folk, plan.nextTier) ?? '';
+      // To Master: pick a path (part of the promotion, so Cancel keeps neither); to Foreman: the path's stronger step,
+      // or a free pick for a Master without one. Promote stays grey until a path is picked, the ✗ row says so.
+      const pathPart = this.paths?.promotionPart(folk, plan.nextTier) ?? null;
+      let chosen = null;
+      const pathMissing = () => pathPart !== null && pathPart.needsPick && chosen === null;
       const feeRow = `<div data-wf-req="gp" tabindex="0"><span class="${gpShort ? 'text-danger' : 'text-success'}">${gpShort ? '✗' : '✓'}</span> ${templateLangString('MOD_WF_PROMO_COST', { cost: fee, percent: `${Math.round((this.levels?.promotionCostRate() ?? promotion.PROMOTION_COST_RATE) * 100)}` })}</div>`;
       const html = `
         <div>
@@ -1290,7 +1314,9 @@ export function createHiringClass({ swalClass, popupDidRender, titleName = (s) =
           ${row(!plan.blockers.includes('mastery'), masteryIcon + templateLangString('MOD_WF_PROMO_MASTERY', { gate: `${plan.gate}`, level: `${this.masteryLevelOf(folk)}` }), 'mastery')}
           ${row(!plan.blockers.includes('diploma'), templateLangString('MOD_WF_PROMO_DIPLOMA', { item: diplomaText }), 'diploma')}
           ${feeRow}
+          ${pathPart === null ? '' : row(!pathPart.needsPick, pathPart.rowText(null), 'path')}
           </div>
+          ${pathPart === null ? '' : '<div class="mt-2" data-wf-paths></div>'}
           ${plan.ok ? '' : `<div class="text-warning mt-2">${this.promotionNeedsLines(folk, plan).map((l) => `<div>${l}</div>`).join('')}</div>`}
           <div class="mt-2">${getLangString(qualifyAfter === '' ? 'MOD_WF_PROMO_KEEPS' : 'MOD_WF_PROMO_KEEPS_STOPS')}</div>
           ${qualifyAfter === '' ? '' : `<div class="text-warning mt-2">${templateLangString('MOD_WF_PROMO_QUALIFY', { name: folk.name, aRole: getLangString(`MOD_WF_A_ROLE_${plan.nextTier}`), reason: qualifyAfter })}</div>`}
@@ -1309,11 +1335,21 @@ export function createHiringClass({ swalClass, popupDidRender, titleName = (s) =
         showCancelButton: true,
         cancelButtonText: getLangString('MOD_WF_BUTTON_CANCEL'),
         // Blocked: focus on Cancel, so a keyboard user lands in the dialog (scan C-32, build .112).
-        focusCancel: !plan.ok,
+        focusCancel: !plan.ok || pathMissing(),
         confirmButtonText: getLangString('MOD_WF_BUTTON_PROMOTE'),
         // Disabled while a requirement is missing: the red rows and the amber line say which.
         didOpen: (el) => {
-          if (!plan.ok) { const b = Swal.getConfirmButton(); if (b) b.disabled = true; }
+          const confirm = Swal.getConfirmButton();
+          if (confirm && (!plan.ok || pathMissing())) confirm.disabled = true;
+          const box = el.querySelector('[data-wf-paths]');
+          if (pathPart !== null && box !== null) {
+            pathPart.mount(box, (id) => {
+              chosen = id;
+              const r = el.querySelector('[data-wf-req="path"]');
+              if (r !== null) { r.className = 'text-success'; r.textContent = `✓ ${pathPart.rowText(id)}`; }
+              if (confirm) confirm.disabled = !plan.ok;
+            });
+          }
           const role = this.roleName(plan.nextTier);
           const tip = {
             level: templateLangString('MOD_WF_PROMO_TIP_LEVEL', { level: `${this.levels?.promotionLevel ?? ''}` }),
@@ -1321,12 +1357,13 @@ export function createHiringClass({ swalClass, popupDidRender, titleName = (s) =
             mastery: templateLangString('MOD_WF_PROMO_TIP_MASTERY', { name: folk.name, gate: `${plan.gate}`, role }),
             diploma: plan.diploma === undefined ? '' : [{ parts: [{ text: getLangString('MOD_WF_PROMO_TIP_DIPLOMA') }, { item: plan.diploma }] }],
             gp: getLangString('MOD_WF_PROMO_TIP_GP'),
+            path: getLangString('MOD_WF_PROMO_TIP_PATH'),
           };
           el.querySelectorAll('[data-wf-req]').forEach((r) => tips?.set(r, tip[r.dataset.wfReq] ?? ''));
         },
         didDestroy: () => tips?.sweep(),
       }).then((result) => {
-        if (!result.isConfirmed) return;
+        if (!result.isConfirmed || pathMissing()) return;
         const fresh = this.promotionPlanFor(folk);
         if (!fresh.ok) {
           this.game.notifications.createErrorNotification('worker_folks:promo', this.promotionNeedsText(folk, fresh));
@@ -1334,7 +1371,7 @@ export function createHiringClass({ swalClass, popupDidRender, titleName = (s) =
         }
         this.game.gp.remove(fresh.cost);
         this.game.bank.removeItemQuantity(fresh.diploma, 1, true);
-        this.crew.promote(folk.id, fresh.nextTier, { paid: fresh.cost });
+        this.crew.promote(folk.id, fresh.nextTier, { paid: fresh.cost, path: chosen });
         this.game.notifications.createSuccessNotification(
           'worker_folks:promoted',
           templateLangString('MOD_WF_PROMOTED', { name: folk.name, role: this.roleName(fresh.nextTier), aRole: getLangString(`MOD_WF_A_ROLE_${fresh.nextTier}`) }),
@@ -1535,9 +1572,12 @@ export function createHiringClass({ swalClass, popupDidRender, titleName = (s) =
      * A tier's effects (Produce Rate is shown separately) as { before, value, after, tone } pieces, so the value can
      * stand out in its colour: 'good' green, 'bad' amber (build .73). The value's place comes from the language string.
      */
-    /** The Folk's Produce Rate now: its tier's, plus a supply line's step while a supplier of it works (round 3). */
+    /**
+     * The Folk's Produce Rate now: its tier's with its path's step (round 6, never below 100 through a path), plus a
+     * supply line's step while a supplier of it works (round 3).
+     */
     rateOf(folk) {
-      return produceRate.produceRate(folk.tier) + (this.supply?.bonus(folk) ?? 0);
+      return paths.rateWithPath(produceRate.produceRate(folk.tier), this.pathEffects(folk).rate) + (this.supply?.bonus(folk) ?? 0);
     }
 
     /** A job's text from its definition (`badge`): '' when it has none or it fails. */

@@ -1,7 +1,9 @@
 // Folk record model, validation and save-root migrations. Pure: no game globals.
 
 export const TIERS = ['Newbie', 'Junior', 'Middle', 'Senior', 'Expert'];
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;
+/** A Master's or Foreman's path (v12, round 6): the same list as src/paths-model.mjs PATH_IDS. */
+export const PATH_IDS = ['Hustler', 'Steady', 'Scholar'];
 /** The most steps a Folk's recipe queue holds (v11, round 5). */
 export const QUEUE_MAX = 3;
 /** The most saved crew plans (v11, round 5). */
@@ -156,6 +158,8 @@ export function createFolk({ id, slot, tier, name, hiredAt = 0, paid = null }) {
     queue: [],
     /** What it last started, as plain ids (src/resume.mjs toSaved), for Restart all and crew plans (v11); null = none. */
     pick: null,
+    /** Its path (v12): one of PATH_IDS at Master or Foreman, null below Master or while a Master has not picked one. */
+    path: null,
   };
 }
 
@@ -262,6 +266,8 @@ export function normalizeFolk(raw) {
   // A queue belongs to a skill: a Folk on none keeps none.
   folk.queue = folk.skillId === null ? [] : normalizeQueue(raw.queue);
   folk.pick = savedPick(raw.pick);
+  // Only a Master or Foreman holds a path; an unknown id is dropped, so the Folk picks again for free.
+  folk.path = (folk.tier === 'Senior' || folk.tier === 'Expert') && PATH_IDS.includes(raw.path) ? raw.path : null;
   return folk;
 }
 
@@ -478,6 +484,12 @@ export const MIGRATIONS = {
     moments: { gapMs: null, warned: false },
     plans: [],
     cairns: {},
+  }),
+  // v12: paths (joint order round 6): no Folk has picked one yet; Masters and Foremen pick for free.
+  11: (root) => ({
+    ...root,
+    v: 12,
+    folks: (Array.isArray(root.folks) ? root.folks : []).map((f) => ({ ...f, path: null })),
   }),
 };
 

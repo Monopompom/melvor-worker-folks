@@ -10,7 +10,7 @@ const lang = JSON.parse(readFileSync(new URL('../languages/en.json', import.meta
 
 test('tips: all with wages on, the wage ones left out with wages off, each with a head and a text', () => {
   assert.equal(tipNumbers(true).length, TIP_COUNT);
-  assert.deepEqual(tipNumbers(false), [3, 4, 7, 8, 10]);
+  assert.deepEqual(tipNumbers(false), [3, 4, 7, 8, 10, 13]);
   for (let n = 1; n <= TIP_COUNT; n += 1) {
     assert.ok(lang[`MOD_WF_TIP_${n}_HEAD`], `head ${n}`);
     assert.ok(lang[`MOD_WF_TIP_${n}`], `tip ${n}`);

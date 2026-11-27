@@ -3,7 +3,7 @@
 // Payroll band (build .98) is reserve-panel.mjs. Pure: no DOM, no game globals (tests/dashboard-model.test.mjs).
 
 /** Tips are MOD_WF_TIP_<n>_HEAD and MOD_WF_TIP_<n> in the language file, n = 1..TIP_COUNT; behind the block's "?". */
-export const TIP_COUNT = 12;
+export const TIP_COUNT = 13;
 /** Tips about wages, the reserve and strikes: left out while wages are off (No sweat). */
 export const WAGE_TIPS = new Set([1, 2, 5, 6, 9, 11, 12]);
 /**

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as B from '../src/backup-model.mjs';
-import { SAVE_VERSION, createFolk, serializeRoot } from '../src/folk.mjs';
+import { SAVE_VERSION, createFolk, serializeRoot, parseRoot } from '../src/folk.mjs';
 
 const folk = (id, slot, extra = {}) => ({ ...createFolk({ id, slot, tier: 'Junior', name: `F${slot}` }), ...extra });
 const record = (folks, reserve = {}) => serializeRoot(folks, reserve);
@@ -215,4 +215,16 @@ test('a restore neither doubles nor loses what a tent depot holds', () => {
   const backup = { record: then, bank: { 'melvorD:Coal_Ore': 10 } };
   assert.deepEqual(B.takes(withDepots({}), backup, { 'melvorD:Coal_Ore': 50 }), [['melvorD:Coal_Ore', 40]]);
   assert.deepEqual(B.returns(withDepots({}), then).items, []);
+});
+
+test('a Master\'s path rides in the backup; a backup from before paths restores every Folk without one', async () => {
+  const master = { ...createFolk({ id: 'm', slot: 0, tier: 'Senior', name: 'Mira' }), path: 'Scholar' };
+  const b = sample({ record: record([master, folk('j', 1)]) });
+  const r = await B.decode(await B.encode(b, { zip: true }), SAVE_VERSION);
+  const back = parseRoot(r.backup.record).root.folks;
+  assert.deepEqual(back.map((f) => f.path), ['Scholar', null]);
+  const old = JSON.stringify({ ...JSON.parse(record([{ ...master }])), v: 11 });
+  const restored = parseRoot(old);
+  assert.deepEqual(restored.applied, [11]);
+  assert.equal(restored.root.folks[0].path, null);
 });

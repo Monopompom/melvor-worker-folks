@@ -26,6 +26,8 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
   let cairns = {};
 
   const emitChange = () => bus.emit('crewChanged', { folks: crew.all });
+  /** A path this Folk may hold at its tier (a Master or Foreman, a known id). */
+  const pathFits = (folk, path) => (folk.tier === 'Senior' || folk.tier === 'Expert') && (model.PATH_IDS ?? []).includes(path);
 
   const crew = {
     get all() {
@@ -202,6 +204,19 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
       emitChange();
       return null;
     },
+    /**
+     * Gives a Master or Foreman a path (round 6), or none with null. False for an unknown Folk, a Folk below Master or an
+     * unknown path; what it costs is the caller's (src/paths-model.mjs pickPlan).
+     */
+    setPath(id, path) {
+      const folk = this.byId(id);
+      if (folk === undefined || (path !== null && !pathFits(folk, path))) return false;
+      if (path === null && !(folk.tier === 'Senior' || folk.tier === 'Expert')) return false;
+      if (folk.path === path) return true;
+      folk.path = path;
+      emitChange();
+      return true;
+    },
     /** Keeps the face the player chose; null goes back to the one from its id. False for an unknown Folk or a bad look. */
     setLook(id, look) {
       const folk = this.byId(id);
@@ -213,12 +228,16 @@ export function createCrew({ bus, model, pickName, maxSlots, now = () => Date.no
       emitChange();
       return true;
     },
-    /** Raises a Folk one tier; everything else (skill, mastery slot, loadout) stays. `paid`: the fee, added to its cost. */
-    promote(id, toTier, { paid = 0 } = {}) {
+    /**
+     * Raises a Folk one tier; everything else (skill, mastery slot, loadout, its path) stays. `paid`: the fee, added to
+     * its cost. `path`: the path picked with the promotion to Master (round 6); one it may not hold is ignored.
+     */
+    promote(id, toTier, { paid = 0, path = null } = {}) {
       const folk = this.byId(id);
       if (folk === undefined) return false;
       const from = folk.tier;
       folk.tier = toTier;
+      if (pathFits(folk, path)) folk.path = path;
       if (paid > 0 && folk.paid !== null) folk.paid += paid;
       bus.emit('folkPromoted', { folk, from, to: toTier });
       emitChange();

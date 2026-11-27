@@ -5,7 +5,7 @@ import { NICK_MAX, cleanNick, createFolk, nickProblem, normalizeFolk, migrateRoo
 
 test('createFolk fills defaults and rejects bad input', () => {
   const f = createFolk({ id: 'a', slot: 0, tier: 'Newbie', name: 'Ada' });
-  assert.deepEqual(f, { id: 'a', slot: 0, tier: 'Newbie', name: 'Ada', skillId: null, job: null, jobMemory: {}, supplies: null, loadout: {}, debt: 0, debtCurrency: null, debtMs: 0, onStrike: false, cooldownTicks: 0, wageCarry: 0, overtime: false, strikes: 0, restartWhenReady: false, restartPick: null, hp: null, place: null, travel: 'idle', hiredAt: 0, traitState: { traits: [], waiting: [], counts: {} }, paid: null, room: { haul: {}, stock: {}, town: {}, purse: {} }, ownStock: false, restockAt: null, townsfolk: false, demand: [], moment: null, queue: [], pick: null });
+  assert.deepEqual(f, { id: 'a', slot: 0, tier: 'Newbie', name: 'Ada', skillId: null, job: null, jobMemory: {}, supplies: null, loadout: {}, debt: 0, debtCurrency: null, debtMs: 0, onStrike: false, cooldownTicks: 0, wageCarry: 0, overtime: false, strikes: 0, restartWhenReady: false, restartPick: null, hp: null, place: null, travel: 'idle', hiredAt: 0, traitState: { traits: [], waiting: [], counts: {} }, paid: null, room: { haul: {}, stock: {}, town: {}, purse: {} }, ownStock: false, restockAt: null, townsfolk: false, demand: [], moment: null, queue: [], pick: null, path: null });
   assert.equal(createFolk({ id: 'a', slot: 0, tier: 'Newbie', name: 'Ada', paid: 4200 }).paid, 4200);
   assert.throws(() => createFolk({ id: 'a', slot: -1, tier: 'Newbie', name: 'Ada' }));
   assert.throws(() => createFolk({ id: 'a', slot: 0, tier: 'Boss', name: 'Ada' }));
@@ -26,7 +26,7 @@ test('normalizeFolk repairs optional fields and rejects impossible records', () 
 test('migrateRoot upgrades a pre-version root (v0) to the current version', () => {
   const legacy = { folks: [{ id: 'a', slot: 0, tier: 'Junior', name: 'Cora' }] };
   const { root, applied } = migrateRoot(legacy);
-  assert.deepEqual(applied, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  assert.deepEqual(applied, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
   assert.equal(root.v, SAVE_VERSION);
   assert.equal(root.folks[0].strikes, 0);
   assert.equal(root.folks[0].cooldownTicks, 0);
@@ -107,20 +107,21 @@ test('serializeRoot / parseRoot round-trip preserves every field', () => {
 // A real save: slot 3 (FolksScanB) in the browser, Worker Folks 1.2.0, read from the game save on 20 Oct 2026.
 const realV3 = readFileSync(new URL('./fixtures/save-v3-folksscanb.json', import.meta.url), 'utf8').trim();
 
-test('a real v3 save migrates to v11: every Folk kept as it was, with no place, not travelling, no traits, no known cost, an empty room, no job and no moment, queue or pick', () => {
+test('a real v3 save migrates to v12: every Folk kept as it was, with no place, not travelling, no traits, no known cost, an empty room, no job, no moment, queue or pick and no path', () => {
   const before = JSON.parse(realV3);
   const r = parseRoot(realV3);
-  assert.deepEqual(r.applied, [3, 4, 5, 6, 7, 8, 9, 10]);
+  assert.deepEqual(r.applied, [3, 4, 5, 6, 7, 8, 9, 10, 11]);
   assert.equal(r.corrupt, false);
   assert.equal(r.dropped, 0);
-  assert.equal(r.root.v, 11);
+  assert.equal(r.root.v, 12);
   assert.deepEqual(r.root.moments, { gapMs: null, warned: false });
   assert.deepEqual(r.root.plans, []);
   assert.deepEqual(r.root.cairns, {});
   assert.equal(r.root.commissions, null);
   assert.equal(r.root.folks.length, before.folks.length);
   r.root.folks.forEach((folk, i) => {
-    const { place, travel, traitState, paid, room, ownStock, restockAt, townsfolk, restartPick, demand, job, jobMemory, supplies, moment, queue, pick, ...rest } = folk;
+    const { place, travel, traitState, paid, room, ownStock, restockAt, townsfolk, restartPick, demand, job, jobMemory, supplies, moment, queue, pick, path, ...rest } = folk;
+    assert.equal(path, null);
     assert.equal(moment, null);
     assert.deepEqual(queue, []);
     assert.equal(pick, null);
@@ -193,7 +194,7 @@ test('normalizeLost keeps whole stacks of frozen slots only', () => {
 test('v7 → v8 keeps each room as it was, adds an empty town side and no commissions yet', () => {
   const v7 = { v: 7, folks: [{ id: 'a', slot: 0, tier: 'Middle', name: 'Ada', room: { haul: { x: { qty: 2, ms: 10 } }, stock: {} } }], board: null };
   const { root, applied } = migrateRoot(v7);
-  assert.deepEqual(applied, [7, 8, 9, 10]);
+  assert.deepEqual(applied, [7, 8, 9, 10, 11]);
   assert.deepEqual(root.folks[0].room, { haul: { x: { qty: 2, ms: 10 } }, stock: {}, town: {}, purse: {} });
   assert.equal(root.commissions, null);
 });
@@ -201,8 +202,8 @@ test('v7 → v8 keeps each room as it was, adds an empty town side and no commis
 test('v8 → v9 keeps each room as it was, adds an empty purse and auto-restock off', () => {
   const v8 = { v: 8, folks: [{ id: 'a', slot: 0, tier: 'Middle', name: 'Ada', ownStock: true, room: { haul: {}, stock: { c: { qty: 9, ms: 30 } }, town: { t: { qty: 1, ms: 5 } } } }], board: null, commissions: null };
   const { root, applied } = migrateRoot(v8);
-  assert.deepEqual(applied, [8, 9, 10]);
-  assert.equal(root.v, 11);
+  assert.deepEqual(applied, [8, 9, 10, 11]);
+  assert.equal(root.v, 12);
   assert.deepEqual(root.folks[0].room, { haul: {}, stock: { c: { qty: 9, ms: 30 } }, town: { t: { qty: 1, ms: 5 } }, purse: {} });
   assert.equal(root.folks[0].restockAt, null);
   assert.equal(root.folks[0].ownStock, true);
@@ -211,8 +212,8 @@ test('v8 → v9 keeps each room as it was, adds an empty purse and auto-restock 
 test('v9 → v10 gives every Folk no job and an empty job memory, the rest as it was', () => {
   const v9 = { v: 9, folks: [{ id: 'a', slot: 0, tier: 'Middle', name: 'Ada', skillId: 'melvorD:Mining', restockAt: 2 }], board: null, commissions: null };
   const { root, applied } = migrateRoot(v9);
-  assert.deepEqual(applied, [9, 10]);
-  assert.equal(root.v, 11);
+  assert.deepEqual(applied, [9, 10, 11]);
+  assert.equal(root.v, 12);
   assert.equal(root.folks[0].job, null);
   assert.deepEqual(root.folks[0].jobMemory, {});
   assert.equal(root.folks[0].skillId, 'melvorD:Mining');
@@ -280,8 +281,8 @@ test('a nickname can not be a reserved word or stack marks on one letter', () =>
 test('v10 → v11 gives every Folk no moment, queue or pick, and the root a fresh moment clock, no plans and no cairns', () => {
   const v10 = { v: 10, folks: [{ id: 'a', slot: 0, tier: 'Middle', name: 'Ada', skillId: 'melvorD:Smithing', job: null, jobMemory: {}, supplies: null }], board: null, commissions: null, depots: {} };
   const { root, applied } = migrateRoot(v10);
-  assert.deepEqual(applied, [10]);
-  assert.equal(root.v, 11);
+  assert.deepEqual(applied, [10, 11]);
+  assert.equal(root.v, 12);
   assert.equal(root.folks[0].moment, null);
   assert.deepEqual(root.folks[0].queue, []);
   assert.equal(root.folks[0].pick, null);
@@ -313,4 +314,27 @@ test('cairns are kept only for frozen slots, plans only up to five, the moment c
   assert.deepEqual(r.root.plans[0], { id: 'p' });
   assert.deepEqual(r.root.moments, { gapMs: null, warned: false });
   assert.deepEqual(parseRoot({ v: 11, folks: [], moments: { gapMs: 7200000.5, warned: true } }).root.moments, { gapMs: 7200000, warned: true });
+});
+
+test('v11 → v12 gives every Folk no path, the rest as it was', () => {
+  const v11 = { v: 11, folks: [{ id: 'a', slot: 0, tier: 'Senior', name: 'Ada', skillId: 'melvorD:Smithing', moment: null, queue: [], pick: null }], board: null, commissions: null, depots: {}, moments: { gapMs: null, warned: false }, plans: [], cairns: {} };
+  const { root, applied } = migrateRoot(v11);
+  assert.deepEqual(applied, [11]);
+  assert.equal(root.v, 12);
+  assert.equal(root.folks[0].path, null);
+  assert.equal(root.folks[0].skillId, 'melvorD:Smithing');
+});
+
+test('a path survives a reload at Master and Foreman; below Master or unknown it is dropped', () => {
+  const base = { id: 'x', slot: 0, name: 'Bram', skillId: 'melvorD:Smithing' };
+  assert.equal(normalizeFolk({ ...base, tier: 'Senior', path: 'Hustler' }).path, 'Hustler');
+  assert.equal(normalizeFolk({ ...base, tier: 'Expert', path: 'Scholar' }).path, 'Scholar');
+  assert.equal(normalizeFolk({ ...base, tier: 'Middle', path: 'Hustler' }).path, null);
+  assert.equal(normalizeFolk({ ...base, tier: 'Senior', path: 'Craftsman' }).path, null);
+  assert.equal(normalizeFolk({ ...base, tier: 'Senior' }).path, null);
+  assert.equal(createFolk({ id: 'n', slot: 1, tier: 'Expert', name: 'New' }).path, null);
+  const f = normalizeFolk({ ...base, tier: 'Expert', path: 'Steady' });
+  const again = parseRoot(serializeRoot([f], undefined, {}, null, {}, null, {}, undefined, [], {}));
+  assert.deepEqual(again.applied, []);
+  assert.equal(again.root.folks[0].path, 'Steady');
 });

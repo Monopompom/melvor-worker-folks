@@ -86,7 +86,7 @@ export function install(ctx, { getHiring, rate, createTablePool, isDisabled = ()
 
   const sourceFor = (folk) => hiring.sortedMasteryActions[folk.slot] ?? hiring;
 
-  /** The Folk's own part of its table, as modifier data: tier, perks, traits, crew bonus, the Steward. */
+  /** The Folk's own part of its table, as modifier data: tier, perks, traits, its path, crew bonus, the Steward. */
   const ownData = (folk, skill) => {
     const tier = rate.tierModifiers(folk.tier, { preservationDisabled: !!game.currentGamemode.disablePreservation });
     const perk = hiring.perksOf?.(folk) ?? { skillXP: 0, intervalPercent: 0 };
@@ -96,8 +96,10 @@ export function install(ctx, { getHiring, rate, createTablePool, isDisabled = ()
     const trait = hiring.heirlooms?.addTo(folk, traits) ?? traits;
     // The Steward (worn by the player, src/steward.mjs) gives every Folk a share more skill XP.
     const stewardXP = hiring.playerModifier?.('folkSkillXP') ?? 0;
-    const bonusXP = tier.skillXP + rate.crewBonus(workingExperts(folk), hiring.levels?.crewBonusMax()) + perk.skillXP + trait.xp + stewardXP;
-    const interval = tier.skillInterval + perk.intervalPercent + trait.interval;
+    // Its path (round 6): Steady's slower actions, Scholar's XP.
+    const path = hiring.pathEffects?.(folk) ?? { interval: 0, xp: 0 };
+    const bonusXP = tier.skillXP + rate.crewBonus(workingExperts(folk), hiring.levels?.crewBonusMax()) + perk.skillXP + trait.xp + stewardXP + path.xp;
+    const interval = tier.skillInterval + perk.intervalPercent + trait.interval + path.interval;
     const preservation = tier.skillPreservationChance + trait.preservation;
     const data = {};
     if (interval !== 0) data.skillInterval = [{ skillID: skill.id, value: interval }];

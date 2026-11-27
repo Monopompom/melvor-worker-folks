@@ -307,6 +307,30 @@ function fillCard(col, folk, view) {
     }
     el.classList.toggle('d-none', icons.length === 0);
   });
+  set('path', (el) => {
+    const path = view.path?.(folk) ?? null;
+    el.classList.toggle('d-none', path === null);
+    if (path === null) return;
+    const key = JSON.stringify([path.pick, path.media, path.text]);
+    if (el.dataset.wfKey !== key) {
+      el.dataset.wfKey = key;
+      const label = document.createElement('span');
+      label.textContent = path.text;
+      if (path.media === null) {
+        el.replaceChildren(label);
+      } else {
+        const img = document.createElement('img');
+        img.className = 'wf-path-icon';
+        img.src = path.media;
+        img.alt = '';
+        el.replaceChildren(img, label);
+      }
+      el.className = `btn btn-sm wf-path-chip ${path.pick ? 'btn-outline-warning' : 'btn-outline-info'}`;
+    }
+    view.tip(el, path.tip);
+    el.disabled = (path.refused ?? '') !== '';
+    el.onclick = () => view.onPath(folk);
+  });
   set('skill', (el) => {
     const media = view.skillMedia(folk);
     const text = folk.skillId === null && folk.job === null ? (view.unassignedText?.() ?? '') : view.assignmentText(folk);
