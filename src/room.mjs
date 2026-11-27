@@ -364,6 +364,25 @@ export function install(ctx, { getHiring, model, depotModel, resume, time, tips,
     return Object.freeze({ items: Object.freeze(items), left: Object.freeze(left), purse: Object.freeze(purse) });
   };
 
+  /**
+   * A Folk put on another skill: stock its new recipe (and queue) can't use goes to your bank, own-stock switch on or
+   * off, so the old skill's goods neither fill the room nor count as hours that keep Restock and auto-restock waiting
+   * (build .337). Only where the bank is in reach: on the haul the other mod's rules decide when goods move. A
+   * carrier's stock is cargo and stays; what the bank can't take stays too.
+   */
+  const stockHomeOnMove = (folk) => {
+    if (folk?.room === undefined || isCarrier(folk) || onHaul(folk) || model.isEmpty(folk.room, 'stock')) return;
+    const recipe = [...inputsOf(folk).perAction.map(({ id }) => id), ...(hiring.queue?.inputIds(folk) ?? [])];
+    const spare = model.leftoverIds(folk.room, recipe);
+    if (spare.length === 0) return;
+    const items = moveSide(folk, 'stock', spare, []);
+    if (items.length === 0) return;
+    log(`room: ${folk.name} changed skill, ${items.length} kind(s) of old stock went to the bank`);
+    afterOut(folk);
+    hiring.markCard(folk);
+    emitChanged(folk);
+  };
+
   /** A Folk leaves the crew: its room goes to the bank as far as it has space; returns what was lost. */
   const leave = (folk) => {
     if (folk?.room !== undefined) purseHome(folk);
@@ -1194,7 +1213,11 @@ export function install(ctx, { getHiring, model, depotModel, resume, time, tips,
       dry.delete(folk.id);
       dryAtLoad.delete(folk.id);
     });
-    hiring.events.on('folkAssigned', ({ folk } = {}) => { if (folk !== undefined) dryAtLoad.delete(folk.id); });
+    hiring.events.on('folkAssigned', ({ folk, previous, skillId } = {}) => {
+      if (folk === undefined) return;
+      dryAtLoad.delete(folk.id);
+      if (skillId != null && previous !== skillId) stockHomeOnMove(folk);
+    });
     // A Folk that moved may now stand by a bank, or away from one: ask the haul's hook again.
     hiring.events.on('folkMoved', ({ folk } = {}) => { if (folk !== undefined) refreshAccess(folk); });
     // A bag put on or taken off changes the room's size.

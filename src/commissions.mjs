@@ -1207,6 +1207,7 @@ export function install(ctx, { swalClass, getHiring, model, stories = [], resume
       delete state.runs[folk.id];
       due.delete(folk.id);
       fullDue.delete(folk.id);
+      servedKept.delete(folk.id);
       state.commissions.forEach((c) => { if (c.folkId === folk.id) c.folkId = null; });
       markDirty();
     });

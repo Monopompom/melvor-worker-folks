@@ -450,6 +450,9 @@ export function install(ctx, { getHiring, wages, pricing, milestones, resume, lo
    */
   const selfSettle = (folk) => {
     if (!folk.onStrike || !hiring.autoSettle?.() || !api.canSettle(folk)) return false;
+    // Another mod's refusal (Voyage: the Folk is away) holds the self-settle too, as it greys the Settle buttons;
+    // the next tick tries again, so the strike settles once the refusal lifts (build .337).
+    if (hiring.refusal('staff', { action: 'settle', folk }) !== '') return false;
     // With strike demands the bank's items go too: the notice (and Welcome Back) says which.
     const items = api.demandsOn ? hiring.demands.itemsText(folk) : '';
     if (!api.settle(folk)) return false;

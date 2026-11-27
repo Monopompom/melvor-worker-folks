@@ -365,6 +365,10 @@ export function createHiringClass({ swalClass, popupDidRender, titleName = (s) =
       const tip = [getLangString('MOD_WF_CTRL_NET_TIP'), templateLangString('MOD_WF_CTRL_NET_MAKES', { amount: full(p.makes), currency })];
       if (p.spends > 0) tip.push(templateLangString('MOD_WF_CTRL_NET_INPUTS', { amount: full(-p.spends), currency }));
       if (p.wageCounted && p.wage > 0) tip.push(templateLangString('MOD_WF_CTRL_NET_WAGE', { amount: full(-p.wage), currency }));
+      if (p.otherWage != null && p.otherWage.perHour > 0) {
+        const other = this.game.currencies.getObjectByID(p.otherWage.currencyId);
+        tip.push(templateLangString('MOD_WF_CTRL_NET_WAGE_APART', { amount: full(-p.otherWage.perHour), currency: other?.name ?? p.otherWage.currencyId }));
+      }
       if (p.courier > 0) tip.push(templateLangString('MOD_WF_CTRL_NET_COURIER', { amount: full(-p.courier), currency }));
       // The path is already in these sums (its Produce Rate, action time and wage); named so a change is explained.
       if (paths.isPath(folk.path) && paths.holdsPath(folk.tier) && this.paths !== undefined) {

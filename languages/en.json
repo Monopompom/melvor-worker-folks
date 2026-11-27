@@ -1424,5 +1424,6 @@
   "MOD_WF_PATH_TAKEN": "${name} now follows the ${path} path.",
   "MOD_WF_TIP_13_HEAD": "Paths",
   "MOD_WF_TIP_13": "A Folk promoted to Master picks a path: Hustler (a higher Produce Rate, a dearer wage), Steady (a cheaper wage, slower actions) or Scholar (more XP and mastery XP, a lower Produce Rate). As Foreman it keeps the path, stronger. Change it from the path on its card, for the tier’s diploma and a quarter of the tier’s next hire price.",
-  "MOD_WF_CTRL_NET_PATH": "Counts its path: ${path}"
+  "MOD_WF_CTRL_NET_PATH": "Counts its path: ${path}",
+  "MOD_WF_CTRL_NET_WAGE_APART": "Wage ${amount} ${currency}/h, not counted in the net"
 }

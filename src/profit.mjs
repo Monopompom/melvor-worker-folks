@@ -231,7 +231,10 @@ export function install(ctx, { getHiring, model, rate, log }) {
     // Thieving: the Folk's own roll, then the NPC's (src/produce-rate.mjs folkSuccessRate). Cooking: a burn gives nothing.
     const success = chance * (read.npcRate === undefined ? 1 : pctOf(read.npcRate)) * (read.cookChance ?? 1);
     const payroll = hiring.payroll;
-    const wageCounted = payroll !== undefined && payroll.enabled && payroll.currencyIdFor(skill) === GP_ID;
+    const wageCurrencyId = payroll !== undefined && payroll.enabled ? payroll.currencyIdFor(skill) : null;
+    const wageCounted = wageCurrencyId === GP_ID;
+    // A wage in another currency (AP, abyssal work) can't go into a GP sum: the tooltip names it apart (build .338).
+    const otherWage = wageCurrencyId !== null && !wageCounted ? { currencyId: wageCurrencyId, perHour: payroll.hourlyWageOf(folk) } : null;
     const result = model.netPerHour({
       intervalMs: read.intervalMs,
       outputs: read.outputs,
@@ -243,7 +246,7 @@ export function install(ctx, { getHiring, model, rate, log }) {
       wagePerHour: wageCounted ? payroll.hourlyWageOf(folk) : 0,
       courierPerHour: courierCost(folk),
     });
-    return result === null ? null : { ...result, wageCounted };
+    return result === null ? null : { ...result, wageCounted, otherWage };
   };
 
   ctx.onModsLoaded(() => {

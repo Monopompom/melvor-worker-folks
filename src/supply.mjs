@@ -271,7 +271,8 @@ export function install(ctx, { getHiring, model, log }) {
     });
     // A new skill makes other things.
     hiring.events.on('folkAssigned', ({ folk }) => { madeBy.delete(folk.id); inputsCache.delete(folk.id); });
-    hiring.events.on('folkFired', ({ folk }) => { madeBy.delete(folk.id); inputsCache.delete(folk.id); });
+    // A fired Folk's lines go with it, and so do the kept answers about them.
+    hiring.events.on('folkFired', ({ folk }) => { madeBy.delete(folk.id); inputsCache.delete(folk.id); api.refreshLinks(folk); });
     hiring.events.on('folkSupplyChanged', () => { hiring.renderQueue.folks = true; });
     hiring.events.on('folkMoved', ({ folk } = {}) => { if (folk !== undefined) api.refreshLinks(folk); });
   });

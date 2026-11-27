@@ -533,10 +533,10 @@ test('api v10: mastery in the view, qualifies, and the haul calls go to the room
   assert.deepEqual(calls.at(-1), ['refresh', undefined], 'removing the hook asks every Folk again');
 });
 
-test('api v13: version is still a plain property, now 13', () => {
+test('api v14: version is still a plain property, now 14', () => {
   const { hiring } = makeHiring();
   const api = createApi({ getHiring: () => hiring, model });
-  assert.equal(API_VERSION, 13);
+  assert.equal(API_VERSION, 14);
   assert.equal(typeof api.version, 'number');
   assert.ok(api.version >= 12, 'what released Voyage reads');
 });
@@ -614,4 +614,27 @@ test('api v13: a registered moment sees Folk views; a bad one throws; awayQueue 
   await new Promise((r) => { setTimeout(r, 900); });
   assert.deepEqual(opened, ['fold', 'x']);
   assert.deepEqual(moments.awayIds, []);
+});
+
+test('api v14: canAssign says why assign would refuse, without assigning', () => {
+  const { hiring } = makeHiring();
+  const mining = { id: 'melvorD:Mining', name: 'Mining' };
+  const fishing = { id: 'melvorD:Fishing', name: 'Fishing' };
+  hiring.delegableSkills = [mining, fishing];
+  const asked = [];
+  hiring.refusal = (kind, request) => { asked.push([kind, request.action, request.skillId]); return request.skillId === 'melvorD:Fishing' ? 'Not by the sea.' : ''; };
+  const folk = hiring.crew.hire('Junior');
+  const api = createApi({ getHiring: () => hiring, model });
+  assert.ok(api.version >= 14);
+  assert.deepEqual(api.canAssign(folk.id, 'melvorD:Mining'), { ok: true, why: null, reason: '' });
+  assert.deepEqual(api.canAssign(folk.id, 'melvorD:Fishing'), { ok: false, why: 'refused', reason: 'Not by the sea.' });
+  assert.deepEqual(asked, [['staff', 'assign', 'melvorD:Mining'], ['staff', 'assign', 'melvorD:Fishing']], 'the Worker box\'s own question');
+  assert.equal(folk.skillId, null, 'nothing assigned');
+  assert.deepEqual(api.canAssign(folk.id, 'melvorD:Nope'), { ok: false, why: 'skill', reason: '' });
+  assert.deepEqual(api.canAssign('nobody', 'melvorD:Mining'), { ok: false, why: 'folk', reason: '' });
+  assert.equal(api.canAssign(folk.id, null).ok, true, 'taking a skill away');
+  hiring.crew.assign(folk.id, 'melvorD:Fishing');
+  assert.equal(api.canAssign(folk.id, 'melvorD:Fishing').ok, true, 'the skill it already has is not asked again');
+  assert.equal(asked.length, 2);
+  assert.ok(Object.isFrozen(api.canAssign(folk.id, 'melvorD:Mining')));
 });

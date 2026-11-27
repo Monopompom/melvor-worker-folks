@@ -10,14 +10,15 @@ function world() {
   globalThis.getLangString = (key) => (key === 'MOD_WF_LIST_SEP' ? ', ' : key);
   globalThis.templateLangString = (key, vars) => `${key}${vars === undefined ? '' : `:${Object.values(vars).join('|')}`}`;
   globalThis.Game = class {};
-  globalThis.game = { _isInOnlineLoop: true, notifications: { createErrorNotification: (id, text) => notices.push(text) } };
+  globalThis.game = { _isInOnlineLoop: true, notifications: { createErrorNotification: (id, text) => notices.push(text), createSuccessNotification: (id, text) => notices.push(text) } };
   const settings = { wageDifficulty: wages.DEFAULT_WAGE_PRESET, generalStrike: true };
   const ctx = {
     settings: { section: () => ({ add: () => {}, get: (name) => settings[name] }) },
     onModsLoaded: (fn) => fn(),
     onCharacterLoaded: () => {},
-    patch: () => ({ after: () => {} }),
+    patch: (_cls, name) => ({ after: (fn) => { if (name === 'tick') tick = fn; } }),
   };
+  let tick = () => {};
   const folks = [];
   const running = new Set();
   const events = [];
@@ -36,6 +37,7 @@ function world() {
     cooldownFactor: () => 1,
     getMediaURL: (p) => p,
     events: { emit: (name, payload) => events.push([name, payload]) },
+    portraitOf: () => '',
   };
   install(ctx, { getHiring: () => hiring, wages, pricing: {}, milestones: {}, resume, log: () => {} });
   const folk = (id, more = {}) => {
@@ -45,7 +47,7 @@ function world() {
     return f;
   };
   const strike = (f) => { f.onStrike = true; running.delete(f.id); };
-  return { payroll: hiring.payroll, folk, strike, notices, events, left, running, settings, setAutoRestart: (v) => { autoRestart = v; } };
+  return { hiring, payroll: hiring.payroll, folk, strike, notices, events, left, running, settings, tick: () => tick(), setAutoRestart: (v) => { autoRestart = v; } };
 }
 
 let w;
@@ -104,4 +106,22 @@ test('a break: stopped unpaid for its time, back to work after from Hiring 55; n
   const s = w.folk('s');
   w.strike(s);
   assert.equal(w.payroll.breakFor(s, 1000), false);
+});
+
+test('a self-settle waits while another mod refuses the settle (the Folk is away), then goes through', () => {
+  const a = w.folk('a');
+  w.strike(a);
+  let away = true;
+  const asked = [];
+  w.hiring.autoSettle = () => true;
+  w.hiring.refusal = (kind, request) => { asked.push([kind, request.action, request.folk.id]); return away ? 'Away at sea.' : ''; };
+  w.payroll.canSettle = () => true;
+  w.payroll.settle = (f) => { f.onStrike = false; return true; };
+  w.tick();
+  assert.equal(a.onStrike, true, 'refused: still on strike');
+  assert.deepEqual(asked, [['staff', 'settle', 'a']], 'asked as the Settle buttons ask');
+  away = false;
+  w.tick();
+  assert.equal(a.onStrike, false, 'the refusal lifted: settled on the next tick');
+  assert.deepEqual(w.notices, ['MOD_WF_AUTO_SETTLED:a']);
 });

@@ -127,6 +127,14 @@ export function install(ctx, { getHiring, pricing, licencePurchase, hirePurchase
     return hirePriceForQuantity(tier, hiring.crew.countByTier(tier), buyQuantity);
   });
 
+  // The game's buy dialog draws its costs first with no decimals (a 1.44M hire read "1M") and with two only when the
+  // costs change; one redraw right after it opens gives this mod's purchases the shop tiles' figure (build .338).
+  const ours = (purchase) => purchase?.costs?.currencies?.some((c) => hireCostTier.has(c) || licenceCost.has(c) || shiftSlotCost.has(c)) === true;
+  ctx.patch(ShopMenu, 'showConfirmBuyPrompt').after(function (_result, purchase) {
+    if (hiring === undefined || !ours(purchase)) return;
+    try { this.confirmBuyItem?.updateCostElements(); } catch (err) { console.error('[Worker Folks] buy dialog costs not redrawn', err); }
+  });
+
   return {
     /** Run after the shop package is registered and before the shop menu is built. */
     afterShopData() {

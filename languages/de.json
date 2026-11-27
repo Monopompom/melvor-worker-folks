@@ -1424,5 +1424,6 @@
   "MOD_WF_PATH_TAKEN": "${name} folgt jetzt dem Pfad ${path}.",
   "MOD_WF_TIP_13_HEAD": "Pfade",
   "MOD_WF_TIP_13": "Ein zum Meister beförderter Helfer wählt einen Pfad: Macher (höhere Produktionsrate, teurerer Lohn), Bedächtiger (billigerer Lohn, langsamere Aktionen) oder Gelehrter (mehr EP und Meisterungs-EP, niedrigere Produktionsrate). Als Vorarbeiter behält er den Pfad, stärker. Wechseln kannst du ihn über den Pfad auf seiner Karte, für das Diplom des Rangs und ein Viertel des nächsten Einstellungspreises dieses Rangs.",
-  "MOD_WF_CTRL_NET_PATH": "Mit seinem Pfad gerechnet: ${path}"
+  "MOD_WF_CTRL_NET_PATH": "Mit seinem Pfad gerechnet: ${path}",
+  "MOD_WF_CTRL_NET_WAGE_APART": "Lohn ${amount} ${currency}/h, nicht im Netto gerechnet"
 }

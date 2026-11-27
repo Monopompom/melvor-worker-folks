@@ -3,9 +3,11 @@
 // Pure: the Hiring skill and the Folk model are injected (mod modules cannot import their siblings).
 
 /** Bumped when something here changes in a way a caller must know about. Voyage refuses an older one. */
-export const API_VERSION = 13;
+export const API_VERSION = 14;
 /** The least of the hire price an outside hire pays (v7): a bargain, never a free Folk. */
 export const HIRE_SHARE_MIN = 0.25;
+/** canAssign's answer when nothing stands in the way. */
+const ASSIGN_OK = Object.freeze({ ok: true, why: null, reason: '' });
 
 const byTier = (o) => Object.freeze(Object.values(o ?? {}));
 /** The per-tier numbers (build .147): first hire price, wage an hour at mastery 99 (Standard), produce rate, Hiring XP
@@ -237,6 +239,21 @@ export function createApi({ getHiring, model, pricing, rules, getBackup, version
       const skill = skillById(skillId);
       if (skill === undefined) return false;
       return hiring().setWorker(skill, id) !== false;
+    },
+    /**
+     * Whether `assign(id, skillId)` would go through, without doing it (v14): { ok, why, reason }. `why` is null when
+     * it would, else 'folk' (no such Folk, or a dead one's slot), 'skill' (not one a Folk can take) or 'refused' (this
+     * mod's rules or another mod's guard), and then `reason` is the line the player would see. Taking a skill away
+     * (null) or the skill it already has is always ok for a known Folk. assign itself still answers only true / false.
+     */
+    canAssign: (id, skillId) => {
+      const folk = record(id);
+      if (folk === undefined) return Object.freeze({ ok: false, why: 'folk', reason: '' });
+      if (skillId === null || folk.skillId === skillId) return ASSIGN_OK;
+      const skill = skillById(skillId);
+      if (skill === undefined) return Object.freeze({ ok: false, why: 'skill', reason: '' });
+      const reason = hiring().refusal('staff', { action: 'assign', folk, skillId, skill });
+      return reason === '' ? ASSIGN_OK : Object.freeze({ ok: false, why: 'refused', reason });
     },
     /**
      * Hurts a Folk by `amount` HP; it can't eat against it, and it dies at zero as from any other harm. `cause` names
